@@ -8,7 +8,6 @@ import { Api, qk } from "@/lib/api";
 import { usePlans } from "@/lib/plans";
 import { routes } from "@/lib/routes";
 import { PlotCanvas } from "@/components/stage/PlotCanvas";
-import { Skeleton } from "@/components/ui";
 
 export default function StagePlotsPage() {
   const qc = useQueryClient();
@@ -33,11 +32,17 @@ export default function StagePlotsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Stage plots</h1>
           <p className="mt-1 text-sm text-ink-muted">Build plots on a blank stage or on top of a PDF. Link items to mics or positions and each Sunday’s plot fills in who’s where.</p>
         </div>
-        <button className="btn-primary" onClick={() => create.mutate({ name: "New stage plot" })}><Plus size={15} /> New stage plot</button>
+        <button className="btn-primary" disabled={create.isPending} onClick={() => create.mutate({ name: "New stage plot" })}><Plus size={15} /> New stage plot</button>
       </div>
       <div className="mt-6 grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
-        {plots.isLoading && [0, 1].map((i) => <Skeleton key={i} className="h-56" />)}
-        {plots.data?.length === 0 && <div className="text-sm text-ink-muted">No stage plots yet.</div>}
+        {/* A plain line while loading, not grey boxes that look like empty plots. */}
+        {plots.isLoading && <div className="text-sm text-ink-muted">Loading stage plots…</div>}
+        {plots.error && <div className="text-sm text-bad">Couldn’t load stage plots: {(plots.error as Error).message}</div>}
+        {plots.data?.length === 0 && (
+          <div className="col-span-full rounded-xl border border-dashed border-line p-8 text-center text-sm text-ink-muted">
+            No stage plots yet. Click <b>New stage plot</b> to make one.
+          </div>
+        )}
         {plots.data?.sort((a, b) => a.name.localeCompare(b.name)).map((p) => (
           <div key={p.id} className="panel group overflow-hidden">
             <Link href={routes.stagePlot(p.id)} className="block p-3 pb-0">

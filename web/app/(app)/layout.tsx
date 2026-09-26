@@ -2,7 +2,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import clsx from "clsx";
-import { BellRing, CalendarDays, MessageCircle, KanbanSquare, LayoutTemplate, LogOut, Settings } from "lucide-react";
+import { BellRing, CalendarDays, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, LayoutTemplate, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -31,9 +31,11 @@ function Shell({ children }: { children: React.ReactNode }) {
   const version = useQuery({ queryKey: ["version"], queryFn: Api.version, staleTime: Infinity }).data;
 
   const nav = [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/workflows", label: "Workflows", icon: KanbanSquare },
     { href: "/services", label: "Services", icon: CalendarDays },
     { href: "/stage-plots", label: "Stage plots", icon: LayoutTemplate },
+    { href: "/propresenter", label: "ProPresenter", icon: MonitorUp },
     { href: "/chat", label: "Chat", icon: MessageCircle },
     { href: "/paging", label: "Parent paging", icon: BellRing },
   ];
@@ -65,7 +67,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <StagePlotsNav activeId={search.get("id")} />
         ) : path.startsWith("/paging") ? (
           <PagingNav />
-        ) : path.startsWith("/chat") ? (
+        ) : path.startsWith("/chat") || path.startsWith("/propresenter") || path.startsWith("/dashboard") ? (
           <div className="flex-1" />
         ) : path.startsWith("/settings") ? (
           <SettingsNav />
@@ -239,7 +241,7 @@ function PagingNav() {
 function SettingsNav() {
   const sections: [string, string][] = [
     ["appearance", "Appearance"], ["logo", "Logo"], ["start", "When Cool Services opens"], ["updates", "Updates"], ["ndi", "Stage plot over NDI"],
-    ["waves", "Waves SuperRack"], ["paging", "ProPresenter & paging"], ["ipads", "Kids & Nursery iPads"],
+    ["waves", "Waves SuperRack"], ["smaart", "Smaart (SPL)"], ["paging", "ProPresenter & paging"], ["ipads", "Kids & Nursery iPads"], ["pro-computers", "ProPresenter computers"],
   ];
   return (
     <>

@@ -186,6 +186,27 @@ updater registers with the server (`/api/updates`) so Settings can drive it; the
 re-signed with a self-made certificate (`build/after-sign.cjs`) so the Keychain ACL for safeStorage
 survives updates.
 
+## 5k. Run sheet editing, Live, compare
+
+Edits go through PcoApi (createItem/updateItem/deleteItem/reorderItems via `item_reorder`,
+saveItemNote/deleteItemNote with item note categories, song catalog `songs` + `arrangements?include=keys`)
+and return the fresh item list. Live control posts `live/go_to_next_item | go_to_previous_item |
+toggle_control`; "you control" = the Live controller is the signed-in person. Actual times come from
+`items?include=item_times` (each ItemTime names its plan_time) and are compared per item
+(`web/lib/runsheet.ts`), matching another plan's items by title. Operator views are stored in the
+data file (`runSheetViews`).
+
+## 5l. Dashboard, ProPresenter control, NDI previews, Smaart
+
+`/api/pro` aggregates a ProPresenter computer's state (active presentation with slides, slide index,
+current/next text, timers with their durations, stage message/screens/layouts, clear groups, looks)
+and performs actions; slide thumbnails are proxied and cached. NDI previews: the Mac app finds NDI
+sources and receives one at low bandwidth only while the dashboard asks for frames
+(`/api/desktop/ndi/frame`, polled), converting BGRA frames to JPEG with nativeImage. Smaart: a
+WebSocket client to `ws://host:26000/api/v3/` (password when asked) that polls likely meter targets
+and keeps any SPL-looking numbers (LAeq, LASlow, LCeq…). Dashboard layout and these settings live in
+the data file (`extras`).
+
 ## 5e. Settings
 
 Theme (dark / light / system), logo (a data URL) and start-up view live in the data file.

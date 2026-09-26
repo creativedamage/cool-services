@@ -3,7 +3,7 @@
  * Endpoint notes live in docs/ARCHITECTURE.md §3.
  */
 import type {
-  Board, Candidate, CheckInLocation, Matrix, RunSheetData, RunSheetLive, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanItem, PlanSummary, PlanTime, Person,
+  Board, Candidate, CheckInLocation, ItemInput, ItemTimes, Matrix, NoteCategory, RunSheetData, RunSheetLive, SongArrangement, SongHit, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanItem, PlanSummary, PlanTime, Person,
   RosterStatus, ScheduleRequest, ServiceType, StaffMe, Team, TeamMember, WorkflowCard, WorkflowSummary,
 } from "../../../shared/types.js";
 import { cache } from "../lib/db.js";
@@ -30,7 +30,7 @@ export class LivePco implements PcoApi {
    * @param actingPersonId In shared-token (PAT) mode, the signed-in staff member — so "me"
    *   is them, not the token's owner.
    */
-  constructor(private c: PcoClient, private orgKey: string, private actingPersonId?: string) {}
+  constructor(private c: PcoClient, private orgKey: string, private actingPersonId?: string, private viewerId?: string) {}
 
   /** Cache keys are scoped per org so multiple churches could share one deployment. */
   private k(key: string) {
@@ -311,13 +311,134 @@ export class LivePco implements PcoApi {
     const ctrl = ref("controller");
     const controller = ctrl ? (inc.get(`${ctrl.type}:${ctrl.id}`)?.attributes as { full_name?: string; name?: string } | undefined) : undefined;
     const currentItemId = itemOf(cur);
-    if (!currentItemId && !ctrl) return null;
+    const a = (live.attributes ?? {}) as { can_control?: boolean; can_take_control?: boolean };
+    if (!currentItemId && !ctrl) return { currentItemId: null, nextItemId: null, currentStartedAt: null, controller: null, youControl: false, canTakeControl: Boolean(a.can_take_control ?? a.can_control) };
     return {
       currentItemId,
       nextItemId: itemOf(itemTime("next_item_time")),
       currentStartedAt: ((cur?.attributes as { live_start_at?: string } | undefined)?.live_start_at) ?? null,
       controller: controller?.full_name ?? controller?.name ?? null,
+      // You're driving Live when you're the controller.
+      youControl: this.viewerId && ctrl ? ctrl.id === this.viewerId : Boolean(a.can_control) && Boolean(ctrl),
+      canTakeControl: Boolean(a.can_take_control ?? a.can_control),
     };
+  }
+
+  async liveControl(st: string, planId: string, action: "next" | "previous" | "take_control"): Promise<RunSheetLive | null> {
+    const path = { next: "go_to_next_item", previous: "go_to_previous_item", take_control: "toggle_control" }[action];
+    await this.c.post(`${S}/service_types/${st}/plans/${planId}/live/${path}`);
+    return this.getLive(st, planId);
+  }
+
+  async getItemTimes(st: string, planId: string): Promise<ItemTimes> {
+    // Raw JSON:API: each ItemTime says which service time (plan_time) it belongs to.
+    const doc = await this.c.raw("GET", `${S}/service_types/${st}/plans/${planId}/items?include=item_times&per_page=100`);
+    const out: ItemTimes = {};
+    if (!doc) return out;
+    const inc = new Map((doc.included ?? []).map((r) => [`${r.type}:${r.id}`, r]));
+    for (const item of (Array.isArray(doc.data) ? doc.data : [doc.data])) {
+      const refs = (item.relationships?.item_times?.data ?? []) as { id: string; type: string }[];
+      for (const ref of refs) {
+        const t = inc.get(`${ref.type}:${ref.id}`);
+        const pt = (t?.relationships?.plan_time?.data as { id: string } | null)?.id;
+        const at = (t?.attributes ?? {}) as { live_start_at?: string | null; live_end_at?: string | null };
+        if (!pt || !(at.live_start_at || at.live_end_at)) continue;
+        (out[item.id] ??= {})[pt] = { start: at.live_start_at ?? null, end: at.live_end_at ?? null };
+      }
+    }
+    return out;
+  }
+
+  /* ───────────── Editing the run sheet ───────────── */
+
+  async listNoteCategories(st: string): Promise<NoteCategory[]> {
+    const rows = await cache.swr(this.k(`notecats:${st}`), 600, () => this.c.list(`${S}/service_types/${st}/item_note_categories`, 2));
+    return rows.map((r) => ({ id: r.id, name: r.name }));
+  }
+
+  async searchSongs(query: string): Promise<SongHit[]> {
+    const q = query.trim();
+    const map = (r: Flat): SongHit => ({ id: r.id, title: r.title, author: r.author ?? null, lastScheduledAt: r.last_scheduled_at ?? null });
+    if (!q) return (await this.c.list(`${S}/songs?where[hidden]=false&order=-last_scheduled_at&per_page=25`, 1)).map(map);
+    const exact = await this.c.list(`${S}/songs?where[title]=${encodeURIComponent(q)}&where[hidden]=false&per_page=25`, 1).catch(() => [] as Flat[]);
+    // Planning Center's title filter can be strict: also look through the catalog by recent use.
+    const recent = await cache.swr(this.k("songs:recent"), 600, () => this.c.list(`${S}/songs?where[hidden]=false&order=-last_scheduled_at&per_page=100`, 5));
+    const needle = q.toLowerCase();
+    const seen = new Set<string>();
+    return [...exact, ...recent.filter((r) => `${r.title} ${r.author ?? ""}`.toLowerCase().includes(needle))]
+      .filter((r) => !seen.has(r.id) && seen.add(r.id)).slice(0, 25).map(map);
+  }
+
+  async songArrangements(songId: string): Promise<SongArrangement[]> {
+    const arr = await this.c.list(`${S}/songs/${songId}/arrangements?include=keys`, 2);
+    return arr.map((a) => ({
+      id: a.id, name: a.name ?? "Default", lengthSec: a.length ?? 0,
+      keys: (a.rel.keys ?? []).map((k: Flat) => ({ id: k.id, name: k.name ?? k.starting_key ?? "Key", startingKey: k.starting_key ?? null })),
+    }));
+  }
+
+  private async afterEdit(st: string, planId: string) {
+    await this.changed(planId);
+    return (await this.getPlan(st, planId)).items;
+  }
+
+  private itemAttrs(input: ItemInput) {
+    const a: Record<string, unknown> = {};
+    if (input.title !== undefined) a.title = input.title;
+    if (input.lengthSec !== undefined) a.length = Math.max(0, Math.round(input.lengthSec));
+    if (input.description !== undefined) a.description = input.description ?? "";
+    if (input.servicePosition) a.service_position = input.servicePosition;
+    if (input.songId !== undefined) a.song_id = input.songId;
+    if (input.arrangementId !== undefined) a.arrangement_id = input.arrangementId;
+    if (input.keyId !== undefined) a.key_id = input.keyId;
+    return a;
+  }
+
+  async createItem(st: string, planId: string, input: ItemInput) {
+    const base = `${S}/service_types/${st}/plans/${planId}`;
+    const before = (await this.getPlan(st, planId)).items;
+    const doc = await this.c.post(`${base}/items`, {
+      data: { type: "Item", attributes: { item_type: input.kind ?? "item", ...this.itemAttrs(input), ...(input.title === undefined && !input.songId ? { title: "New item" } : {}) } },
+    });
+    const id = flatten(doc!)[0].id;
+    if (input.afterItemId !== undefined) {
+      // Put it where it was added (Planning Center adds new items at the end).
+      const ids = before.map((i) => i.id);
+      const at = input.afterItemId === null ? 0 : ids.indexOf(input.afterItemId) + 1;
+      ids.splice(at, 0, id);
+      await this.c.post(`${base}/item_reorder`, { data: { type: "PlanItemReorder", attributes: { sequence: ids } } });
+    }
+    return this.afterEdit(st, planId);
+  }
+
+  async updateItem(st: string, planId: string, itemId: string, input: ItemInput) {
+    await this.c.patch(`${S}/service_types/${st}/plans/${planId}/items/${itemId}`, { data: { type: "Item", id: itemId, attributes: this.itemAttrs(input) } });
+    return this.afterEdit(st, planId);
+  }
+
+  async deleteItem(st: string, planId: string, itemId: string) {
+    await this.c.delete(`${S}/service_types/${st}/plans/${planId}/items/${itemId}`);
+    return this.afterEdit(st, planId);
+  }
+
+  async reorderItems(st: string, planId: string, itemIds: string[]) {
+    await this.c.post(`${S}/service_types/${st}/plans/${planId}/item_reorder`, { data: { type: "PlanItemReorder", attributes: { sequence: itemIds } } });
+    return this.afterEdit(st, planId);
+  }
+
+  async saveItemNote(st: string, planId: string, itemId: string, note: { noteId?: string; categoryId: string; content: string }) {
+    const base = `${S}/service_types/${st}/plans/${planId}/items/${itemId}/item_notes`;
+    if (note.noteId) {
+      await this.c.patch(`${base}/${note.noteId}`, { data: { type: "ItemNote", id: note.noteId, attributes: { content: note.content } } });
+    } else {
+      await this.c.post(base, { data: { type: "ItemNote", attributes: { content: note.content, item_note_category_id: note.categoryId } } });
+    }
+    return this.afterEdit(st, planId);
+  }
+
+  async deleteItemNote(st: string, planId: string, itemId: string, noteId: string) {
+    await this.c.delete(`${S}/service_types/${st}/plans/${planId}/items/${itemId}/item_notes/${noteId}`);
+    return this.afterEdit(st, planId);
   }
 
   private planSummary(p: Flat, t: ServiceType, roster: Flat[] | null): PlanSummary {
@@ -388,7 +509,10 @@ export class LivePco implements PcoApi {
         // The key chosen for this service; otherwise the arrangement key's starting key.
         songKey: i.key_name || i.rel.key?.starting_key || i.rel.key?.name || null,
         servicePosition: (i.service_position ?? "during") as PlanItem["servicePosition"],
-        notes: (i.rel.item_notes ?? []).map((n: Flat) => ({ category: n.category_name ?? "Note", body: n.content ?? "" })),
+        notes: (i.rel.item_notes ?? []).map((n: Flat) => ({ id: n.id, category: n.category_name ?? "Note", body: n.content ?? "" })),
+        songId: i.rel.song?.id ?? null,
+        arrangementId: i.rel.arrangement?.id ?? null,
+        keyId: i.rel.key?.id ?? null,
       }))
       .sort((a, b) => a.sequence - b.sequence);
     const teamList: Team[] = teams.map((tm) => ({

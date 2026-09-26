@@ -14,6 +14,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { config } from "../config.js";
 import { KEY_ROOTS } from "../../../shared/types.js";
+import type { RunSheetView } from "../../../shared/types.js";
 import type { AppSettings, MicAssignment, MicSetup, Ministry, MinistryPaging, PagingConfig, StagePlot } from "../../../shared/types.js";
 
 /* ───────────── Models ───────────── */
@@ -87,6 +88,10 @@ interface Data {
   planStage: Record<string, string>;
   /** Parent paging (ProPresenter) and the Kids/Nursery iPad pages. */
   paging: PagingStored | null;
+  /** Full run sheet operator views. */
+  runSheetViews: RunSheetView[];
+  /** Other ProPresenter computers to watch/control, dashboard layout, Smaart. */
+  extras: Record<string, unknown>;
 }
 
 export interface PagingStored {
@@ -100,7 +105,7 @@ export interface PagingStored {
 
 /* ───────────── File handling ───────────── */
 
-const empty = (): Data => ({ version: 1, users: [], tokens: [], sessions: [], notes: [], audit: [], micSetup: null, planMics: {}, micUsual: {}, settings: null, stagePlots: [], planStage: {}, paging: null });
+const empty = (): Data => ({ version: 1, users: [], tokens: [], sessions: [], notes: [], audit: [], micSetup: null, planMics: {}, micUsual: {}, settings: null, stagePlots: [], planStage: {}, paging: null, runSheetViews: [], extras: {} });
 const file = () => path.resolve(process.cwd(), config.dataDir, "cool-services.json");
 const now = () => new Date().toISOString();
 const newId = () => crypto.randomUUID();
@@ -248,6 +253,29 @@ export const pagingStore = {
     load().paging = v;
     save();
   },
+};
+
+/* ───────────── Run sheet views ───────────── */
+
+export const runSheetViews = {
+  list: (): RunSheetView[] => load().runSheetViews ?? [],
+  save(v: RunSheetView) {
+    const d = load();
+    d.runSheetViews = [...(d.runSheetViews ?? []).filter((x) => x.id !== v.id), v];
+    save();
+    return v;
+  },
+  remove(id: string) {
+    const d = load();
+    d.runSheetViews = (d.runSheetViews ?? []).filter((x) => x.id !== id);
+    save();
+  },
+};
+
+/** Small keyed settings that don't need their own model (ProPresenter computers, dashboard, Smaart). */
+export const extras = {
+  get<T>(key: string, fallback: T): T { return ((load().extras ?? {})[key] as T | undefined) ?? fallback; },
+  set(key: string, value: unknown) { const d = load(); d.extras = { ...(d.extras ?? {}), [key]: value }; save(); },
 };
 
 /* ───────────── Stage plots ───────────── */

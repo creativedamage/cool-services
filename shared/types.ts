@@ -113,7 +113,11 @@ export interface PlanItem {
   description: string | null;
   songKey: string | null;
   servicePosition: "pre" | "during" | "post";
-  notes: { category: string; body: string }[];
+  notes: { id?: string; categoryId?: string | null; category: string; body: string }[];
+  /** Songs: the catalog song, arrangement and key chosen for this item. */
+  songId?: string | null;
+  arrangementId?: string | null;
+  keyId?: string | null;
 }
 
 export type RosterStatus = "C" | "U" | "D";
@@ -498,6 +502,45 @@ export interface RunSheetLive {
   /** When the current item started (live_start_at). */
   currentStartedAt: string | null;
   controller: string | null;
+  /** You're the one driving Live. */
+  youControl?: boolean;
+  /** You're allowed to take over Live. */
+  canTakeControl?: boolean;
+}
+
+/** An operator view of the full run sheet: which Planning Center note categories show, in what order. */
+export interface RunSheetView {
+  id: string;
+  name: string;
+  /** Item note categories shown as columns, in this order. */
+  categories: string[];
+  /** Emphasize items that have notes in this category. */
+  highlight: string | null;
+  /** Plan-wide note categories shown at the top (null = all). */
+  planNotes: string[] | null;
+  showDescriptions: boolean;
+}
+
+export interface NoteCategory { id: string; name: string }
+
+/** Actual Live times: item id → plan time id → when it started/ended. */
+export type ItemTimes = Record<string, Record<string, { start: string | null; end: string | null }>>;
+
+export interface SongHit { id: string; title: string; author: string | null; lastScheduledAt: string | null }
+export interface SongArrangement { id: string; name: string; lengthSec: number; keys: { id: string; name: string; startingKey: string | null }[] }
+
+/** Add or change a run sheet item in Planning Center. */
+export interface ItemInput {
+  kind?: "song" | "header" | "media" | "item";
+  title?: string;
+  lengthSec?: number;
+  description?: string | null;
+  servicePosition?: "pre" | "during" | "post";
+  songId?: string | null;
+  arrangementId?: string | null;
+  keyId?: string | null;
+  /** New items: put right after this item (null = at the top; omitted = at the end). */
+  afterItemId?: string | null;
 }
 
 export interface RunSheetData {
@@ -505,4 +548,71 @@ export interface RunSheetData {
   /** Plan-wide notes (e.g. "Version"). */
   planNotes: { category: string; body: string }[];
   fetchedAt: string;
+}
+
+/* ───────────── ProPresenter control (side screens computer, etc.) ───────────── */
+
+export interface ProMachine { id: string; name: string; host: string; port: number; /** "paging" is the Kids & Nursery one from Settings. */ builtIn?: boolean }
+
+export interface ProSlide { index: number; group: string; groupColor: string | null; label: string; text: string; enabled: boolean }
+
+export interface ProTimer {
+  id: ProId;
+  /** "00:04:32" as ProPresenter shows it (may start with "-" when over). */
+  time: string;
+  state: "stopped" | "running" | "complete" | "overrunning" | "overran" | string;
+  kind: "countdown" | "count_down_to_time" | "elapsed" | "unknown";
+  /** Countdown length in seconds. */
+  duration: number | null;
+  allowsOverrun: boolean;
+}
+
+export interface ProControlState {
+  ok: boolean;
+  error?: string;
+  name?: string;
+  version?: string;
+  presentation: { uuid: string; name: string; slides: ProSlide[] } | null;
+  slideIndex: number | null;
+  current: { text: string; notes: string } | null;
+  next: { text: string; notes: string } | null;
+  timers: ProTimer[];
+  stageMessage: string;
+  stageScreens: { id: ProId; layout: ProId | null }[];
+  stageLayouts: ProId[];
+  clearGroups: ProId[];
+  looks: ProId[];
+  at: string;
+}
+
+export type ProAction =
+  | { type: "next" } | { type: "previous" }
+  | { type: "trigger"; uuid: string; index: number }
+  | { type: "clear"; layer: "slide" | "media" | "props" | "messages" | "announcements" | "audio" | "video_input" | "all" }
+  | { type: "clearGroup"; id: string }
+  | { type: "look"; id: string }
+  | { type: "timer"; id: string; op: "start" | "stop" | "reset" }
+  | { type: "timerSet"; id: string; duration: number; allowsOverrun?: boolean }
+  | { type: "timerAdd"; id: string; seconds: number }
+  | { type: "stageMessage"; text: string | null }
+  | { type: "stageLayout"; screen: string; layout: string };
+
+/* ───────────── Smaart SPL + dashboard ───────────── */
+
+export interface SmaartSettingsView { enabled: boolean; host: string; port: number; path: string; limit: number; hasPassword: boolean }
+export interface SmaartStatusView {
+  state: "off" | "connecting" | "connected" | "error";
+  error: string | null;
+  readings: { key: string; label: string; value: number }[];
+  at: string | null;
+  sample: string[];
+}
+
+export type WidgetType = "tuning" | "ndi" | "spl" | "wireless" | "live" | "clock" | "pro";
+export interface DashboardWidget {
+  id: string;
+  type: WidgetType;
+  /** s = 1 column, m = 2, l = full width. */
+  size: "s" | "m" | "l";
+  options: Record<string, string | number | boolean | null>;
 }

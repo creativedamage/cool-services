@@ -11,7 +11,9 @@ import { setTheme } from "@/lib/theme";
 import { Logo } from "@/components/Logo";
 import { Spinner } from "@/components/ui";
 import { PagingSettings } from "@/components/paging/PagingSettings";
+import { ProComputersSettings } from "@/components/pro/ProComputersSettings";
 import { WavesSettings } from "@/components/settings/WavesSettings";
+import { SmaartSettings } from "@/components/settings/SmaartSettings";
 import { UpdatesSettings } from "@/components/settings/UpdatesSettings";
 
 export default function SettingsPage() {
@@ -36,6 +38,13 @@ export default function SettingsPage() {
   });
 
   const s = settings.data;
+  // Links like /settings#smaart open at that section.
+  const ready = Boolean(s);
+  useEffect(() => {
+    if (!ready || !location.hash) return;
+    const t = setTimeout(() => document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+    return () => clearTimeout(t);
+  }, [ready]);
   if (!s) return <div className="p-8"><Spinner /></div>;
 
   const serviceTypes = [...new Map((plans.data ?? []).map((p) => [p.serviceTypeId, p.serviceTypeName])).entries()];
@@ -126,7 +135,11 @@ export default function SettingsPage() {
 
         <WavesSettings w={s.waves} onChange={(waves) => save.mutate({ waves })} />
 
+        <SmaartSettings />
+
         <PagingSettings />
+
+        <ProComputersSettings />
       </div>
     </div>
   );

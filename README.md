@@ -12,11 +12,27 @@ Services scheduling faster.
 - **Matrix**: several weeks of a service type side by side (4–12 weeks, optionally the last two):
   every team and position, who's on it with their status, open slots, and each week's songs and
   keys. Hover a name to see all the weeks that person serves. Open it from "Matrix" in the sidebar.
-- **Full run sheet**: a whole-page run sheet for a service (the "Run sheet" tab): clock times for
-  the chosen service time, lengths, descriptions, and every note category in its own column. Pick a
-  team layout (Lighting, Video, Audio…) to put that team's notes first and highlight their items.
-  Follows Planning Center Live (current item, next, time used/left), refreshes every 10 seconds, and
-  has full screen, text size and print. Keys: F, + / −, L, P.
+- **Full run sheet** (the "Run sheet" tab on a service): clock times for the chosen service time,
+  lengths, descriptions and Planning Center notes as columns.
+  - **Views** for each operator (Lighting, Video, Stage manager…): pick which note categories show,
+    their order, one to highlight, and which plan notes appear at the top.
+  - **Edit** (E): add headers, items, media and songs from the Planning Center song catalog (with
+    arrangement and key), change titles, lengths, descriptions and notes, move and delete items.
+    Everything saves to Planning Center.
+  - **Planning Center Live**: follows the current item (time used / left), and Previous / Next /
+    Take control drive Live from here.
+  - **Compare**: actual times against another service time (the 9:00 while you run the 11:00) or
+    another campus's service the same day, per item and "how far later/earlier at this item".
+  - **Watch**: other services' Live position and over/under in a side panel.
+  - Full screen, text size and print. Keys: F, + / −, L, E, P.
+- **Dashboard**: widgets for service flow: tuning keys (sends to Waves), ProPresenter outputs over NDI
+  (side screens, confidence monitors), SPL from Smaart, Shure wireless (who's on it, battery, RF),
+  Planning Center Live, a clock with the countdown to service, and ProPresenter control. Edit to
+  add, remove, resize and reorder; the layout is saved on this Mac.
+- **ProPresenter**: watch and take over any ProPresenter computer (e.g. side screens): click a slide
+  to show it, previous / next, clear layers, clear groups and looks, timers (start, stop, reset,
+  change the time, ±30 s / 1 min), stage message and each stage screen's layout. Add computers in
+  Settings → ProPresenter computers; the Kids & Nursery one from paging is included automatically.
 - **Chat**: Planning Center Chat inside Cool Services (sidebar → Chat): current conversations, new
   ones, teams and direct messages. Planning Center has no public Chat API, so this is Planning
   Center's own Chat shown in the app window, using your Planning Center sign-in.
@@ -155,6 +171,18 @@ snapshots 1–384.
 Keys come from Planning Center (the key chosen on the service item, otherwise the arrangement's key).
 C# and Db (and every other sharp/flat pair) are matched separately; a minor key uses its letter's snapshot (F#m → F#).
 
+## Dashboard: ProPresenter outputs and Smaart
+
+- **ProPresenter outputs**: in ProPresenter, turn on NDI for each screen you want to watch (Screens →
+  the screen → NDI). On the dashboard, add a "ProPresenter output (NDI)" widget and pick the source.
+  Previews use NDI's low-bandwidth stream (about 5 frames a second). Needs the NDI add-on (see
+  "Build the DMG").
+- **Smaart v9 SPL**: in Smaart, start logging on a calibrated input and turn on Options → API
+  (default port 26000, optional password). In Cool Services, Settings → Smaart (SPL): enter the
+  computer and password, then Save and connect. The readings Smaart sends are listed there; pick one
+  for the SPL widget. Rational Acoustics hasn't published the full API command list, so if your
+  readings don't appear, open "What Smaart is sending" in Settings and send it to us.
+
 ## Check-ins permission
 
 Check-ins need Planning Center **Check-Ins** access. The first time someone opens the Check-ins tab
@@ -254,6 +282,10 @@ server/src/pco/            Planning Center client, People/Services calls, app re
 server/src/lib/db.ts       Local data file (users, tokens, sessions, staff notes, mics, history)
 server/src/lib/shure.ts    Shure receiver status, read-only (TCP 2202)
 server/src/lib/propresenter.ts  ProPresenter API client + finding it on the network
+server/src/routes/pro.ts   ProPresenter control (slides, timers, stage) for any computer
+server/src/lib/smaart.ts   Smaart v9 API client (SPL readings)
+desktop/src/ndiIn.ts       NDI previews of ProPresenter outputs for the dashboard
+desktop/src/embed.ts       Planning Center Chat inside the window
 server/src/lib/paging.ts   Parent paging: the on-screen lock, messages, PINs
 server/src/kiosk.ts        Kids & Nursery iPad server (network, PIN-locked)
 server/src/demo/demo.ts    Sample data for "Explore with sample data"

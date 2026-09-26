@@ -5,11 +5,30 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { EmbedBridge } from "../../../shared/embed.js";
+import type { NdiViewerBridge } from "../../../shared/ndiView.js";
 
 let embed: EmbedBridge | null = null;
 export const setEmbedBridge = (b: EmbedBridge) => { embed = b; };
 
+let ndi: NdiViewerBridge | null = null;
+export const setNdiViewer = (b: NdiViewerBridge) => { ndi = b; };
+
 export const desktopRouter = Router();
+
+/* ── NDI previews (ProPresenter outputs on the dashboard) ── */
+desktopRouter.get("/ndi/sources", async (_req, res) => {
+  if (!ndi) return res.json({ available: false, error: "NDI previews work in the Cool Services Mac app.", sources: [] });
+  const a = ndi.available();
+  if (!a.ok) return res.json({ available: false, error: a.error, sources: [] });
+  try { res.json({ available: true, sources: await ndi.sources() }); } catch (e) { res.json({ available: false, error: (e as Error).message, sources: [] }); }
+});
+/** Newest frame of a source as a JPEG (the dashboard asks again as soon as each one arrives). */
+desktopRouter.get("/ndi/frame", (req, res) => {
+  const name = String(req.query.source ?? "");
+  const f = ndi && name ? ndi.frame(name) : null;
+  if (!f) return res.status(204).end(); // still connecting
+  res.set({ "Cache-Control": "no-store", "X-Frame-Size": f.size, "X-Frame-At": String(f.at) }).type("image/jpeg").send(f.jpeg);
+});
 
 const Req = z.object({
   action: z.enum(["show", "hide", "reload", "home"]),

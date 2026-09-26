@@ -3,7 +3,7 @@
  * Lets every screen run without PCO credentials (DEMO_MODE=true).
  */
 import type {
-  Board, Candidate, CheckInLocation, Matrix, RunSheetData, RunSheetLive, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanItem, PlanSummary, Person, RosterStatus,
+  Board, Candidate, CheckInLocation, ItemInput, ItemTimes, Matrix, NoteCategory, RunSheetData, RunSheetLive, SongArrangement, SongHit, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanItem, PlanSummary, Person, RosterStatus,
   ScheduleRequest, ServiceType, StaffMe, Team, TeamMember, WorkflowCard, WorkflowStep, WorkflowSummary,
 } from "../../../shared/types.js";
 import { computeConflicts, type PcoApi } from "../pco/api.js";
@@ -31,6 +31,15 @@ function demoCheckIns(key: string, start: number): CheckInRow[] {
     };
   }).reverse();
 }
+
+/** Demo Live after someone takes control: plan id → current item index and when it started. */
+const demoLive = new Map<string, { idx: number; at: number }>();
+const DEMO_SONGS: [string, string][] = [
+  ["Firm Foundation (He Won't)", "Cody Carnes"], ["Gratitude", "Brandon Lake"], ["Holy Forever", "Chris Tomlin"], ["Praise", "Elevation Worship"],
+  ["Build My Life", "Pat Barrett"], ["Goodness of God", "Bethel Music"], ["Way Maker", "Sinach"], ["Graves Into Gardens", "Elevation Worship"],
+  ["King of Kings", "Hillsong Worship"], ["What A Beautiful Name", "Hillsong Worship"], ["Great Are You Lord", "All Sons & Daughters"],
+  ["O Come to the Altar", "Elevation Worship"], ["Living Hope", "Phil Wickham"], ["Battle Belongs", "Phil Wickham"], ["This Is Amazing Grace", "Phil Wickham"],
+];
 
 const demoBoot = Date.now();
 const nid = () => String(++seq);
@@ -117,6 +126,7 @@ const profileNotes: Record<string, Note[]> = {
 
 const serviceTypes: ServiceType[] = [
   { id: "10", name: "Sunday Gathering" },
+  { id: "12", name: "Sunday · North Campus" },
   { id: "11", name: "Wednesday Night Youth" },
 ];
 
@@ -172,7 +182,7 @@ const runSheet = (w: number): PlanItem[] => {
     { title: "Closing & Blessing", kind: "item", lengthSec: 180, description: null, songKey: null, servicePosition: "during", notes: [] },
     { title: "Walk-out Playlist", kind: "media", lengthSec: 600, description: null, songKey: null, servicePosition: "post", notes: [] },
   ];
-  return rows.map((r, i) => ({ ...r, id: nid(), sequence: i }));
+  return rows.map((r, i) => ({ ...r, id: nid(), sequence: i, notes: r.notes.map((n) => ({ ...n, id: nid() })) }));
 };
 
 const NEEDED = [
@@ -218,6 +228,17 @@ for (let w = 0; w < SERIES.length; w++) {
     }
   });
   roster.set(id, members);
+}
+// A second campus on the same Sundays, so services can be watched and compared side by side.
+for (const src of plans.filter((p) => p.serviceTypeId === "10").slice(0, 4)) {
+  const id = `n${src.id.slice(1)}`;
+  plans.push({
+    ...src, id, serviceTypeId: "12", serviceTypeName: "Sunday · North Campus",
+    times: src.times.map((t) => ({ ...t, id: nid() })),
+    items: src.items.map((i) => ({ ...i, id: nid(), notes: i.notes.map((n) => ({ ...n, id: nid() })) })),
+    roster: [], needed: [],
+  });
+  roster.set(id, (roster.get(src.id) ?? []).map((m) => ({ ...m, id: nid() })));
 }
 // Wednesday youth nights
 for (let w = 0; w < 3; w++) {
@@ -339,15 +360,144 @@ export class DemoPco implements PcoApi {
     };
   }
 
-  /** Sample Live: moves to the next item every 40 seconds, so the full run sheet can be seen following along. */
+  /**
+   * Sample Live: moves to the next item every 40 seconds, so the full run sheet can be seen
+   * following along, until someone takes control (then Next/Previous drive it).
+   */
   async getLive(st: string, planId: string): Promise<RunSheetLive | null> {
     const items = this.plan(st, planId).items.filter((i) => i.kind !== "header");
-    const n = Math.floor((Date.now() - demoBoot) / 40_000) % items.length;
+    const manual = demoLive.get(planId);
+    const n = manual ? Math.min(manual.idx, items.length - 1) : Math.floor((Date.now() - demoBoot) / 40_000) % items.length;
+    const started = manual ? manual.at : demoBoot + Math.floor((Date.now() - demoBoot) / 40_000) * 40_000;
     return {
       currentItemId: items[n].id, nextItemId: items[n + 1]?.id ?? null,
-      currentStartedAt: new Date(demoBoot + Math.floor((Date.now() - demoBoot) / 40_000) * 40_000).toISOString(),
-      controller: "Wayne (Demo)",
+      currentStartedAt: new Date(started).toISOString(),
+      controller: manual ? "Wayne (Demo)" : "Jordan (Demo)",
+      youControl: Boolean(manual), canTakeControl: true,
     };
+  }
+
+  async liveControl(st: string, planId: string, action: "next" | "previous" | "take_control"): Promise<RunSheetLive | null> {
+    const items = this.plan(st, planId).items.filter((i) => i.kind !== "header");
+    const cur = await this.getLive(st, planId);
+    const idx = Math.max(0, items.findIndex((i) => i.id === cur?.currentItemId));
+    if (action === "take_control") demoLive.set(planId, { idx, at: Date.parse(cur?.currentStartedAt ?? new Date().toISOString()) });
+    else demoLive.set(planId, { idx: Math.min(items.length - 1, Math.max(0, idx + (action === "next" ? 1 : -1))), at: Date.now() });
+    return this.getLive(st, planId);
+  }
+
+  /** Sample actual times: the first service ran a little long in places; the second is live now. */
+  async getItemTimes(st: string, planId: string): Promise<ItemTimes> {
+    const p = this.plan(st, planId);
+    const services = p.times.filter((t) => t.kind === "service");
+    const live = await this.getLive(st, planId);
+    const out: ItemTimes = {};
+    const wobble = (id: string, k: number) => ((Number(id) * 37 + k * 11) % 61) - 20; // seconds, -20…+40
+    services.forEach((t, si) => {
+      const pre = p.items.filter((i) => i.servicePosition === "pre").reduce((n, i) => n + i.lengthSec, 0);
+      let at = Date.parse(t.startsAt) - pre * 1000;
+      const liveIdx = si === services.length - 1 ? p.items.findIndex((i) => i.id === live?.currentItemId) : Infinity;
+      p.items.forEach((i, idx) => {
+        if (idx > liveIdx) return;
+        const len = i.kind === "header" ? 0 : Math.max(0, i.lengthSec + wobble(i.id, si));
+        (out[i.id] ??= {})[t.id] = { start: new Date(at).toISOString(), end: idx === liveIdx ? null : new Date(at + len * 1000).toISOString() };
+        at += len * 1000;
+      });
+    });
+    return out;
+  }
+
+  async listNoteCategories(): Promise<NoteCategory[]> {
+    return ["Person", "Audio", "Lighting", "Video", "Stage", "ProPresenter", "Production", "Camera"].map((name, i) => ({ id: `nc${i}`, name }));
+  }
+
+  async searchSongs(query: string): Promise<SongHit[]> {
+    const q = query.trim().toLowerCase();
+    return DEMO_SONGS.map(([title, author], i) => ({ id: `song${i}`, title, author, lastScheduledAt: new Date(Date.now() - i * 6 * 864e5).toISOString() }))
+      .filter((x) => !q || `${x.title} ${x.author}`.toLowerCase().includes(q)).slice(0, 25);
+  }
+
+  async songArrangements(songId: string): Promise<SongArrangement[]> {
+    const i = Number(songId.replace("song", "")) || 0;
+    const keys = ["A", "Bb", "C", "D", "E", "G"].map((k, j) => ({ id: `${songId}-k${j}`, name: k, startingKey: k }));
+    return [
+      { id: `${songId}-a0`, name: "Default", lengthSec: 270 + (i % 5) * 20, keys },
+      { id: `${songId}-a1`, name: "Acoustic", lengthSec: 240 + (i % 4) * 15, keys: keys.slice(0, 3) },
+    ];
+  }
+
+  private items(st: string, planId: string) { return this.plan(st, planId).items; }
+  private renumber(items: PlanItem[]) { items.forEach((it, i) => { it.sequence = i; }); return items.map((x) => ({ ...x, notes: x.notes.map((n) => ({ ...n })) })); }
+
+  async createItem(st: string, planId: string, input: ItemInput) {
+    const items = this.items(st, planId);
+    let title = input.title ?? "New item", lengthSec = input.lengthSec ?? 0, songKey: string | null = null;
+    if (input.songId) {
+      const song = (await this.searchSongs("")).find((x) => x.id === input.songId);
+      const arr = (await this.songArrangements(input.songId)).find((a) => a.id === input.arrangementId);
+      title = input.title ?? song?.title ?? title;
+      lengthSec = input.lengthSec ?? arr?.lengthSec ?? 300;
+      songKey = arr?.keys.find((k) => k.id === input.keyId)?.name ?? null;
+    }
+    const it: PlanItem = {
+      id: nid(), title, sequence: 0, kind: input.kind ?? "item", lengthSec, description: input.description ?? null, songKey,
+      servicePosition: input.servicePosition ?? "during", notes: [], songId: input.songId ?? null, arrangementId: input.arrangementId ?? null, keyId: input.keyId ?? null,
+    };
+    const at = input.afterItemId === undefined ? items.length : input.afterItemId === null ? 0 : items.findIndex((x) => x.id === input.afterItemId) + 1;
+    items.splice(at, 0, it);
+    return this.renumber(items);
+  }
+
+  async updateItem(st: string, planId: string, itemId: string, input: ItemInput) {
+    const items = this.items(st, planId);
+    const it = items.find((x) => x.id === itemId);
+    if (it) {
+      if (input.title !== undefined) it.title = input.title;
+      if (input.lengthSec !== undefined) it.lengthSec = input.lengthSec;
+      if (input.description !== undefined) it.description = input.description || null;
+      if (input.servicePosition) it.servicePosition = input.servicePosition;
+      if (input.keyId !== undefined && it.songId) {
+        it.keyId = input.keyId;
+        it.songKey = (await this.songArrangements(it.songId)).flatMap((a) => a.keys).find((k) => k.id === input.keyId)?.name ?? it.songKey;
+      }
+    }
+    return this.renumber(items);
+  }
+
+  async deleteItem(st: string, planId: string, itemId: string) {
+    const items = this.items(st, planId);
+    const i = items.findIndex((x) => x.id === itemId);
+    if (i >= 0) items.splice(i, 1);
+    return this.renumber(items);
+  }
+
+  async reorderItems(st: string, planId: string, itemIds: string[]) {
+    const items = this.items(st, planId);
+    const byId = new Map(items.map((x) => [x.id, x]));
+    const next = itemIds.map((id) => byId.get(id)).filter((x): x is PlanItem => Boolean(x));
+    items.splice(0, items.length, ...next, ...items.filter((x) => !itemIds.includes(x.id)));
+    return this.renumber(items);
+  }
+
+  async saveItemNote(st: string, planId: string, itemId: string, note: { noteId?: string; categoryId: string; content: string }) {
+    const items = this.items(st, planId);
+    const it = items.find((x) => x.id === itemId);
+    if (it) {
+      const existing = note.noteId ? it.notes.find((n) => n.id === note.noteId) : undefined;
+      if (existing) existing.body = note.content;
+      else {
+        const cat = (await this.listNoteCategories()).find((c) => c.id === note.categoryId);
+        it.notes.push({ id: nid(), categoryId: note.categoryId, category: cat?.name ?? "Note", body: note.content });
+      }
+    }
+    return this.renumber(items);
+  }
+
+  async deleteItemNote(st: string, planId: string, itemId: string, noteId: string) {
+    const items = this.items(st, planId);
+    const it = items.find((x) => x.id === itemId);
+    if (it) it.notes = it.notes.filter((n) => n.id !== noteId);
+    return this.renumber(items);
   }
 
   private plan(st: string, id: string) {

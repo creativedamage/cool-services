@@ -57,6 +57,24 @@ interface ThemeGroup { id: ProId; themes?: { id: ProId; slides?: { id: ProId }[]
 
 export class ProPresenter {
   constructor(public host: string, public port: number) {}
+  /** Any API call (used by the ProPresenter control page). */
+  api<T>(method: string, path: string, body?: unknown, timeoutMs?: number) { return this.call<T>(method, path, body, timeoutMs); }
+
+  /** An image from the API (slide thumbnails). */
+  image(path: string, timeoutMs = 5000): Promise<{ type: string; data: Buffer }> {
+    if (!this.host || !this.port) return Promise.reject(new ProPresenterError("ProPresenter isn't set up."));
+    return new Promise((resolve, reject) => {
+      const req = http.request({ host: this.host, port: this.port, method: "GET", path, timeout: timeoutMs }, (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => (res.statusCode ?? 0) >= 400 ? reject(new ProPresenterError(`ProPresenter answered ${res.statusCode}`, res.statusCode)) : resolve({ type: String(res.headers["content-type"] ?? "image/jpeg"), data: Buffer.concat(chunks) }));
+      });
+      req.on("timeout", () => req.destroy(new ProPresenterError("ProPresenter didn't answer.")));
+      req.on("error", (e) => reject(e instanceof ProPresenterError ? e : new ProPresenterError(e.message)));
+      req.end();
+    });
+  }
+
   private call<T>(method: string, path: string, body?: unknown, timeoutMs?: number) {
     if (!this.host || !this.port) throw new ProPresenterError("Add the ProPresenter computer in Settings first.");
     return request<T>(this.host, this.port, method, path, body, timeoutMs);

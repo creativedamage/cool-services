@@ -13,6 +13,7 @@ import path from "node:path";
 import { startNdi } from "./ndi";
 import { createUpdater } from "./updater";
 import { createEmbed } from "./embed";
+import { createNdiViewer } from "./ndiIn";
 
 // Must match server/src/pco/registration.ts (and the redirect URIs registered with Planning Center).
 const PORTS = [47123, 47124, 47125];
@@ -89,7 +90,7 @@ async function boot() {
   session.defaultSession.setPermissionCheckHandler((_wc, _perm, requestingOrigin) => ours(requestingOrigin));
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { startServer, ndiBridge, setUpdateBridge, setEmbedBridge } = require("./server.cjs") as typeof import("../../server/src/app");
+  const { startServer, ndiBridge, setUpdateBridge, setEmbedBridge, setNdiViewer } = require("./server.cjs") as typeof import("../../server/src/app");
   await startServer({ port, webDir: path.join(__dirname, "web") });
 
   // Check for Updates (GitHub Releases). Only the packaged app can replace itself.
@@ -104,6 +105,7 @@ async function boot() {
   setUpdateBridge(updater);
   embed = createEmbed(() => win); // Planning Center Chat inside the window
   setEmbedBridge(embed);
+  setNdiViewer(createNdiViewer()); // ProPresenter outputs (sent as NDI) on the dashboard
   updater.start();
   buildMenu(updater);
 

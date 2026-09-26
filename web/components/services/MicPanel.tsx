@@ -166,7 +166,7 @@ export function MicPanel({ plan }: { plan: PlanDetail }) {
 const hm = (mins: number) => (mins >= 60 ? `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m` : `${mins}m`);
 
 /** Battery · runtime · antennas · signal, as read from the receiver. */
-function LiveStatus({ s }: { s: ChannelStatus }) {
+export function LiveStatus({ s }: { s: ChannelStatus }) {
   if (!s.txOn) {
     return <div className="flex items-center gap-1.5 text-[10px] text-ink-faint"><span className="h-1.5 w-1.5 rounded-full bg-ink-faint" /> Transmitter off{s.name ? ` · ${s.name}` : ""}</div>;
   }

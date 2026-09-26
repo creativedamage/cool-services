@@ -3,7 +3,7 @@
  * implementation (LivePco) and the in-memory demo (DemoPco) are interchangeable.
  */
 import type {
-  Board, Candidate, Matrix, RunSheetData, RunSheetLive, CheckInLocation, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanSummary, Person, RosterStatus,
+  Board, Candidate, ItemInput, ItemTimes, Matrix, NoteCategory, PlanItem, RunSheetData, RunSheetLive, SongArrangement, SongHit, CheckInLocation, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanSummary, Person, RosterStatus,
   ScheduleRequest, ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary,
 } from "../../../shared/types.js";
 
@@ -33,6 +33,21 @@ export interface PcoApi {
   getRunSheet(serviceTypeId: string, planId: string): Promise<RunSheetData>;
   /** Planning Center Live position (null when nobody has started Live for this plan). */
   getLive(serviceTypeId: string, planId: string): Promise<RunSheetLive | null>;
+  /** Drive Planning Center Live: next / previous item, or take control. */
+  liveControl(serviceTypeId: string, planId: string, action: "next" | "previous" | "take_control"): Promise<RunSheetLive | null>;
+  /** When each item actually started/ended in each service time (from Live). */
+  getItemTimes(serviceTypeId: string, planId: string): Promise<ItemTimes>;
+
+  // Editing the run sheet (writes to Planning Center)
+  listNoteCategories(serviceTypeId: string): Promise<NoteCategory[]>;
+  searchSongs(query: string): Promise<SongHit[]>;
+  songArrangements(songId: string): Promise<SongArrangement[]>;
+  createItem(serviceTypeId: string, planId: string, input: ItemInput): Promise<PlanItem[]>;
+  updateItem(serviceTypeId: string, planId: string, itemId: string, input: ItemInput): Promise<PlanItem[]>;
+  deleteItem(serviceTypeId: string, planId: string, itemId: string): Promise<PlanItem[]>;
+  reorderItems(serviceTypeId: string, planId: string, itemIds: string[]): Promise<PlanItem[]>;
+  saveItemNote(serviceTypeId: string, planId: string, itemId: string, note: { noteId?: string; categoryId: string; content: string }): Promise<PlanItem[]>;
+  deleteItemNote(serviceTypeId: string, planId: string, itemId: string, noteId: string): Promise<PlanItem[]>;
   /** Everyone checked in (Planning Center Check-Ins) around this plan's service times. */
   getCheckIns(serviceTypeId: string, planId: string): Promise<CheckInsForPlan>;
   /** Everyone checked in today (for the Kids and Nursery iPad pages). */

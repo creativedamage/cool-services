@@ -172,7 +172,7 @@ export function pcoForUser(userId: string, demo: boolean): PcoApi | null {
   if (demo) return demoApi;
   const u = users.get(userId);
   if (!u) return null;
-  if (patClient) return new LivePco(patClient, u.pcoOrgId, u.pcoPersonId);
+  if (patClient) return new LivePco(patClient, u.pcoOrgId, u.pcoPersonId, u.pcoPersonId);
   const t = tokenStore.get(u.id);
   if (!t) return null;
   const tokens: TokenSet = {
@@ -182,7 +182,7 @@ export function pcoForUser(userId: string, demo: boolean): PcoApi | null {
     scope: t.scope,
   };
   const client = new PcoClient(tokens, (nt) => saveTokens(u.id, nt), u.pcoPersonId);
-  return new LivePco(client, u.pcoOrgId);
+  return new LivePco(client, u.pcoOrgId, undefined, u.pcoPersonId);
 }
 
 /** Resolve session → user → per-request Planning Center API (live or demo). */

@@ -28,6 +28,17 @@ export function PlotEditor({ plotId }: { plotId: string }) {
 
   useEffect(() => { if (remote.data && !plot) setPlot(remote.data); }, [remote.data, plot]);
 
+  // Leaving a brand-new plot without adding anything discards it, so blank "New stage plot"s
+  // don't pile up in the list.
+  const latest = useRef<StagePlot | null>(null);
+  latest.current = plot;
+  useEffect(() => () => {
+    const p = latest.current;
+    if (p && p.name === "New stage plot" && p.items.length === 0 && !p.background && !p.serviceTypeId) {
+      void Api.deletePlot(p.id).then(() => qc.invalidateQueries({ queryKey: qk.plots })).catch(() => {});
+    }
+  }, [qc]);
+
   const save = useMutation({
     mutationFn: Api.savePlot,
     onSuccess: (p) => { qc.setQueryData(qk.plot(p.id), p); qc.invalidateQueries({ queryKey: qk.plots }); setSaving("saved"); },

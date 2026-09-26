@@ -1,7 +1,7 @@
 import type {
   AppSettings, NdiStatus, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, StagePlot, PlanSummary, RosterStatus, ScheduleRequest,
   ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary,
-  Matrix, RunSheetData, RunSheetLive, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
+  DashboardWidget, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 
@@ -78,6 +78,33 @@ export const Api = {
   plan: (st: string, plan: string) => api<PlanDetail>(`/services/plans/${st}/${plan}`),
   runSheet: (st: string, plan: string) => api<RunSheetData>(`/services/plans/${st}/${plan}/runsheet`),
   live: (st: string, plan: string) => api<{ live: RunSheetLive | null }>(`/services/plans/${st}/${plan}/live`).then((r) => r.live),
+  liveControl: (st: string, plan: string, action: "next" | "previous" | "take_control") =>
+    api<{ live: RunSheetLive | null }>(`/services/plans/${st}/${plan}/live/${action}`, { method: "POST" }).then((r) => r.live),
+  itemTimes: (st: string, plan: string) => api<ItemTimes>(`/services/plans/${st}/${plan}/item-times`),
+  noteCategories: (st: string) => api<NoteCategory[]>(`/services/types/${st}/note-categories`),
+  songs: (q: string) => api<SongHit[]>(`/services/songs?q=${encodeURIComponent(q)}`),
+  arrangements: (songId: string) => api<SongArrangement[]>(`/services/songs/${songId}/arrangements`),
+  addItem: (st: string, plan: string, input: ItemInput) => api<PlanItem[]>(`/services/plans/${st}/${plan}/items`, { method: "POST", json: input }),
+  editItem: (st: string, plan: string, item: string, input: ItemInput) => api<PlanItem[]>(`/services/plans/${st}/${plan}/items/${item}`, { method: "PATCH", json: input }),
+  deleteItem: (st: string, plan: string, item: string) => api<PlanItem[]>(`/services/plans/${st}/${plan}/items/${item}`, { method: "DELETE" }),
+  reorderItems: (st: string, plan: string, ids: string[]) => api<PlanItem[]>(`/services/plans/${st}/${plan}/items-order`, { method: "POST", json: { ids } }),
+  saveNote: (st: string, plan: string, item: string, note: { noteId?: string; categoryId: string; content: string }) =>
+    api<PlanItem[]>(`/services/plans/${st}/${plan}/items/${item}/notes`, { method: "PUT", json: note }),
+  deleteNote: (st: string, plan: string, item: string, noteId: string) => api<PlanItem[]>(`/services/plans/${st}/${plan}/items/${item}/notes/${noteId}`, { method: "DELETE" }),
+  proMachines: () => api<ProMachine[]>("/pro/machines"),
+  saveProMachines: (list: Omit<ProMachine, "builtIn">[]) => api<ProMachine[]>("/pro/machines", { method: "PUT", json: list }),
+  proState: (id: string) => api<ProControlState>(`/pro/${id}/state`),
+  proAction: (id: string, a: ProAction) => api<{ ok: true }>(`/pro/${id}/action`, { method: "POST", json: a }),
+  smaartConfig: () => api<SmaartSettingsView>("/smaart/config"),
+  saveSmaart: (p: Partial<SmaartSettingsView> & { password?: string }) => api<SmaartSettingsView>("/smaart/config", { method: "PUT", json: p }),
+  smaartStatus: () => api<SmaartStatusView>("/smaart/status"),
+  dashboard: () => api<DashboardWidget[] | null>("/dashboard"),
+  saveDashboard: (w: DashboardWidget[]) => api<DashboardWidget[]>("/dashboard", { method: "PUT", json: w }),
+  ndiSources: () => api<{ available: boolean; error?: string; sources: { name: string }[] }>("/desktop/ndi/sources"),
+  runSheetViews: () => api<RunSheetView[]>("/runsheet-views"),
+  saveRunSheetView: (v: Omit<RunSheetView, "id"> & { id?: string }) =>
+    v.id ? api<RunSheetView>(`/runsheet-views/${v.id}`, { method: "PUT", json: v }) : api<RunSheetView>("/runsheet-views", { method: "POST", json: v }),
+  deleteRunSheetView: (id: string) => api<void>(`/runsheet-views/${id}`, { method: "DELETE" }),
   matrix: (st: string, weeks: number, past: number) => api<Matrix>(`/services/matrix/${st}?weeks=${weeks}&past=${past}`),
   checkins: (st: string, plan: string) => api<CheckInsForPlan>(`/services/plans/${st}/${plan}/checkins`),
   // Background work: the server lets requests you're waiting on (opening a service) go first.
@@ -158,6 +185,15 @@ export const qk = {
   matrix: (st: string, weeks: number, past: number) => ["matrix", st, weeks, past] as const,
   runSheet: (plan: string) => ["runSheet", plan] as const,
   live: (plan: string) => ["live", plan] as const,
+  itemTimes: (plan: string) => ["itemTimes", plan] as const,
+  noteCategories: (st: string) => ["noteCategories", st] as const,
+  runSheetViews: ["runSheetViews"] as const,
+  proMachines: ["proMachines"] as const,
+  smaartConfig: ["smaartConfig"] as const,
+  smaartStatus: ["smaartStatus"] as const,
+  dashboard: ["dashboard"] as const,
+  ndiSources: ["ndiSources"] as const,
+  proState: (id: string) => ["proState", id] as const,
   pagingChildren: ["pagingChildren"] as const,
 };
 
