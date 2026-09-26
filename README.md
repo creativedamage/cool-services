@@ -173,6 +173,14 @@ no personal data). Send that file along when reporting slowness.
    `MAC_CERT_PASSWORD`. Releases are then signed with the church's own certificate, so macOS keeps
    "Always Allow" for Cool Services' Keychain item after updates instead of asking again. Keep the
    `.p12` file out of the repository (it's in `.gitignore`).
+4. Publish the first release (1.7.0, the version already in the project):
+
+   ```bash
+   git tag v1.7.0 && git push origin v1.7.0
+   ```
+
+   When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.7.0.dmg` from the
+   release and install it on each Mac once. From then on, updates come through the app.
 
 ### Publishing a new version
 
