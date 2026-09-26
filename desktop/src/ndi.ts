@@ -13,6 +13,7 @@ import { BrowserWindow } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import type { NdiSettings, NdiStatus } from "../../shared/types";
+import { loadGrandiose } from "./ndiLib";
 
 interface Bridge {
   settings: () => NdiSettings;
@@ -47,12 +48,7 @@ function loadNdi(): { lib: any; error?: string } {
       },
     };
   }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return { lib: require("@stagetimerio/grandiose") };
-  } catch (e) {
-    return { lib: null, error: `NDI isn’t included in this build (${(e as Error).message.split("\n")[0]})` };
-  }
+  return loadGrandiose();
 }
 
 export function startNdi(origin: string, bridge: Bridge) {

@@ -138,8 +138,12 @@ uses its own chosen plot, or else its service type's default (only one default p
 
 `desktop/src/ndi.ts` opens an invisible off-screen Electron window on `/ndi` at 720p, 1080p or 4K.
 Each painted frame is kept as BGRA and re-sent at the chosen frame rate with
-`@stagetimerio/grandiose` (NDI SDK 6, N-API). It's an optionalDependency, so builds without it still
-work. `/ndi` resolves the next service (optionally of one type), its plot, mic assignments and team,
+`@stagetimerio/grandiose` (NDI SDK 6, N-API). It's an optionalDependency (npm skips it quietly if it
+can't compile), so `build.mjs` checks it: it retries the build out loud, builds the other processor's
+slice and joins them with `lipo`, and copies `dist/` (grandiose.node + libndi.dylib) to
+`app/native/grandiose`, which is unpacked from the asar. `desktop/src/ndiLib.ts` loads that copy
+(falling back to node_modules when running from source). `build.mjs --dist` fails if the add-on
+isn't there, unless COOL_SKIP_NDI=1. `/ndi` resolves the next service (optionally of one type), its plot, mic assignments and team,
 and refreshes on its own. Settings changes start, stop or restart the sender through `ndiBridge`,
 and status (source name, receivers connected) is shown in Settings.
 

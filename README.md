@@ -71,9 +71,12 @@ Services scheduling faster.
 ## Build the DMG (on your Mac)
 
 You need Node.js 22.12 or newer (`node -v` to check). Get it from https://nodejs.org (LTS).
-For NDI output you also need Apple's command-line developer tools, since the NDI add-on is compiled
-during install: run `xcode-select --install` once. `npm install` downloads the NDI SDK from ndi.video.
-If NDI can't be built, the app still builds and Settings says NDI isn't available.
+For NDI (stage plot output and the dashboard's ProPresenter previews) you also need Apple's
+command-line developer tools, since the NDI add-on is compiled on your Mac: run
+`xcode-select --install` once. The build downloads the NDI SDK from downloads.ndi.tv, compiles the
+add-on for Apple silicon and Intel, and copies it into the app. If that fails, `npm run dist:mac`
+stops and says why, instead of making an app that says "NDI isn't included in this build". To make
+an app without NDI anyway: `COOL_SKIP_NDI=1 npm run dist:mac`.
 
 ```bash
 npm install
@@ -225,7 +228,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.9.1 && git push origin v1.9.1
+   git tag v1.9.2 && git push origin v1.9.2
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

@@ -1,7 +1,7 @@
 {
   "name": "cool-services",
   "productName": "Cool Services",
-  "version": "1.9.1",
+  "version": "1.9.2",
   "description": "Volunteer workflows and service scheduling, powered by Planning Center.",
   "author": "Wayne Goodman Productions",
   "private": true,
@@ -9,7 +9,7 @@
   "scripts": {
     "build": "node build.mjs",
     "start": "node build.mjs && electron .",
-    "dist": "node build.mjs && electron-builder --mac --publish never",
+    "dist": "node build.mjs --dist && electron-builder --mac --publish never",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
@@ -24,7 +24,8 @@
     "copyright": "Wayne Goodman Productions",
     "files": [
       "app/**/*",
-      "package.json"
+      "package.json",
+      "!**/node_modules/@stagetimerio/**"
     ],
     "directories": {
       "output": "release",
@@ -49,7 +50,7 @@
         }
       ],
       "identity": "-",
-      "x64ArchFiles": "**/node_modules/@stagetimerio/grandiose/**",
+      "x64ArchFiles": "**/native/grandiose/**",
       "artifactName": "Cool-Services-${version}-mac.${ext}"
     },
     "dmg": {
@@ -58,7 +59,7 @@
     },
     "npmRebuild": false,
     "asarUnpack": [
-      "**/node_modules/@stagetimerio/grandiose/**"
+      "app/native/**"
     ],
     "afterSign": "build/after-sign.cjs"
   },

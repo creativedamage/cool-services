@@ -7,6 +7,7 @@
  */
 import { nativeImage } from "electron";
 import type { NdiViewerBridge } from "../../shared/ndiView";
+import { loadGrandiose } from "./ndiLib";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Grandiose = any;
@@ -16,12 +17,7 @@ const FRAME_MS = 180; // ≈5–6 frames a second is plenty for a preview
 
 function load(): { lib: Grandiose | null; error?: string } {
   if (process.env.COOL_NDI_FAKE) return { lib: "fake" };
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return { lib: require("@stagetimerio/grandiose") };
-  } catch (e) {
-    return { lib: null, error: `NDI isn’t included in this build (${(e as Error).message.split("\n")[0]})` };
-  }
+  return loadGrandiose();
 }
 
 /** A moving test picture, for trying the dashboard without NDI hardware (COOL_NDI_FAKE). */
