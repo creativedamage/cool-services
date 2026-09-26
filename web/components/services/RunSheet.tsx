@@ -3,6 +3,7 @@ import clsx from "clsx";
 import { Film, Music2, Type } from "lucide-react";
 import type { PlanDetail } from "@shared/types";
 import { clock, mmss } from "@/lib/format";
+import { Expandable } from "@/components/Expandable";
 
 /** Run sheet with a live clock column computed from the first service time. */
 export function RunSheet({ plan }: { plan: PlanDetail }) {
@@ -46,13 +47,19 @@ export function RunSheet({ plan }: { plan: PlanDetail }) {
                   <span className="min-w-0 break-words text-sm font-medium">{item.title}</span>
                   {item.songKey && <span className="mt-0.5 shrink-0 rounded bg-violet-soft px-1.5 font-mono text-[10px] text-violet">{item.songKey}</span>}
                 </div>
-                {item.description && <div className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-ink-muted">{item.description}</div>}
+                {item.description && (
+                  <Expandable lines={2} className="mt-0.5 text-xs leading-relaxed">
+                    <div className="whitespace-pre-wrap break-words text-xs leading-relaxed text-ink-muted">{item.description}</div>
+                  </Expandable>
+                )}
                 {item.notes.length > 0 && (
                   <div className="mt-1.5 space-y-1">
                     {item.notes.map((n, i) => (
-                      <div key={i} className="whitespace-pre-wrap break-words rounded-md border border-line px-2 py-1 text-[11px] leading-relaxed text-ink-soft">
-                        <span className="font-medium text-ink-muted">{n.category}:</span> {n.body}
-                      </div>
+                      <Expandable key={i} lines={2} className="rounded-md border border-line px-2 py-1 text-[11px] leading-relaxed">
+                        <div className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-ink-soft">
+                          <span className="font-medium text-ink-muted">{n.category}:</span> {n.body}
+                        </div>
+                      </Expandable>
                     ))}
                   </div>
                 )}

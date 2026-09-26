@@ -9,6 +9,20 @@ Services scheduling faster.
 - **Services**: every upcoming plan on one screen. The plan view puts the roster, open slots and
   run sheet side by side. You can fill a slot in one click with conflict checks, and confirm,
   decline, replace or remove people from the row.
+- **Matrix**: several weeks of a service type side by side (4–12 weeks, optionally the last two):
+  every team and position, who's on it with their status, open slots, and each week's songs and
+  keys. Hover a name to see all the weeks that person serves. Open it from "Matrix" in the sidebar.
+- **Full run sheet**: a whole-page run sheet for a service (the "Run sheet" tab): clock times for
+  the chosen service time, lengths, descriptions, and every note category in its own column. Pick a
+  team layout (Lighting, Video, Audio…) to put that team's notes first and highlight their items.
+  Follows Planning Center Live (current item, next, time used/left), refreshes every 10 seconds, and
+  has full screen, text size and print. Keys: F, + / −, L, P.
+- **Chat**: Planning Center Chat inside Cool Services (sidebar → Chat): current conversations, new
+  ones, teams and direct messages. Planning Center has no public Chat API, so this is Planning
+  Center's own Chat shown in the app window, using your Planning Center sign-in.
+- **Message the team**: on any service, text or email one person, a team, or everyone (by status).
+  It opens a message in Messages on this Mac addressed with their mobile numbers from Planning
+  Center, like Planning Center's mobile app does (there's no API for sending texts).
 - **Tuning**: every song's key, big, across the top of each service in service order ("Song 1 · A",
   "Song 2 · Db"). With Waves SuperRack connected in Settings, pressing a key recalls that key's
   SuperRack snapshot over MIDI.
@@ -65,7 +79,7 @@ replaces the app in Applications and opens the new version. Sign-ins, settings, 
 stay as they are (they live in `~/Library/Application Support/Cool Services`).
 
 The app must be running from the Applications folder (not from the DMG) to update itself.
-Versions before 1.7.0 don't have the updater: install 1.7.0 from its DMG once.
+Versions before 1.7.0 don’t have the updater: install the first GitHub release from its DMG once.
 
 ### Installing on a Mac
 
@@ -173,13 +187,13 @@ no personal data). Send that file along when reporting slowness.
    `MAC_CERT_PASSWORD`. Releases are then signed with the church's own certificate, so macOS keeps
    "Always Allow" for Cool Services' Keychain item after updates instead of asking again. Keep the
    `.p12` file out of the repository (it's in `.gitignore`).
-4. Publish the first release (1.7.0, the version already in the project):
+4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.7.0 && git push origin v1.7.0
+   git tag v1.8.0 && git push origin v1.8.0
    ```
 
-   When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.7.0.dmg` from the
+   When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the
    release and install it on each Mac once. From then on, updates come through the app.
 
 ### Publishing a new version

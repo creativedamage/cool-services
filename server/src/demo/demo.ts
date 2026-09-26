@@ -3,7 +3,7 @@
  * Lets every screen run without PCO credentials (DEMO_MODE=true).
  */
 import type {
-  Board, Candidate, CheckInLocation, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanItem, PlanSummary, Person, RosterStatus,
+  Board, Candidate, CheckInLocation, Matrix, RunSheetData, RunSheetLive, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanItem, PlanSummary, Person, RosterStatus,
   ScheduleRequest, ServiceType, StaffMe, Team, TeamMember, WorkflowCard, WorkflowStep, WorkflowSummary,
 } from "../../../shared/types.js";
 import { computeConflicts, type PcoApi } from "../pco/api.js";
@@ -153,7 +153,7 @@ const at = (d: Date, hh: number, mm = 0) => {
   x.setHours(hh, mm, 0, 0);
   return iso(x);
 };
-const SERIES = ["Unshakeable", "Unshakeable", "Unshakeable", "Neighbors"];
+const SERIES = ["Unshakeable", "Unshakeable", "Unshakeable", "Neighbors", "Neighbors", "Neighbors", "Advent", "Advent"];
 const SONGS: [string, string, number][] = [
   ["Firm Foundation (He Won't)", "B", 330], ["Gratitude", "Db", 300], ["Holy Forever", "C", 360],
   ["Praise", "E", 280], ["Build My Life", "Bb", 340], ["Goodness of God", "A", 320],
@@ -163,11 +163,11 @@ const runSheet = (w: number): PlanItem[] => {
   const rows: Omit<PlanItem, "id" | "sequence">[] = [
     { title: "Pre-Service Countdown", kind: "media", lengthSec: 300, description: "5:00 countdown on all screens", songKey: null, servicePosition: "pre", notes: [{ category: "Production", body: "House music fades at 0:30" }] },
     { title: "Worship", kind: "header", lengthSec: 0, description: null, songKey: null, servicePosition: "during", notes: [] },
-    { title: s(0)[0], kind: "song", lengthSec: s(0)[2], description: null, songKey: s(0)[1], servicePosition: "during", notes: [{ category: "Lighting", body: "Full stage wash, haze on" }] },
-    { title: s(1)[0], kind: "song", lengthSec: s(1)[2], description: null, songKey: s(1)[1], servicePosition: "during", notes: [] },
+    { title: s(0)[0], kind: "song", lengthSec: s(0)[2], description: null, songKey: s(0)[1], servicePosition: "during", notes: [{ category: "Lighting", body: "Full stage wash, haze on" }, { category: "Audio", body: "Band in from the count-in. Vox 1 lead." }, { category: "Video", body: "Wide on the band for the intro, then lyrics lower third on stream" }] },
+    { title: s(1)[0], kind: "song", lengthSec: s(1)[2], description: null, songKey: s(1)[1], servicePosition: "during", notes: [{ category: "Lighting", body: "Slow blue, pull the haze" }, { category: "Stage", body: "Acoustic only for verse 1" }] },
     { title: "Welcome & Announcements", kind: "item", lengthSec: 360, description: "Next Steps lunch after second service in the café. Serve Day is Oct 17: sign-ups at the Connect table and in the app. Kids check-in opens 20 minutes early next week because of the baptism service.", songKey: null, servicePosition: "during", notes: [{ category: "ProPresenter", body: "3 announcement slides. Hold the Serve Day slide until the host says “sign up today”, then advance to the QR code slide and leave it up through the offering." }] },
     { title: "Message", kind: "header", lengthSec: 0, description: null, songKey: null, servicePosition: "during", notes: [] },
-    { title: `${SERIES[w]} — Week ${w + 1}`, kind: "item", lengthSec: 2100, description: "Pastor Mike", songKey: null, servicePosition: "during", notes: [{ category: "Camera", body: "Lower third at 0:30" }] },
+    { title: `${SERIES[w]} — Week ${w + 1}`, kind: "item", lengthSec: 2100, description: "Pastor Mike", songKey: null, servicePosition: "during", notes: [{ category: "Video", body: "Lower third at 0:30. Scripture slides from ProPresenter." }, { category: "Audio", body: "Handheld 2 for Pastor Mike; lav as backup" }] },
     { title: s(2)[0], kind: "song", lengthSec: s(2)[2], description: "Response", songKey: s(2)[1], servicePosition: "during", notes: [] },
     { title: "Closing & Blessing", kind: "item", lengthSec: 180, description: null, songKey: null, servicePosition: "during", notes: [] },
     { title: "Walk-out Playlist", kind: "media", lengthSec: 600, description: null, songKey: null, servicePosition: "post", notes: [] },
@@ -185,7 +185,7 @@ const NEEDED = [
   { teamId: "t4", positionName: "Classroom Lead", quantity: 2 },
 ];
 
-for (let w = 0; w < 4; w++) {
+for (let w = 0; w < SERIES.length; w++) {
   const d = nextWeekday(0, w);
   const id = `p${w}`;
   plans.push({
@@ -206,7 +206,7 @@ for (let w = 0; w < 4; w++) {
     const pos = team.positions.find((p) => p.name === n.positionName)!;
     const pool = qualified.get(pos.id)!;
     for (let q = 0; q < n.quantity; q++) {
-      if ((ni * 3 + q + w * 5) % 10 < 2 + w) continue; // leave ~20–50% open, more further out
+      if ((ni * 3 + q + w * 5) % 10 < 2 + Math.min(w, 4)) continue; // leave ~20–50% open, more further out
       const pid = [...pool.slice((q + w) % pool.length), ...pool].find((id) => !members.some((m) => m.personId === id));
       if (!pid) continue;
       const p = personById(pid);
@@ -280,7 +280,7 @@ export class DemoPco implements PcoApi {
   }
 
   async getContacts(ids: string[]) {
-    return Object.fromEntries(ids.map((id) => [id, { email: personById(id)?.email ?? null, phone: personById(id)?.phone ?? null }]));
+    return Object.fromEntries(ids.map((id) => [id, { email: personById(id)?.email ?? null, phone: personById(id)?.phone ?? null, mobile: personById(id)?.phone ?? null }]));
   }
 
   async getPerson(personId: string) {
@@ -321,6 +321,33 @@ export class DemoPco implements PcoApi {
   async listUpcomingPlans(serviceTypeId?: string) {
     return plans.filter((p) => !serviceTypeId || p.serviceTypeId === serviceTypeId).map((p) => this.summarize(p))
       .sort((a, b) => a.sortDate.localeCompare(b.sortDate));
+  }
+
+  async getMatrix(st: string, weeks: number): Promise<Matrix> {
+    const list = plans.filter((p) => p.serviceTypeId === st).sort((a, b) => a.sortDate.localeCompare(b.sortDate)).slice(0, weeks);
+    return { serviceType: serviceTypes.find((t) => t.id === st) ?? { id: st, name: "Service" }, plans: await Promise.all(list.map((p) => this.getPlan(st, p.id))) };
+  }
+
+  async getRunSheet(st: string, planId: string): Promise<RunSheetData> {
+    return {
+      plan: await this.getPlan(st, planId),
+      planNotes: [
+        { category: "Version", body: "v3 · updated Thursday 4:12 PM" },
+        { category: "Production", body: "Baptism video moves to after the message. Keep the stage wash at 60% for the response song." },
+      ],
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+
+  /** Sample Live: moves to the next item every 40 seconds, so the full run sheet can be seen following along. */
+  async getLive(st: string, planId: string): Promise<RunSheetLive | null> {
+    const items = this.plan(st, planId).items.filter((i) => i.kind !== "header");
+    const n = Math.floor((Date.now() - demoBoot) / 40_000) % items.length;
+    return {
+      currentItemId: items[n].id, nextItemId: items[n + 1]?.id ?? null,
+      currentStartedAt: new Date(demoBoot + Math.floor((Date.now() - demoBoot) / 40_000) * 40_000).toISOString(),
+      controller: "Wayne (Demo)",
+    };
   }
 
   private plan(st: string, id: string) {

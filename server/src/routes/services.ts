@@ -11,6 +11,23 @@ servicesRouter.get("/service-types", h(async (req, res) => res.json(await req.pc
 servicesRouter.get("/plans", h(async (req, res) =>
   res.json(await req.pco.listUpcomingPlans(req.query.serviceTypeId as string | undefined))));
 
+servicesRouter.get("/matrix/:st", h(async (req, res) => {
+  const weeks = Math.min(16, Math.max(1, Number(req.query.weeks) || 6));
+  const past = Math.min(8, Math.max(0, Number(req.query.past) || 0));
+  res.json(await req.pco.getMatrix(req.params.st, weeks, past));
+}));
+
+servicesRouter.get("/plans/:st/:plan/runsheet", h(async (req, res) => res.json(await req.pco.getRunSheet(req.params.st, req.params.plan))));
+
+servicesRouter.get("/plans/:st/:plan/live", h(async (req, res) => {
+  try {
+    res.json({ live: await req.pco.getLive(req.params.st, req.params.plan) });
+  } catch (e: any) {
+    if (e?.status === 404 || e?.status === 403) return res.json({ live: null }); // Live not available for this plan
+    throw e;
+  }
+}));
+
 servicesRouter.get("/plans/:st/:plan", h(async (req, res) => res.json(await req.pco.getPlan(req.params.st, req.params.plan))));
 
 servicesRouter.get("/plans/:st/:plan/checkins", h(async (req, res) => {

@@ -12,6 +12,7 @@ import net from "node:net";
 import path from "node:path";
 import { startNdi } from "./ndi";
 import { createUpdater } from "./updater";
+import { createEmbed } from "./embed";
 
 // Must match server/src/pco/registration.ts (and the redirect URIs registered with Planning Center).
 const PORTS = [47123, 47124, 47125];
@@ -21,6 +22,7 @@ nativeTheme.themeSource = "system"; // the page picks dark/light from Settings; 
 
 let win: BrowserWindow | null = null;
 let origin = "";
+let embed: ReturnType<typeof createEmbed> | null = null;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -87,7 +89,7 @@ async function boot() {
   session.defaultSession.setPermissionCheckHandler((_wc, _perm, requestingOrigin) => ours(requestingOrigin));
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { startServer, ndiBridge, setUpdateBridge } = require("./server.cjs") as typeof import("../../server/src/app");
+  const { startServer, ndiBridge, setUpdateBridge, setEmbedBridge } = require("./server.cjs") as typeof import("../../server/src/app");
   await startServer({ port, webDir: path.join(__dirname, "web") });
 
   // Check for Updates (GitHub Releases). Only the packaged app can replace itself.
@@ -100,6 +102,8 @@ async function boot() {
     log: (m) => console.log(`[updates] ${m}`),
   });
   setUpdateBridge(updater);
+  embed = createEmbed(() => win); // Planning Center Chat inside the window
+  setEmbedBridge(embed);
   updater.start();
   buildMenu(updater);
 
@@ -208,6 +212,9 @@ function createWindow() {
   win.webContents.on("will-navigate", (e, url) => {
     if (!isInApp(url)) { e.preventDefault(); void shell.openExternal(url); }
   });
+
+  // A full page load (not the app's own in-page navigation) always takes Chat off the screen.
+  win.webContents.on("did-navigate", () => embed?.apply({ action: "hide" }));
 
   void win.loadURL(`${origin}/`);
   win.on("closed", () => { win = null; });

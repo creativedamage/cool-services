@@ -105,7 +105,19 @@ body {
   .print-area, .print-area * { visibility: visible; }
   .print-area { position: fixed; inset: 0; margin: 0; padding: 0; color: #000; max-width: none; }
   .no-print { display: none !important; }
+
+  /* Full run sheet: print the whole sheet as a plain table. */
+  body:has(.runsheet) * { visibility: visible !important; }
+  .runsheet { font-size: 10.5px !important; }
+  .runsheet, .runsheet * { color: #000 !important; opacity: 1 !important; }
+  .runsheet th { position: static !important; }
+  .runsheet td, .runsheet th { border-bottom-color: #bbb !important; }
+  .runsheet td > div[style] { border-left-color: #888 !important; }
+  .runsheet tr { break-inside: avoid; }
 }
+
+.print-only { display: none; }
+@media print { .print-only { display: block; } }
 
 @keyframes shake {
   0%, 100% { transform: translateX(0); }

@@ -2,7 +2,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import clsx from "clsx";
-import { BellRing, CalendarDays, KanbanSquare, LayoutTemplate, LogOut, Settings } from "lucide-react";
+import { BellRing, CalendarDays, MessageCircle, KanbanSquare, LayoutTemplate, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -34,6 +34,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     { href: "/workflows", label: "Workflows", icon: KanbanSquare },
     { href: "/services", label: "Services", icon: CalendarDays },
     { href: "/stage-plots", label: "Stage plots", icon: LayoutTemplate },
+    { href: "/chat", label: "Chat", icon: MessageCircle },
     { href: "/paging", label: "Parent paging", icon: BellRing },
   ];
 
@@ -64,6 +65,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           <StagePlotsNav activeId={search.get("id")} />
         ) : path.startsWith("/paging") ? (
           <PagingNav />
+        ) : path.startsWith("/chat") ? (
+          <div className="flex-1" />
         ) : path.startsWith("/settings") ? (
           <SettingsNav />
         ) : (
@@ -138,7 +141,13 @@ function ServicesNav({ activeSt, activePlan, tab }: { activeSt: string | null; a
       {plans.types === undefined && <div className="px-2 text-xs text-ink-faint">Loading services…</div>}
       {types.map(([stId, stName]) => (
         <div key={stId} className="mb-4">
-          <div className="label truncate px-2 pb-2">{stName}</div>
+          <div className="flex items-center justify-between gap-2 px-2 pb-2">
+            <span className="label truncate">{stName}</span>
+            <Link href={routes.matrix(stId)} title="Several weeks side by side"
+              className={clsx("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium transition", tab === "/services/matrix" && activeSt === stId ? "bg-accent-soft text-accent" : "text-ink-muted hover:bg-hover hover:text-ink-soft")}>
+              Matrix
+            </Link>
+          </div>
           <div className="space-y-0.5">
             {list.filter((p) => p.serviceTypeId === stId).map((p) => {
               const d = new Date(p.sortDate);

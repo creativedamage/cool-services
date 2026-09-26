@@ -3,11 +3,11 @@
  * Endpoint notes live in docs/ARCHITECTURE.md §3.
  */
 import type {
-  Board, Candidate, CheckInLocation, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanItem, PlanSummary, PlanTime, Person,
+  Board, Candidate, CheckInLocation, Matrix, RunSheetData, RunSheetLive, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanItem, PlanSummary, PlanTime, Person,
   RosterStatus, ScheduleRequest, ServiceType, StaffMe, Team, TeamMember, WorkflowCard, WorkflowSummary,
 } from "../../../shared/types.js";
 import { cache } from "../lib/db.js";
-import { computeConflicts, type PcoApi } from "./api.js";
+import { computeConflicts, mapLimit, type PcoApi } from "./api.js";
 import { PcoClient, flatten, type Flat } from "./client.js";
 
 const P = "/people/v2";
@@ -49,6 +49,7 @@ export class LivePco implements PcoApi {
       avatarUrl: f.avatar ?? null,
       email: primary(emails)?.address ?? null,
       phone: primary(phones)?.number ?? null,
+      mobile: (phones.find((x) => /mobile|cell/i.test(x.location ?? "")) ?? null)?.number ?? null,
     };
   }
 
@@ -138,9 +139,9 @@ export class LivePco implements PcoApi {
     return (await this.people([personId])).get(personId)!;
   }
 
-  async getContacts(personIds: string[]): Promise<Record<string, { email: string | null; phone: string | null }>> {
+  async getContacts(personIds: string[]): Promise<Record<string, { email: string | null; phone: string | null; mobile: string | null }>> {
     const people = await this.people(personIds.slice(0, 300));
-    return Object.fromEntries([...people].map(([id, p]) => [id, { email: p.email, phone: p.phone }]));
+    return Object.fromEntries([...people].map(([id, p]) => [id, { email: p.email, phone: p.phone, mobile: p.mobile ?? null }]));
   }
 
   private steps(workflowId: string) {
@@ -269,6 +270,54 @@ export class LivePco implements PcoApi {
       }),
     );
     return all.flat().sort((a, b) => a.sortDate.localeCompare(b.sortDate));
+  }
+
+  async getMatrix(st: string, weeks: number, past: number): Promise<Matrix> {
+    const t = (await this.listServiceTypes()).find((x) => x.id === st) ?? { id: st, name: "Service" };
+    const base = `${S}/service_types/${st}/plans`;
+    const [upcoming, recent] = await Promise.all([
+      cache.swr(this.k(`plans:${st}:next:${weeks}`), 60, () => this.c.list(`${base}?filter=future&order=sort_date&per_page=${weeks}`, 1)),
+      past ? cache.swr(this.k(`plans:${st}:past:${past}`), 600, () => this.c.list(`${base}?filter=past&order=-sort_date&per_page=${past}`, 1)) : Promise.resolve([] as Flat[]),
+    ]);
+    const ids = [...recent.slice(0, past).reverse(), ...upcoming.slice(0, weeks)].map((p) => p.id);
+    // Each plan comes from the same shared cache as the service page, 3 at a time.
+    const plans = await mapLimit(ids, 3, (id) => this.getPlan(st, id));
+    return { serviceType: t, plans };
+  }
+
+  async getRunSheet(st: string, planId: string): Promise<RunSheetData> {
+    const base = `${S}/service_types/${st}/plans/${planId}`;
+    const [plan, notes] = await Promise.all([
+      this.getPlan(st, planId),
+      cache.swr(this.k(`plannotes:${planId}`), 20, () => this.c.list(`${base}/notes`, 2)),
+    ]);
+    return {
+      plan,
+      planNotes: notes.map((n) => ({ category: n.category_name ?? "Note", body: n.content ?? "" })).filter((n) => n.body.trim()),
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+
+  async getLive(st: string, planId: string): Promise<RunSheetLive | null> {
+    // Raw JSON:API here: the item each ItemTime points to is two relationships deep.
+    const doc = await this.c.raw("GET", `${S}/service_types/${st}/plans/${planId}/live?include=current_item_time,next_item_time,controller`);
+    const live = doc && !Array.isArray(doc.data) ? doc.data : null;
+    if (!live) return null;
+    const inc = new Map((doc!.included ?? []).map((r) => [`${r.type}:${r.id}`, r]));
+    const ref = (name: string) => (live.relationships?.[name]?.data as { id: string; type: string } | null) ?? null;
+    const itemTime = (name: string) => { const r = ref(name); return r ? inc.get(`${r.type}:${r.id}`) : undefined; };
+    const itemOf = (t?: { relationships?: Record<string, { data?: unknown }> }) => ((t?.relationships?.item?.data as { id: string } | null)?.id) ?? null;
+    const cur = itemTime("current_item_time");
+    const ctrl = ref("controller");
+    const controller = ctrl ? (inc.get(`${ctrl.type}:${ctrl.id}`)?.attributes as { full_name?: string; name?: string } | undefined) : undefined;
+    const currentItemId = itemOf(cur);
+    if (!currentItemId && !ctrl) return null;
+    return {
+      currentItemId,
+      nextItemId: itemOf(itemTime("next_item_time")),
+      currentStartedAt: ((cur?.attributes as { live_start_at?: string } | undefined)?.live_start_at) ?? null,
+      controller: controller?.full_name ?? controller?.name ?? null,
+    };
   }
 
   private planSummary(p: Flat, t: ServiceType, roster: Flat[] | null): PlanSummary {

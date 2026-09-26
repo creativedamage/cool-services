@@ -11,6 +11,8 @@ export interface Person {
   avatarUrl: string | null;
   email: string | null;
   phone: string | null;
+  /** The number marked "Mobile" in Planning Center (for texting), if there is one. */
+  mobile?: string | null;
 }
 
 export interface StaffMe extends Person {
@@ -478,3 +480,29 @@ export interface KioskInfo {
 export interface KioskChildren { children: KioskChild[]; fetchedAt: string }
 
 export interface CheckInLocation { id: string; name: string; event: string; folder: string | null; childOrAdult: string | null }
+
+/* ───────────── Matrix (several weeks of one service type) ───────────── */
+
+export interface Matrix {
+  serviceType: ServiceType;
+  /** Oldest first: any past weeks asked for, then the upcoming ones. */
+  plans: PlanDetail[];
+}
+
+/* ───────────── Full run sheet ───────────── */
+
+/** Planning Center Live for a plan: where the service is right now. */
+export interface RunSheetLive {
+  currentItemId: string | null;
+  nextItemId: string | null;
+  /** When the current item started (live_start_at). */
+  currentStartedAt: string | null;
+  controller: string | null;
+}
+
+export interface RunSheetData {
+  plan: PlanDetail;
+  /** Plan-wide notes (e.g. "Version"). */
+  planNotes: { category: string; body: string }[];
+  fetchedAt: string;
+}

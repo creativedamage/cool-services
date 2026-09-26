@@ -1,7 +1,8 @@
 "use client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { AlertTriangle, Check, GripVertical, Plus, RotateCcw, Trash2, UserPlus, X } from "lucide-react";
+import { AlertTriangle, Check, GripVertical, MessageSquare, Plus, RotateCcw, Trash2, UserPlus, X } from "lucide-react";
+import { MessageTeamModal } from "./MessageTeamModal";
 import { useState } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { toast } from "sonner";
@@ -18,6 +19,7 @@ export function RosterPanel({ plan, filter, setFilter }: { plan: PlanDetail; fil
   const qc = useQueryClient();
   const key = qk.plan(plan.serviceTypeId, plan.id);
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [messaging, setMessaging] = useState<{ personIds?: string[]; teamIds?: string[] } | null>(null);
   const [shownTeams, setShownTeams] = useTeamFilter(plan.serviceTypeId);
   const [order, setOrder] = useTeamOrder(plan.serviceTypeId);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
@@ -91,7 +93,12 @@ export function RosterPanel({ plan, filter, setFilter }: { plan: PlanDetail; fil
             <span className="ml-1.5 tabular-nums text-ink-faint">{counts[f]}</span>
           </button>
         ))}
+        <button className="btn-outline ml-auto py-1 text-xs" onClick={() => setMessaging({ teamIds: shownTeams.size ? [...shownTeams] : undefined })}
+          title="Text or email the people on this service">
+          <MessageSquare size={13} /> Message team
+        </button>
       </div>
+      {messaging && <MessageTeamModal plan={plan} preset={messaging} onClose={() => setMessaging(null)} />}
 
       {teams.length > 1 && (
         <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -138,6 +145,10 @@ export function RosterPanel({ plan, filter, setFilter }: { plan: PlanDetail; fil
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <GripVertical size={14} className="-ml-2 text-ink-faint opacity-40 transition group-hover:opacity-100" />
                   {team.name}
+                  <button onPointerDown={(e) => e.stopPropagation()} onClick={() => setMessaging({ teamIds: [team.id] })}
+                    title={`Message ${team.name}`} className="rounded p-1 text-ink-faint opacity-0 transition hover:bg-hover hover:text-accent group-hover:opacity-100">
+                    <MessageSquare size={12} />
+                  </button>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] tabular-nums text-ink-muted">
                   <div className="h-1 w-16 overflow-hidden rounded-full bg-hover">
@@ -165,7 +176,8 @@ export function RosterPanel({ plan, filter, setFilter }: { plan: PlanDetail; fil
                             </div>
                           </div>
                           <StatusPill status={m.status} />
-                          <div className="flex w-[92px] justify-end gap-0.5 opacity-0 transition group-hover:opacity-100">
+                          <div className="flex w-[120px] justify-end gap-0.5 opacity-0 transition group-hover:opacity-100">
+                            <RowBtn title={`Text ${m.name.split(" ")[0]}`} tone="accent" onClick={() => setMessaging({ personIds: [m.personId] })}><MessageSquare size={13} /></RowBtn>
                             {m.status === "D" ? (
                               <RowBtn title="Find a replacement" tone="accent" onClick={() => setAssigning(assigning === replaceKey ? null : replaceKey)}><RotateCcw size={14} /></RowBtn>
                             ) : m.status !== "C" ? (

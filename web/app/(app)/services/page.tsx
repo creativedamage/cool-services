@@ -28,6 +28,11 @@ export default function ServicesPage() {
             {t.name}
           </button>
         ))}
+        {type && (
+          <Link href={routes.matrix(type)} className="ml-2 rounded-full border border-line px-3 py-1 text-xs text-ink-soft hover:border-accent/50 hover:text-accent">
+            Matrix view →
+          </Link>
+        )}
       </div>
 
       <div className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3">

@@ -79,6 +79,7 @@ export function ServiceView({ serviceTypeId, planId }: { serviceTypeId: string; 
             <Link href="/services" className="hover:text-ink-soft">Services</Link>
             <span>/</span>
             <span>{p.serviceTypeName}</span>
+            <Link href={routes.matrix(serviceTypeId)} className="ml-2 rounded-md border border-line px-2 py-0.5 hover:border-line-strong hover:text-ink-soft">Matrix</Link>
             <div className="ml-auto mr-28 flex gap-1">
               <NavBtn href={prev && routes.plan(serviceTypeId, prev.id)}><ChevronLeft size={15} /></NavBtn>
               <NavBtn href={next && routes.plan(serviceTypeId, next.id)}><ChevronRight size={15} /></NavBtn>

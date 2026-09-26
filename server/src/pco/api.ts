@@ -3,7 +3,7 @@
  * implementation (LivePco) and the in-memory demo (DemoPco) are interchangeable.
  */
 import type {
-  Board, Candidate, CheckInLocation, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanSummary, Person, RosterStatus,
+  Board, Candidate, Matrix, RunSheetData, RunSheetLive, CheckInLocation, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanSummary, Person, RosterStatus,
   ScheduleRequest, ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary,
 } from "../../../shared/types.js";
 
@@ -16,7 +16,7 @@ export interface PcoApi {
   /** Move to `toStepId` (null = complete the card). `skip` marks intermediate steps skipped. */
   moveCard(workflowId: string, cardId: string, toStepId: string | null, skip?: boolean, personId?: string): Promise<WorkflowCard>;
   /** Email + phone for board cards, loaded after the board itself. */
-  getContacts(personIds: string[]): Promise<Record<string, { email: string | null; phone: string | null }>>;
+  getContacts(personIds: string[]): Promise<Record<string, { email: string | null; phone: string | null; mobile: string | null }>>;
   getPerson(personId: string): Promise<Person>;
   getNotes(personId: string, cardId: string): Promise<Note[]>;
   addCardNote(personId: string, cardId: string, body: string): Promise<Note>;
@@ -27,6 +27,12 @@ export interface PcoApi {
   listUpcomingPlans(serviceTypeId?: string): Promise<PlanSummary[]>;
   getPlan(serviceTypeId: string, planId: string): Promise<PlanDetail>;
   getPlanCounts(serviceTypeId: string, planId: string): Promise<PlanCounts>;
+  /** Several weeks of one service type, for the Matrix: `weeks` upcoming plans and `past` recent ones. */
+  getMatrix(serviceTypeId: string, weeks: number, past: number): Promise<Matrix>;
+  /** The plan plus its plan-wide notes, for the full run sheet. */
+  getRunSheet(serviceTypeId: string, planId: string): Promise<RunSheetData>;
+  /** Planning Center Live position (null when nobody has started Live for this plan). */
+  getLive(serviceTypeId: string, planId: string): Promise<RunSheetLive | null>;
   /** Everyone checked in (Planning Center Check-Ins) around this plan's service times. */
   getCheckIns(serviceTypeId: string, planId: string): Promise<CheckInsForPlan>;
   /** Everyone checked in today (for the Kids and Nursery iPad pages). */
@@ -67,5 +73,15 @@ export function computeConflicts(input: {
       out.push({ kind: "double_booked", label: `Also scheduled: ${s.label}` });
     }
   }
+  return out;
+}
+
+/** Run fn over items, at most `limit` at a time (keeps Planning Center's rate limit happy). */
+export async function mapLimit<T, R>(items: T[], limit: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) { const i = next++; out[i] = await fn(items[i]); }
+  }));
   return out;
 }

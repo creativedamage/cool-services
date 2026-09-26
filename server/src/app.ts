@@ -17,6 +17,7 @@ import { settingsRouter } from "./routes/settings.js";
 import { stageRouter } from "./routes/stage.js";
 import { pagingRouter } from "./routes/paging.js";
 import { setUpdateBridge, updatesRouter } from "./routes/updates.js";
+import { desktopRouter, setEmbedBridge } from "./routes/desktop.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
 import { PcoError } from "./pco/client.js";
 import { flush, settings } from "./lib/db.js";
@@ -36,6 +37,7 @@ export function createApp(webDir?: string) {
   app.use("/api/stage", requireAuth, stageRouter);
   app.use("/api/paging", requireAuth, pagingRouter);
   app.use("/api/updates", requireAuth, updatesRouter);
+  app.use("/api/desktop", requireAuth, desktopRouter);
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
   app.use("/api", requireAuth, peopleRouter);
   app.use("/api", (_req, res) => res.status(404).json({ error: "not_found" }));
@@ -100,4 +102,4 @@ export const ndiBridge = {
 };
 
 /** Used by the Mac app to plug its updater into /api/updates. */
-export { setUpdateBridge };
+export { setUpdateBridge, setEmbedBridge };

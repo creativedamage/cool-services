@@ -1,7 +1,7 @@
 import type {
   AppSettings, NdiStatus, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, StagePlot, PlanSummary, RosterStatus, ScheduleRequest,
   ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary,
-  CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
+  Matrix, RunSheetData, RunSheetLive, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 
@@ -65,7 +65,7 @@ export const Api = {
   board: (wf: string) => api<Board>(`/workflows/${wf}/board`),
   moveCard: (wf: string, card: string, toStepId: string | null, personId?: string) =>
     api<WorkflowCard>(`/workflows/${wf}/cards/${card}/move`, { method: "POST", json: { toStepId, personId } }),
-  contacts: (ids: string[]) => api<Record<string, { email: string | null; phone: string | null }>>(`/contacts?ids=${ids.join(",")}`),
+  contacts: (ids: string[]) => api<Record<string, { email: string | null; phone: string | null; mobile: string | null }>>(`/contacts?ids=${ids.join(",")}`),
   notes: (person: string, card: string) => api<Note[]>(`/people/${person}/cards/${card}/notes`),
   addNote: (person: string, card: string, body: string, internal: boolean) =>
     api<Note>(`/people/${person}/cards/${card}/notes`, { method: "POST", json: { body, internal } }),
@@ -76,6 +76,9 @@ export const Api = {
   plans: (serviceTypeId?: string) =>
     api<PlanSummary[]>(`/services/plans${serviceTypeId ? `?serviceTypeId=${serviceTypeId}` : ""}`),
   plan: (st: string, plan: string) => api<PlanDetail>(`/services/plans/${st}/${plan}`),
+  runSheet: (st: string, plan: string) => api<RunSheetData>(`/services/plans/${st}/${plan}/runsheet`),
+  live: (st: string, plan: string) => api<{ live: RunSheetLive | null }>(`/services/plans/${st}/${plan}/live`).then((r) => r.live),
+  matrix: (st: string, weeks: number, past: number) => api<Matrix>(`/services/matrix/${st}?weeks=${weeks}&past=${past}`),
   checkins: (st: string, plan: string) => api<CheckInsForPlan>(`/services/plans/${st}/${plan}/checkins`),
   // Background work: the server lets requests you're waiting on (opening a service) go first.
   planCounts: (st: string, plan: string) => lowLane(() => api<PlanCounts>(`/services/plans/${st}/${plan}/counts`, { headers: { "X-Priority": "low" } })),
@@ -152,6 +155,9 @@ export const qk = {
   checkInLocations: ["checkInLocations"] as const,
   ipads: ["ipads"] as const,
   updates: ["updates"] as const,
+  matrix: (st: string, weeks: number, past: number) => ["matrix", st, weeks, past] as const,
+  runSheet: (plan: string) => ["runSheet", plan] as const,
+  live: (plan: string) => ["live", plan] as const,
   pagingChildren: ["pagingChildren"] as const,
 };
 

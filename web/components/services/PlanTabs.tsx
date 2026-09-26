@@ -1,6 +1,6 @@
 "use client";
 import clsx from "clsx";
-import { CalendarDays, LayoutTemplate, UserCheck } from "lucide-react";
+import { CalendarDays, LayoutTemplate, ScrollText, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { routes } from "@/lib/routes";
 
@@ -10,6 +10,7 @@ export function PlanTabs({ st, plan, active }: { st: string; plan: string; activ
     { key: "plan", label: "Plan", icon: CalendarDays, href: routes.plan(st, plan) },
     { key: "checkins", label: "Check-ins", icon: UserCheck, href: routes.checkins(st, plan) },
     { key: "stage", label: "Stage plot", icon: LayoutTemplate, href: routes.planStage(st, plan) },
+    { key: "runsheet", label: "Run sheet", icon: ScrollText, href: routes.runSheet(st, plan) },
   ] as const;
   return (
     <div className="no-print flex gap-1">
