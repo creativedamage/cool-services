@@ -1,0 +1,73 @@
+{
+  "name": "cool-services",
+  "productName": "Cool Services",
+  "version": "1.7.0",
+  "description": "Volunteer workflows and service scheduling, powered by Planning Center.",
+  "author": "Wayne Goodman Productions",
+  "private": true,
+  "main": "app/main.cjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node build.mjs && electron .",
+    "dist": "node build.mjs && electron-builder --mac --publish never",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.7.2"
+  },
+  "build": {
+    "appId": "org.coolchurch.coolservices",
+    "productName": "Cool Services",
+    "copyright": "Wayne Goodman Productions",
+    "files": [
+      "app/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "darkModeSupport": true,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "identity": "-",
+      "x64ArchFiles": "**/node_modules/@stagetimerio/grandiose/**"
+    },
+    "dmg": {
+      "title": "Cool Services",
+      "artifactName": "Cool-Services-${version}.dmg"
+    },
+    "npmRebuild": false,
+    "asarUnpack": [
+      "**/node_modules/@stagetimerio/grandiose/**"
+    ],
+    "zip": {
+      "artifactName": "Cool-Services-${version}-mac.zip"
+    },
+    "afterSign": "build/after-sign.cjs"
+  },
+  "optionalDependencies": {
+    "@stagetimerio/grandiose": "0.2.0"
+  },
+  "coolServices": {
+    "updateRepo": "YOUR-GITHUB-NAME/cool-services"
+  }
+}

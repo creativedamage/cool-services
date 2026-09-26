@@ -1,0 +1,103 @@
+/**
+ * The Cool Services server: API + (in the Mac app) the web UI, on one 127.0.0.1 address.
+ */
+import fs from "node:fs";
+import path from "node:path";
+import type { Server } from "node:http";
+import express, { type NextFunction, type Request, type Response } from "express";
+import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import { ZodError } from "zod";
+import { config, pcoConfigured, usingPat } from "./config.js";
+import { authRouter, requireAuth } from "./auth/oauth.js";
+import { peopleRouter } from "./routes/people.js";
+import { servicesRouter } from "./routes/services.js";
+import { micsRouter } from "./routes/mics.js";
+import { settingsRouter } from "./routes/settings.js";
+import { stageRouter } from "./routes/stage.js";
+import { pagingRouter } from "./routes/paging.js";
+import { setUpdateBridge, updatesRouter } from "./routes/updates.js";
+import { initKiosk, kioskRouter } from "./kiosk.js";
+import { PcoError } from "./pco/client.js";
+import { flush, settings } from "./lib/db.js";
+import { ndiStatus } from "./lib/ndi-status.js";
+
+export function createApp(webDir?: string) {
+  const app = express();
+  app.use(helmet({ contentSecurityPolicy: false })); // UI is our own static files; PCO avatars load from their CDN
+  app.use(cookieParser());
+  app.use(express.json({ limit: "25mb" })); // logos and stage-plot backgrounds
+
+  app.get("/api/health", (_req, res) => res.json({ ok: true, version: process.env.APP_VERSION ?? "dev" }));
+  app.use("/api/auth", authRouter);
+  app.use("/api/settings", settingsRouter);
+  app.use("/api/services", requireAuth, servicesRouter);
+  app.use("/api/mics", requireAuth, micsRouter);
+  app.use("/api/stage", requireAuth, stageRouter);
+  app.use("/api/paging", requireAuth, pagingRouter);
+  app.use("/api/updates", requireAuth, updatesRouter);
+  app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
+  app.use("/api", requireAuth, peopleRouter);
+  app.use("/api", (_req, res) => res.status(404).json({ error: "not_found" }));
+
+  // The exported web UI (Mac app). /workflows → workflows.html, etc.
+  if (webDir && fs.existsSync(webDir)) {
+    // Pages: /workflows → workflows.html (checked first, since a same-named folder also exists).
+    const root = path.resolve(webDir);
+    app.get(/^\/[^.]*$/, (req, res, next) => {
+      const page = req.path === "/" ? "index" : req.path.replace(/^\/+|\/+$/g, "");
+      const file = path.resolve(root, `${page}.html`);
+      // Pages must never come from the window's cache, or an update wouldn't show until much later.
+      if (file.startsWith(root + path.sep) && fs.existsSync(file)) return res.set("Cache-Control", "no-cache").sendFile(file);
+      next();
+    });
+    app.use(express.static(webDir, {
+      redirect: false,
+      setHeaders: (res, file) =>
+        res.setHeader("Cache-Control", file.includes(`${path.sep}_next${path.sep}static${path.sep}`)
+          ? "public, max-age=31536000, immutable" // file names change with every build
+          : "no-cache"),
+    }));
+    app.use((_req, res) => res.status(404).sendFile(path.join(webDir, "404.html")));
+  }
+
+  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    if (err instanceof ZodError) return res.status(400).json({ error: "invalid_request", issues: err.issues });
+    if (err instanceof PcoError) {
+      console.error(err.message);
+      return res.status(err.status === 401 ? 401 : 502).json({ error: "pco_error", message: err.message });
+    }
+    console.error(err);
+    res.status(500).json({ error: "server_error", message: (err as Error)?.message });
+  });
+  return app;
+}
+
+/** Start listening on 127.0.0.1 only — nothing on the network can reach it. */
+export function startServer(opts: { port: number; webDir?: string }): Promise<Server> {
+  const app = createApp(opts.webDir);
+  return new Promise((resolve, reject) => {
+    const server = app.listen(opts.port, "127.0.0.1", () => {
+      console.log(`Cool Services on http://127.0.0.1:${opts.port}`);
+      console.log(pcoConfigured()
+        ? `  Planning Center sign-in on (client ${config.pco.clientId.slice(0, 6)}…) · return address ${config.pco.redirectUri}`
+        : "  Planning Center sign-in OFF — add the Client ID in server/src/pco/registration.ts");
+      console.log(usingPat() ? "  Data: shared Personal Access Token" : "  Data: each person's own sign-in");
+      initKiosk(opts.webDir);
+      resolve(server);
+    });
+    server.on("error", reject);
+  });
+}
+
+process.on("exit", flush);
+
+/** Used by the Mac app (same process) to drive NDI output from Settings. */
+export const ndiBridge = {
+  settings: () => settings.get().ndi,
+  onSettings: (fn: (ndi: ReturnType<typeof settings.get>["ndi"]) => void) => settings.onChange((s) => fn(s.ndi)),
+  setStatus: ndiStatus.set,
+};
+
+/** Used by the Mac app to plug its updater into /api/updates. */
+export { setUpdateBridge };

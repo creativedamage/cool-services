@@ -1,0 +1,25 @@
+{
+  "name": "cool-services",
+  "private": true,
+  "workspaces": [
+    "server",
+    "web",
+    "desktop"
+  ],
+  "scripts": {
+    "setup": "npm install",
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
+    "app": "npm run start -w desktop",
+    "dist:mac": "npm run dist -w desktop",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web && npm run typecheck -w desktop",
+    "dist:mac:arm": "npm run build -w desktop && cd desktop && npx electron-builder --mac dmg zip --arm64 --publish never",
+    "set-repo": "node scripts/set-repo.mjs",
+    "release": "node scripts/release.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}

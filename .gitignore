@@ -1,0 +1,14 @@
+node_modules
+.next
+web/out
+.data
+.env
+next-env.d.ts
+*.tsbuildinfo
+desktop/app
+desktop/release
+web/public/pdf.worker.min.js
+.DS_Store
+*.p12
+*.pem
+cool-services-signing.*

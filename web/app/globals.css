@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Dark (default) */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --c-canvas: 10 12 16;
+  --c-surface: 17 20 26;
+  --c-raised: 23 27 35;
+  --c-hover: 29 34 44;
+  --c-line: 36 42 54;
+  --c-line-strong: 50 58 74;
+  --c-ink: 232 235 242;
+  --c-ink-soft: 180 187 203;
+  --c-ink-muted: 125 134 154;
+  --c-ink-faint: 86 96 116;
+  --c-accent: 79 156 255;
+  --c-accent-strong: 122 182 255;
+  --c-on-accent: 5 18 38;
+  --c-ok: 52 211 153;
+  --c-warn: 251 191 36;
+  --c-bad: 251 113 133;
+  --c-violet: 167 139 250;
+  --shadow-card: 0 1px 0 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lift: 0 12px 32px -8px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(79, 156, 255, 0.35);
+  --scrollbar: #2a3140;
+}
+
+/* Light */
+[data-theme="light"] {
+  color-scheme: light;
+  --c-canvas: 244 246 249;
+  --c-surface: 255 255 255;
+  --c-raised: 255 255 255;
+  --c-hover: 236 240 245;
+  --c-line: 224 229 237;
+  --c-line-strong: 200 207 219;
+  --c-ink: 15 20 32;
+  --c-ink-soft: 55 64 82;
+  --c-ink-muted: 100 112 133;
+  --c-ink-faint: 150 160 179;
+  --c-accent: 37 111 235;
+  --c-accent-strong: 29 92 204;
+  --c-on-accent: 255 255 255;
+  --c-ok: 5 150 105;
+  --c-warn: 180 110 6;
+  --c-bad: 214 48 78;
+  --c-violet: 118 84 224;
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-lift: 0 12px 32px -8px rgba(16, 24, 40, 0.25), 0 0 0 1px rgba(37, 111, 235, 0.35);
+  --scrollbar: #c8cfdb;
+}
+
+html,
+body {
+  @apply bg-canvas text-ink antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+
+::selection {
+  background: rgba(79, 156, 255, 0.35);
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-on-accent hover:bg-accent-strong;
+  }
+  .btn-ghost {
+    @apply btn text-ink-soft hover:bg-hover hover:text-ink;
+  }
+  .btn-outline {
+    @apply btn border border-line text-ink-soft hover:border-line-strong hover:bg-hover hover:text-ink;
+  }
+  .input {
+    @apply w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-faint
+      focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20;
+  }
+  .panel {
+    @apply rounded-xl border border-line bg-surface;
+  }
+  .label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted;
+  }
+}
+
+/* Printing (stage plots): only the printable area, on white. */
+@media print {
+  @page { size: landscape; margin: 0.4in; }
+  html, body { background: #fff !important; color-scheme: light !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } /* keep card colors */
+  body * { visibility: hidden; }
+  body *:not(.print-area):not(.print-area *) { background: transparent !important; box-shadow: none !important; border-color: transparent !important; }
+  .h-screen, .h-full, .overflow-y-auto, .overflow-hidden { height: auto !important; overflow: visible !important; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: fixed; inset: 0; margin: 0; padding: 0; color: #000; max-width: none; }
+  .no-print { display: none !important; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}

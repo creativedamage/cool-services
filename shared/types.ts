@@ -1,0 +1,480 @@
+/**
+ * Domain DTOs shared by server and web (type-only imports).
+ * The server flattens PCO's JSON:API into these shapes so the UI never deals with JSON:API.
+ */
+
+export interface Person {
+  id: string; // PCO person id — identical across People and Services
+  name: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+export interface StaffMe extends Person {
+  orgName: string;
+  demo: boolean;
+}
+
+/* ───────────── People / Workflows ───────────── */
+
+export interface WorkflowSummary {
+  id: string;
+  name: string;
+  readyCount: number;
+  overdueCount: number;
+}
+
+export interface WorkflowStep {
+  id: string;
+  name: string;
+  sequence: number;
+}
+
+export type CardStage = "ready" | "snoozed" | "completed" | "removed";
+
+export interface WorkflowCard {
+  id: string;
+  personId: string;
+  person: Person;
+  stepId: string | null; // null once completed
+  stage: CardStage;
+  assigneeName: string | null;
+  overdue: boolean;
+  movedToStepAt: string;
+  createdAt: string;
+  snoozeUntil: string | null;
+  noteCount: number;
+}
+
+export interface Board {
+  workflow: { id: string; name: string };
+  steps: WorkflowStep[];
+  cards: WorkflowCard[];
+}
+
+export type NoteSource = "card" | "profile" | "internal";
+
+export interface Note {
+  id: string;
+  body: string;
+  authorName: string;
+  createdAt: string;
+  source: NoteSource;
+  category: string | null;
+}
+
+/* ───────────── Services ───────────── */
+
+export interface ServiceType {
+  id: string;
+  name: string;
+}
+
+export interface PlanSummary {
+  id: string;
+  serviceTypeId: string;
+  serviceTypeName: string;
+  title: string;
+  seriesTitle: string | null;
+  dates: string; // human string from PCO, e.g. "October 4, 2026"
+  sortDate: string; // ISO
+  neededCount: number;
+  /** null in the fast upcoming-plans list; loaded separately (PlanCounts) when shown. */
+  confirmedCount: number | null;
+  unconfirmedCount: number | null;
+  declinedCount: number | null;
+}
+
+export interface PlanCounts {
+  confirmed: number;
+  unconfirmed: number;
+  declined: number;
+}
+
+export interface PlanTime {
+  id: string;
+  name: string;
+  kind: "service" | "rehearsal" | "other";
+  startsAt: string;
+  endsAt: string;
+}
+
+export interface PlanItem {
+  id: string;
+  title: string;
+  sequence: number;
+  kind: "song" | "header" | "media" | "item";
+  lengthSec: number;
+  description: string | null;
+  songKey: string | null;
+  servicePosition: "pre" | "during" | "post";
+  notes: { category: string; body: string }[];
+}
+
+export type RosterStatus = "C" | "U" | "D";
+
+export interface TeamMember {
+  id: string; // PlanPerson id
+  personId: string;
+  name: string;
+  avatarUrl: string | null;
+  teamId: string;
+  teamName: string;
+  positionName: string;
+  status: RosterStatus;
+  declineReason: string | null;
+  notifiedAt: string | null;
+}
+
+export interface NeededPosition {
+  id: string;
+  teamId: string;
+  teamName: string;
+  positionName: string;
+  quantity: number;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  positions: { id: string; name: string }[];
+}
+
+export interface PlanDetail extends PlanSummary {
+  confirmedCount: number;
+  unconfirmedCount: number;
+  declinedCount: number;
+  times: PlanTime[];
+  items: PlanItem[];
+  roster: TeamMember[];
+  needed: NeededPosition[];
+  teams: Team[];
+}
+
+export type ConflictKind = "blockout" | "double_booked" | "same_plan";
+
+export interface Conflict {
+  kind: ConflictKind;
+  label: string;
+}
+
+export interface Candidate {
+  personId: string;
+  name: string;
+  avatarUrl: string | null;
+  conflicts: Conflict[];
+  lastServed: string | null;
+  /** false = only checked against this plan so far; blockouts/other services load separately. */
+  checked: boolean;
+}
+
+export interface ScheduleRequest {
+  personId: string;
+  teamId: string;
+  positionName: string;
+  notify: boolean;
+}
+
+/* ───────────── Mics & packs (Shure) ───────────── */
+
+export type ShureModel = "ULXD" | "QLXD" | "SLXD" | "AD";
+
+export interface Receiver {
+  id: string;
+  name: string; // e.g. "Rack A"
+  model: ShureModel;
+  ip: string; // blank = assign only, don't send names
+  channels: number; // 1, 2 or 4
+}
+
+export type MicKind = "vocal" | "pack" | "other";
+
+export interface MicChannel {
+  id: string;
+  label: string; // e.g. "Vox 1", "AG Pack"
+  kind: MicKind;
+  receiverId: string | null;
+  channel: number; // 1-based channel on the receiver
+  /** Positions this mic is for, used by Auto-assign (e.g. ["Worship Leader"], ["Vocals"]). */
+  positions: string[];
+}
+
+export interface MicSetup {
+  receivers: Receiver[];
+  channels: MicChannel[];
+}
+
+/** Live status of one receiver channel, read from the receiver (never written). */
+export interface ChannelStatus {
+  channel: number;
+  name: string | null; // channel name currently on the receiver
+  txOn: boolean; // a transmitter is linked and on
+  txModel: string | null; // e.g. ULXD2, AD1
+  batteryBars: number | null; // 0–5
+  batteryMinutes: number | null; // runtime left (Shure rechargeables)
+  batteryPercent: number | null;
+  batteryType: string | null; // LION, ALKA, NIMH, LITH
+  frequencyMHz: number | null;
+  antennas: string | null; // one letter per antenna: A/B (or R/B on Axient) = active, X = off
+  rfDbm: number | null; // strongest antenna, dBm
+  interference: boolean;
+  muted: boolean | null;
+}
+
+export interface ReceiverStatus {
+  receiverId: string;
+  ok: boolean;
+  error?: string;
+  channels: ChannelStatus[];
+  at: string;
+}
+
+export interface MicAssignment {
+  channelId: string;
+  personId: string;
+  name: string;
+}
+
+export interface PlanMics {
+  planId: string;
+  assignments: MicAssignment[];
+  /** "<kind>:<personId>" → channelId they used last time (Auto-assign keeps people on "their" mic). */
+  usual: Record<string, string>;
+}
+
+
+/* ───────────── Settings ───────────── */
+
+export type ThemePref = "dark" | "light" | "system";
+
+export type StartView =
+  | { kind: "workflows" }
+  | { kind: "workflow"; workflowId: string }
+  | { kind: "services" }
+  | { kind: "next-service"; serviceTypeId: string | null }
+  | { kind: "next-checkins"; serviceTypeId: string | null };
+
+export interface NdiSettings {
+  enabled: boolean;
+  /** Shown to receivers as "<MAC NAME> (<name>)". */
+  name: string;
+  resolution: "720p" | "1080p" | "4k";
+  fps: 10 | 30 | 60;
+  /** Which service's stage plot to send: the next one of this type (null = next of any type). */
+  serviceTypeId: string | null;
+  /** Show the service title and date along the top. */
+  showHeader: boolean;
+  /** Frame color around the plot. */
+  background: "black" | "white";
+}
+
+export interface NdiStatus {
+  /** NDI is included in this build of the Mac app. */
+  available: boolean;
+  running: boolean;
+  sourceName: string | null;
+  connections: number;
+  width: number;
+  height: number;
+  fps: number;
+  error?: string;
+}
+
+/** Every key as it's written: sharps and flats are listed (and matched to snapshots) separately. */
+export const KEY_ROOTS = ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"] as const;
+export type KeyRoot = (typeof KEY_ROOTS)[number];
+
+/**
+ * Waves SuperRack over MIDI. SuperRack recalls snapshot N from Bank LSB (CC 32) = floor((N-1)/128)
+ * followed by Program Change (N-1) % 128. Each key is mapped to the snapshot that sets it up.
+ */
+export interface WavesSettings {
+  enabled: boolean;
+  /** MIDI output name on this Mac, e.g. "IAC Driver Bus 1" or "Network Session 1". */
+  output: string | null;
+  channel: number; // 1–16
+  /** Key as written ("C", "C#", "Db" … "B") → SuperRack snapshot number (1–384). */
+  snapshots: Record<string, number | null>;
+}
+
+export interface AppSettings {
+  theme: ThemePref;
+  /** Custom logo as a data: URL (PNG, JPG or SVG), shown in the sidebar and on the sign-in page. */
+  logo: string | null;
+  startView: StartView;
+  ndi: NdiSettings;
+  waves: WavesSettings;
+}
+
+/* ───────────── Check-ins ───────────── */
+
+export type CheckInKind = "Regular" | "Guest" | "Volunteer";
+
+export interface CheckInRow {
+  id: string;
+  personId: string | null;
+  name: string;
+  avatarUrl: string | null;
+  kind: CheckInKind;
+  event: string;
+  locations: string[];
+  /** Check-Ins location ids (rooms), for matching a ministry's rooms. */
+  locationIds: string[];
+  at: string; // checked in
+  checkedOutAt: string | null;
+  securityCode: string | null;
+}
+
+export interface CheckInsForPlan {
+  from: string;
+  to: string;
+  rows: CheckInRow[];
+  fetchedAt: string;
+}
+
+/* ───────────── Stage plots ───────────── */
+
+export type PlotItemType =
+  | "vocal" | "mic" | "di" | "wedge" | "iem" | "amp" | "keys" | "drums"
+  | "acoustic" | "electric" | "bass" | "person" | "power" | "riser" | "label";
+
+/** What an item shows on a given Sunday: the person on a mic channel, or whoever's in a position. */
+export type PlotLink = { kind: "mic"; channelId: string } | { kind: "position"; position: string } | null;
+
+export interface PlotItem {
+  id: string;
+  type: PlotItemType;
+  x: number; // 0–1 across the stage (centre of the item)
+  y: number; // 0–1 down the stage
+  w?: number; // risers and labels: 0–1 width
+  h?: number; // risers: 0–1 height
+  rotation: number; // degrees
+  label: string;
+  link: PlotLink;
+  /** Card fill color (hex). Text switches between dark and light automatically. */
+  color?: string;
+  /** Card corner radius in px. */
+  radius?: number;
+}
+
+/** Who a stage-plot card shows on a given service. */
+export interface PlotPerson {
+  name: string;
+  position: string;
+  mics: string[]; // mic labels assigned to them this service, e.g. ["Vox 2", "AG Pack"]
+}
+
+export interface StagePlot {
+  id: string;
+  name: string;
+  /** Used by default for this service type's services. */
+  serviceTypeId: string | null;
+  /** Background image (a PDF page is converted to an image when it's added). */
+  background: { fileId: string; width: number; height: number; source: string } | null;
+  items: PlotItem[];
+  updatedAt: string;
+}
+
+/* ───────────── Parent paging (ProPresenter messages) ───────────── */
+
+export type Ministry = "nursery" | "kids";
+export const MINISTRIES: Ministry[] = ["nursery", "kids"];
+
+/** ProPresenter's way of naming things: any of uuid, name or index identifies it. */
+export interface ProId { uuid: string; name: string; index: number }
+
+export interface ProPresenterMachine {
+  host: string;
+  port: number;
+  /** "Main sanctuary Pro7 machine" */
+  name: string;
+  /** "ProPresenter 7.14" */
+  version: string;
+  platform: string;
+}
+
+/** A theme slide that a message can use, e.g. "Nursery › Lower third". */
+export interface ProThemeOption { id: ProId; theme: string; slide: string; label: string }
+
+/** An existing ProPresenter message and its text tokens. */
+export interface ProMessageOption { id: ProId; message: string; tokens: string[] }
+
+export interface MinistryPaging {
+  enabled: boolean;
+  /** Shown on the iPad page, e.g. "Nursery". */
+  title: string;
+  /** Check-Ins rooms whose children appear on this ministry's iPad page. */
+  locationIds: string[];
+  /**
+   * "managed": Cool Services keeps its own ProPresenter message ("Cool Services · Nursery") with
+   * the text and theme below. "existing": trigger a message you already have in ProPresenter.
+   */
+  mode: "managed" | "existing";
+  /** Managed: the message text; {code} becomes the child's security code. */
+  text: string;
+  /** Managed: the theme slide the message uses. */
+  theme: ProId | null;
+  /** Existing: which message, and which of its text tokens gets the code. */
+  existing: { id: ProId; token: string } | null;
+  /** A PIN is set (the PIN itself is never sent to the app). */
+  hasPin: boolean;
+}
+
+export interface PagingConfig {
+  propresenter: { host: string; port: number };
+  /** How long a page stays on screen. Nobody can page again until it's gone (default 15s). */
+  onScreenSeconds: number;
+  /** iPad pages on the church network. */
+  ipads: { enabled: boolean; port: number };
+  ministries: Record<Ministry, MinistryPaging>;
+}
+
+/** Settings → iPad addresses for each ministry. */
+export interface KioskAddresses { urls: string[]; port: number; running: boolean; error?: string }
+
+export interface PageEvent {
+  id: string;
+  ministry: Ministry;
+  code: string;
+  childName: string | null;
+  by: string; // "Nursery iPad" or a staff name
+  at: string;
+  ok: boolean;
+  error?: string;
+}
+
+export interface PagingStatus {
+  configured: boolean;
+  /** A page is on screen until this time; paging is locked until then. */
+  onScreenUntil: string | null;
+  current: PageEvent | null;
+  recent: PageEvent[];
+  serverTime: string;
+}
+
+/** A child on a ministry's iPad page. */
+export interface KioskChild {
+  id: string; // check-in id
+  name: string;
+  avatarUrl: string | null;
+  securityCode: string | null;
+  room: string;
+  at: string;
+  guest: boolean;
+}
+
+export interface KioskInfo {
+  ministry: Ministry;
+  title: string;
+  church: string;
+  logo: string | null;
+  unlocked: boolean;
+  enabled: boolean;
+}
+
+export interface KioskChildren { children: KioskChild[]; fetchedAt: string }
+
+export interface CheckInLocation { id: string; name: string; event: string; folder: string | null; childOrAdult: string | null }
