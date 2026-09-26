@@ -173,15 +173,22 @@ C# and Db (and every other sharp/flat pair) are matched separately; a minor key 
 
 ## Dashboard: ProPresenter outputs and Smaart
 
+- **Your service**: at the top of the dashboard, pick your campus (service type). The clock, Live,
+  tuning and wireless widgets, and the Live widget's Run sheet link, follow that campus's next plan.
+  Pick a plan in the second list to pin it; "Next one (automatic)" moves on by itself. A widget can
+  still be set to another service type in its options.
 - **ProPresenter outputs**: in ProPresenter, turn on NDI for each screen you want to watch (Screens →
   the screen → NDI). On the dashboard, add a "ProPresenter output (NDI)" widget and pick the source.
   Previews use NDI's low-bandwidth stream (about 5 frames a second). Needs the NDI add-on (see
   "Build the DMG").
 - **Smaart v9 SPL**: in Smaart, start logging on a calibrated input and turn on Options → API
   (default port 26000, optional password). In Cool Services, Settings → Smaart (SPL): enter the
-  computer and password, then Save and connect. The readings Smaart sends are listed there; pick one
-  for the SPL widget. Rational Acoustics hasn't published the full API command list, so if your
-  readings don't appear, open "What Smaart is sending" in Settings and send it to us.
+  computer and password, then Save and connect. Cool Services lists Smaart's measurements (e.g. RTA
+  MIC, REF) and streams each one. SPL values Smaart sends are used as they are; otherwise the overall
+  level is worked out from the measurement's spectrum (marked ≈, accurate only if the input is
+  calibrated). Pick a reading for the SPL widget in its options. Rational Acoustics hasn't published
+  the full data format, so if readings don't appear, open "What Smaart is sending" in Settings, press
+  Copy and send it to us.
 
 ## Check-ins permission
 
@@ -218,7 +225,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.9.0 && git push origin v1.9.0
+   git tag v1.9.1 && git push origin v1.9.1
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

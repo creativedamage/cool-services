@@ -1,7 +1,7 @@
 import type {
   AppSettings, NdiStatus, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, StagePlot, PlanSummary, RosterStatus, ScheduleRequest,
   ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary,
-  DashboardWidget, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
+  DashboardWidget, HomeService, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 
@@ -99,6 +99,8 @@ export const Api = {
   saveSmaart: (p: Partial<SmaartSettingsView> & { password?: string }) => api<SmaartSettingsView>("/smaart/config", { method: "PUT", json: p }),
   smaartStatus: () => api<SmaartStatusView>("/smaart/status"),
   dashboard: () => api<DashboardWidget[] | null>("/dashboard"),
+  home: () => api<HomeService>("/dashboard/home"),
+  saveHome: (h: HomeService) => api<HomeService>("/dashboard/home", { method: "PUT", json: h }),
   saveDashboard: (w: DashboardWidget[]) => api<DashboardWidget[]>("/dashboard", { method: "PUT", json: w }),
   ndiSources: () => api<{ available: boolean; error?: string; sources: { name: string }[] }>("/desktop/ndi/sources"),
   runSheetViews: () => api<RunSheetView[]>("/runsheet-views"),
@@ -192,6 +194,7 @@ export const qk = {
   smaartConfig: ["smaartConfig"] as const,
   smaartStatus: ["smaartStatus"] as const,
   dashboard: ["dashboard"] as const,
+  home: ["home"] as const,
   ndiSources: ["ndiSources"] as const,
   proState: (id: string) => ["proState", id] as const,
   pagingChildren: ["pagingChildren"] as const,

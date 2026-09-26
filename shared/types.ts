@@ -603,10 +603,14 @@ export interface SmaartSettingsView { enabled: boolean; host: string; port: numb
 export interface SmaartStatusView {
   state: "off" | "connecting" | "connected" | "error";
   error: string | null;
-  readings: { key: string; label: string; value: number }[];
+  readings: { key: string; label: string; value: number; approx?: boolean }[];
   at: string | null;
+  measurements: { name: string; endpoint: string; active: boolean; stream: "off" | "connecting" | "open" | "error"; messages: number }[];
   sample: string[];
 }
+
+/** The service the dashboard follows: a service type (your campus), optionally pinned to one plan. */
+export interface HomeService { serviceTypeId: string | null; planId: string | null }
 
 export type WidgetType = "tuning" | "ndi" | "spl" | "wireless" | "live" | "clock" | "pro";
 export interface DashboardWidget {

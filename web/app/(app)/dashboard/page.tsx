@@ -13,7 +13,7 @@ import type { DashboardWidget, WidgetType } from "@shared/types";
 import { Api, qk } from "@/lib/api";
 import { usePlans } from "@/lib/plans";
 import { Modal } from "@/components/ui";
-import { ClockWidget, LiveWidget, NdiWidget, ProWidget, SplWidget, TuningWidget, WirelessWidget } from "@/components/dashboard/Widgets";
+import { ClockWidget, LiveWidget, NdiWidget, ProWidget, SplWidget, TuningWidget, WirelessWidget, useHome, useNextService } from "@/components/dashboard/Widgets";
 
 const NAMES: Record<WidgetType, string> = {
   tuning: "Tuning keys", ndi: "ProPresenter output (NDI)", spl: "SPL (Smaart)", wireless: "Shure wireless",
@@ -53,6 +53,7 @@ export default function DashboardPage() {
       <header className="flex items-center gap-3 border-b border-line px-6 py-3 pr-28">
         <LayoutDashboard size={18} className="text-accent" />
         <h1 className="text-lg font-semibold">Dashboard</h1>
+        <HomePicker />
         <div className="ml-auto flex gap-1.5">
           {editing && <button className="btn-outline py-1 text-xs" onClick={() => setAdding(true)}><Plus size={13} /> Add widget</button>}
           <button className={clsx("btn-ghost py-1 text-xs", editing && "bg-accent-soft text-accent")} onClick={() => setEditing(!editing)}><Pencil size={13} /> {editing ? "Done" : "Edit"}</button>
@@ -145,7 +146,7 @@ function OptionsModal({ w, onClose, onSave }: { w: DashboardWidget; onClose: () 
         {(w.type === "tuning" || w.type === "live") && (
           <label className="block"><span className="label">Service</span>
             <select className="input mt-1" value={(o.serviceTypeId as string) ?? ""} onChange={(e) => set("serviceTypeId", e.target.value || null)}>
-              <option value="">Next service (any type)</option>
+              <option value="">The dashboard’s service</option>
               {types.map(([id, n]) => <option key={id} value={id}>Next {n}</option>)}
             </select>
           </label>
@@ -164,5 +165,45 @@ function OptionsModal({ w, onClose, onSave }: { w: DashboardWidget; onClose: () 
         <button className="btn-primary" onClick={() => onSave({ ...w, options: o })}>Save</button>
       </footer>
     </Modal>
+  );
+}
+
+/**
+ * Your service: which campus (service type) the dashboard follows, and optionally one plan.
+ * Widgets, the clock and the Live widget's Run sheet link all use it.
+ */
+function HomePicker() {
+  const qc = useQueryClient();
+  const home = useHome();
+  const plans = usePlans();
+  const next = useNextService();
+  const types = [...new Map((plans.data ?? []).map((p) => [p.serviceTypeId, p.serviceTypeName])).entries()];
+  const st = home.data?.serviceTypeId ?? "";
+  const cutoff = Date.now() - 6 * 3600e3;
+  const upcoming = (plans.data ?? []).filter((p) => (!st || p.serviceTypeId === st) && Date.parse(p.sortDate) > cutoff).slice(0, 12);
+  const save = useMutation({
+    mutationFn: Api.saveHome,
+    onMutate: (h) => qc.setQueryData(qk.home, h),
+    onSuccess: (h) => qc.setQueryData(qk.home, h),
+    onError: (e) => { toast.error("Couldn’t save", { description: (e as Error).message }); void home.refetch(); },
+  });
+  if (!home.data) return null;
+  const pinned = home.data.planId;
+  const day = (p: { sortDate: string }) => new Date(p.sortDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return (
+    <div className="ml-3 flex min-w-0 items-center gap-1.5 text-xs">
+      <span className="text-ink-muted">Your service</span>
+      <select className={clsx("input w-auto max-w-[14rem] py-1 text-xs", !st && "border-warn/50")} value={st}
+        onChange={(e) => save.mutate({ serviceTypeId: e.target.value || null, planId: null })} title="Which campus / service type the dashboard follows">
+        <option value="">Any (next service)</option>
+        {types.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
+      </select>
+      <select className={clsx("input w-auto max-w-[16rem] py-1 text-xs", pinned && "border-accent/60 text-accent")} value={pinned ?? ""}
+        onChange={(e) => save.mutate({ serviceTypeId: st || null, planId: e.target.value || null })} title="Follow the next one automatically, or pin a plan">
+        <option value="">Next one{next && !pinned ? ` · ${day(next)}` : ""} (automatic)</option>
+        {pinned && !upcoming.some((p) => p.id === pinned) && <option value={pinned}>Pinned plan</option>}
+        {upcoming.map((p) => <option key={p.id} value={p.id}>{day(p)} · {p.title}{st ? "" : ` (${p.serviceTypeName})`}</option>)}
+      </select>
+    </div>
   );
 }

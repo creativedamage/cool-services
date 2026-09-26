@@ -11,6 +11,15 @@ const Widget = z.object({
   options: z.record(z.string().max(40), z.union([z.string().max(300), z.number(), z.boolean(), z.null()])).default({}),
 });
 dashboardRouter.get("/", (_req, res) => res.json(extras.get("dashboard", null)));
+
+/** Your service: which service type (campus) the dashboard follows, optionally pinned to one plan. */
+dashboardRouter.get("/home", (_req, res) => res.json(extras.get("home", { serviceTypeId: null, planId: null })));
+dashboardRouter.put("/home", (req, res) => {
+  const id = z.string().regex(/^[\w-]{1,40}$/).nullable();
+  const home = z.object({ serviceTypeId: id, planId: id }).parse(req.body);
+  extras.set("home", home);
+  res.json(home);
+});
 dashboardRouter.put("/", (req, res) => {
   const widgets = z.array(Widget).max(24).parse(req.body);
   extras.set("dashboard", widgets);

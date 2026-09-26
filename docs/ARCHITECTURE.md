@@ -203,8 +203,11 @@ current/next text, timers with their durations, stage message/screens/layouts, c
 and performs actions; slide thumbnails are proxied and cached. NDI previews: the Mac app finds NDI
 sources and receives one at low bandwidth only while the dashboard asks for frames
 (`/api/desktop/ndi/frame`, polled), converting BGRA frames to JPEG with nativeImage. Smaart: a
-WebSocket client to `ws://host:26000/api/v3/` (password when asked) that polls likely meter targets
-and keeps any SPL-looking numbers (LAeq, LASlow, LCeq…). Dashboard layout and these settings live in
+WebSocket client to `ws://host:26000/api/v4/` (password when asked). A plain `get` lists the measurements with
+their `streamEndpoint`s; each active one is streamed over its own WebSocket. Any SPL-looking numbers
+(LAeq, LASlow, LCeq…) are kept; failing that, an approximate overall level (dBZ, and dBA when
+frequencies come too) is summed from the spectrum. Unknown targets are remembered by sequence
+number and not asked again. Dashboard layout and these settings live in
 the data file (`extras`).
 
 ## 5e. Settings

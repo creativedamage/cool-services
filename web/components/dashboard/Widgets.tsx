@@ -17,11 +17,25 @@ import { useProAction, useProState } from "@/components/pro/ProControl";
 
 type O = DashboardWidget["options"];
 
-/** The next service (optionally of one service type): today's until it's over, then the next one. */
+export const useHome = () => useQuery({ queryKey: qk.home, queryFn: Api.home, staleTime: 60_000 });
+
+/**
+ * The service a widget follows: today's until it's over, then the next one.
+ *  - a widget can name its own service type;
+ *  - otherwise the dashboard's service (Your service): a pinned plan, else that campus's next plan;
+ *  - with nothing chosen, the next service of any type.
+ */
 export function useNextService(serviceTypeId?: string | null): PlanSummary | undefined {
   const plans = usePlans({ refetchInterval: 5 * 60_000 });
+  const home = useHome().data;
   const cutoff = Date.now() - 6 * 3600e3;
-  return (plans.data ?? []).find((p) => (!serviceTypeId || p.serviceTypeId === serviceTypeId) && Date.parse(p.sortDate) > cutoff);
+  const list = plans.data ?? [];
+  if (!serviceTypeId && home?.planId) {
+    const pinned = list.find((p) => p.id === home.planId && Date.parse(p.sortDate) > cutoff);
+    if (pinned) return pinned;
+  }
+  const st = serviceTypeId || home?.serviceTypeId || null;
+  return list.find((p) => (!st || p.serviceTypeId === st) && Date.parse(p.sortDate) > cutoff);
 }
 
 export function Frame({ title, icon: Icon, right, children, className }: { title: React.ReactNode; icon: typeof Clock3; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
@@ -171,7 +185,8 @@ export function SplWidget({ o }: { o: O }) {
   const cfg = useQuery({ queryKey: qk.smaartConfig, queryFn: Api.smaartConfig, staleTime: 60_000 });
   const key = (o.reading as string) || "";
   const readings = st.data?.readings ?? [];
-  const r = readings.find((x) => x.key === key) ?? readings.find((x) => /laeq|leq/i.test(x.label)) ?? readings[0];
+  const r = readings.find((x) => x.key === key) ?? readings.find((x) => !x.approx && /laeq|leq/i.test(x.label)) ?? readings.find((x) => !x.approx)
+    ?? readings.find((x) => /dBA/.test(x.label) && !/^(ref|reference|generator)\b/i.test(x.label)) ?? readings.find((x) => /dBA/.test(x.label)) ?? readings[0];
   const hist = useRef<number[]>([]);
   useEffect(() => { if (r) { hist.current = [...hist.current, r.value].slice(-120); } }, [r?.value, st.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const limit = cfg.data?.limit ?? 95;
@@ -180,10 +195,10 @@ export function SplWidget({ o }: { o: O }) {
   return (
     <Frame title={(o.label as string) || (r ? r.label : "SPL")} icon={Gauge} right={<Link href="/settings#smaart" className="text-[10px] font-normal text-ink-faint hover:text-accent">Smaart</Link>}>
       {!st.data || st.data.state === "off" ? <div className="grid h-full place-items-center text-center text-sm text-ink-faint">Connect Smaart in Settings.</div>
-        : st.data.state !== "connected" || !r ? <div className="grid h-full place-items-center text-center text-xs text-ink-faint">{st.data.error ?? "Waiting for SPL from Smaart…"}</div> : (
+        : st.data.state !== "connected" || !r ? <div className="grid h-full place-items-center text-center text-xs text-ink-faint">{st.data.error ?? (st.data.measurements.length ? `Connected to Smaart (${st.data.measurements.map((m) => m.name).join(", ")}). Waiting for level data…` : "Waiting for SPL from Smaart…")}</div> : (
           <div className="flex h-full flex-col justify-center">
             <div className={clsx("font-mono text-6xl font-semibold tabular-nums", tone)}>{r.value.toFixed(1)}<span className="ml-1 text-lg text-ink-muted">dB</span></div>
-            <div className="mt-1 text-[11px] text-ink-muted">Limit {limit} dB</div>
+            <div className="mt-1 text-[11px] text-ink-muted">Limit {limit} dB{r.approx ? " · from the spectrum (approx.)" : ""}</div>
             {h.length > 2 && (
               <svg viewBox={`0 0 ${h.length - 1} 40`} preserveAspectRatio="none" className="mt-2 h-10 w-full">
                 <line x1="0" x2={h.length - 1} y1={40 - ((limit - lo) / (hi - lo)) * 40} y2={40 - ((limit - lo) / (hi - lo)) * 40} stroke="rgb(var(--c-bad))" strokeDasharray="2 2" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />

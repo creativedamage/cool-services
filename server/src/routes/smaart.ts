@@ -4,8 +4,12 @@ import { z } from "zod";
 import { extras } from "../lib/db.js";
 import { applySmaart, smaartStatus, type SmaartConfig } from "../lib/smaart.js";
 
-export const smaartDefaults: SmaartConfig = { enabled: false, host: "", port: 26000, password: "", path: "/api/v3/", limit: 95 };
-export const smaartConfig = () => ({ ...smaartDefaults, ...extras.get<Partial<SmaartConfig>>("smaart", {}) });
+export const smaartDefaults: SmaartConfig = { enabled: false, host: "", port: 26000, password: "", path: "/api/v4/", limit: 95 };
+export const smaartConfig = (): SmaartConfig => {
+  const c = { ...smaartDefaults, ...extras.get<Partial<SmaartConfig>>("smaart", {}) };
+  // 1.9.0 defaulted to v3; Smaart v9 speaks v4 (its measurement streams are under /api/v4/).
+  return c.path === "/api/v3/" ? { ...c, path: "/api/v4/" } : c;
+};
 export const startSmaart = () => applySmaart(smaartConfig());
 
 export const smaartRouter = Router();
