@@ -6,6 +6,11 @@
  * Program Change (N-1) % 128 on its MIDI input. Each song key is mapped to a snapshot in Settings,
  * so pressing a key recalls the snapshot that has your tuning set up for it.
  *
+ * SuperRack side: add the MIDI Controller module (Controllers section), tick this MIDI input in its
+ * settings, and give each snapshot an External ID. SuperRack recalls by External ID, not by where
+ * a snapshot sits in the list: "snapshot N" here means External ID Bank floor((N-1)/128),
+ * PC (N-1) % 128 — i.e. snapshot 1 = Bank 0 / PC 0.
+ *
  * SuperRack on this Mac: turn on the IAC Driver (Audio MIDI Setup) and pick it in both apps.
  * SuperRack on another computer: use a Network MIDI session (Audio MIDI Setup → Network).
  */

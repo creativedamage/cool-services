@@ -17,7 +17,11 @@ export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial
   const test = async (id: string) => {
     try {
       const n = await sendKey({ ...w, enabled: true }, id);
-      toast.success(`Sent ${id}`, { description: `SuperRack snapshot ${n}` });
+      const b = Math.floor((n - 1) / 128), pc = (n - 1) % 128, hex = (x: number) => x.toString(16).toUpperCase().padStart(2, "0");
+      toast.success(`Sent ${id} → snapshot ${n}`, {
+        description: `To “${w.output}”, channel ${w.channel}: Bank LSB (CC 32) = ${b}, Program Change = ${pc} (MIDI bytes ${hex(0xb0 + w.channel - 1)} 20 ${hex(b)} · ${hex(0xc0 + w.channel - 1)} ${hex(pc)}). In SuperRack, the snapshot's External ID must be Bank ${b} / PC ${pc}.`,
+        duration: 9000,
+      });
     } catch (e) { toast.error("Couldn’t send", { description: (e as Error).message }); }
   };
 
@@ -90,7 +94,11 @@ export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial
           <li><b>SuperRack on another computer:</b> Audio MIDI Setup → MIDI Studio → Network. Create a session on both computers
             and connect them. Choose that session above. (On Windows, use rtpMIDI.)</li>
           <li>In SuperRack: Controllers → add <b>MIDI Controller</b> → the gear icon → under MIDI IN tick the IAC or network port.</li>
-          <li>Save a SuperRack snapshot for each key you use (e.g. Waves Tune Real-Time set to A), and enter its number next to that key here.</li>
+          <li>Save a SuperRack snapshot for each key you use (e.g. Waves Tune Real-Time set to A).</li>
+          <li><b>Give each snapshot an External ID</b> (the arrow next to the snapshot → External ID). SuperRack only recalls
+            snapshots that have one. Snapshot number here = External ID: <b>1 = Bank 0 / PC 0</b>, 2 = Bank 0 / PC 1 … 129 = Bank 1 / PC 0.</li>
+          <li>Not recalling? Press ▶ next to a key: the message shows exactly what was sent. The free app
+            <b> MIDI Monitor</b> (snoize.com) shows whether it arrives on the IAC bus.</li>
         </ol>
         <p className="mt-2">Cool Services sends Bank LSB (CC 32) and a Program Change, which is how SuperRack recalls snapshots 1–384.</p>
       </details>
