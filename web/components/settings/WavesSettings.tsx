@@ -4,8 +4,8 @@ import clsx from "clsx";
 import { AudioLines, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { KEY_ROOTS, type WavesSettings as W } from "@shared/types";
-import { sendKey, snapshotMidi, useMidiOutputs } from "@/lib/waves";
+import { KEY_ROOTS, TUNING_EXTRAS, type WavesSettings as W } from "@shared/types";
+import { sendKey, slotLabel, snapshotMidi, useMidiOutputs } from "@/lib/waves";
 
 export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial<W>) => void }) {
   const { outputs, error } = useMidiOutputs(true);
@@ -18,7 +18,7 @@ export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial
     try {
       const n = await sendKey({ ...w, enabled: true }, id);
       const { bank: b, program: pc } = snapshotMidi(n, w.numbering), hex = (x: number) => x.toString(16).toUpperCase().padStart(2, "0");
-      toast.success(`Sent ${id} → snapshot ${n}`, {
+      toast.success(`Sent ${slotLabel(id)} → snapshot ${n}`, {
         description: `To “${w.output}”, channel ${w.channel}: Bank LSB (CC 32) = ${b}, Program Change = ${pc} (MIDI bytes ${hex(0xb0 + w.channel - 1)} 20 ${hex(b)} · ${hex(0xc0 + w.channel - 1)} ${hex(pc)}). ${w.numbering === "program" ? "" : `That recalls the snapshot whose External ID is ${n}.`}`,
         duration: 9000,
       });
@@ -78,10 +78,10 @@ export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial
       <div className="mt-5">
         <span className="label">Match each key to its Waves snapshot</span>
         <p className="mt-0.5 text-[11px] text-ink-faint">
-          Type each key’s snapshot {(w.numbering ?? "externalId") === "externalId" ? "External ID exactly as SuperRack shows it (0139 → 139)" : "number"}. Sharps and flats each have their own snapshot, and a
-          minor key uses its letter’s snapshot (F#m → F#). Leave keys you don’t use empty. ▶ sends it now.
+          Type each key’s snapshot {(w.numbering ?? "externalId") === "externalId" ? "External ID exactly as SuperRack shows it (0139 → 139)" : "number"}. F# and Gb each have their own snapshot; songs in
+          C#, D#, G# or A# use the flat (C# → Db), and a minor key uses its letter’s snapshot (F#m → F#). Leave keys you don’t use empty. ▶ sends it now.
         </p>
-        <div className="mt-3 grid gap-x-6 gap-y-1.5 sm:grid-flow-col sm:grid-cols-2 sm:grid-rows-9">
+        <div className="mt-3 grid gap-x-6 gap-y-1.5 sm:grid-flow-col sm:grid-cols-2 sm:grid-rows-7">
           {KEY_ROOTS.map((k) => (
             <div key={k} className="flex items-center gap-3 rounded-lg border border-line px-3 py-1.5">
               <span className="w-10 font-mono text-base font-semibold text-violet">{k}</span>
@@ -90,6 +90,19 @@ export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial
             </div>
           ))}
         </div>
+
+        <span className="label mt-5 block">Tuning buttons</span>
+        <p className="mt-0.5 text-[11px] text-ink-faint">Shown before the songs on the Tuning bar and the dashboard. They recall their own snapshot, like a key.</p>
+        <div className="mt-2 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+          {TUNING_EXTRAS.map((x) => (
+            <div key={x.id} className="flex items-center gap-3 rounded-lg border border-line px-3 py-1.5">
+              <span className="text-sm font-semibold text-violet">{x.label}</span>
+              <SnapInput value={w.snapshots[x.id]} onSave={(v) => onChange({ snapshots: { [x.id]: v } })} onTest={() => test(x.id)} />
+            </div>
+          ))}
+        </div>
+
+        <HideList list={w.hideFromTuning ?? ["Vocal Warm Ups"]} onSave={(hideFromTuning) => onChange({ hideFromTuning })} />
       </div>
 
       <details className="mt-5 rounded-lg border border-line px-3 py-2 text-[12px] text-ink-muted">
@@ -125,6 +138,30 @@ function SnapInput({ value, onSave, onTest }: { value: number | null | undefined
       <input className="input w-20 py-1 text-center font-mono text-sm" inputMode="numeric" placeholder="—" value={v}
         onChange={(e) => setV(e.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 3))} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && commit()} />
       <button className="btn-ghost p-1" title="Send now" disabled={value == null} onClick={onTest}><Play size={12} /></button>
+    </div>
+  );
+}
+
+/** Song titles to leave off the Tuning bar (items that are songs in Planning Center but aren't songs). */
+function HideList({ list, onSave }: { list: string[]; onSave: (l: string[]) => void }) {
+  const [v, setV] = useState("");
+  const add = () => { const t = v.trim(); if (t && !list.some((x) => x.toLowerCase() === t.toLowerCase())) onSave([...list, t]); setV(""); };
+  return (
+    <div className="mt-5">
+      <span className="label">Leave off the Tuning bar</span>
+      <p className="mt-0.5 text-[11px] text-ink-faint">Song items with these titles aren’t shown (capitals, spaces and dashes don’t matter).</p>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {list.map((t) => (
+          <span key={t} className="flex items-center gap-1 rounded-full border border-line bg-raised py-0.5 pl-2.5 pr-1 text-xs">
+            {t}
+            <button className="rounded-full px-1 text-ink-faint hover:text-bad" title="Show it again" onClick={() => onSave(list.filter((x) => x !== t))}>×</button>
+          </span>
+        ))}
+        <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); add(); }}>
+          <input className="input w-44 py-0.5 text-xs" placeholder="e.g. Vocal Warm Ups" value={v} onChange={(e) => setV(e.target.value)} />
+          <button className="btn-ghost py-0.5 text-xs" disabled={!v.trim()}>Add</button>
+        </form>
+      </div>
     </div>
   );
 }

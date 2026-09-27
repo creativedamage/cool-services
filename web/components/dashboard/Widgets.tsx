@@ -11,7 +11,8 @@ import { Api, planQuery, qk } from "@/lib/api";
 import { clock, mmss } from "@/lib/format";
 import { usePlans } from "@/lib/plans";
 import { routes } from "@/lib/routes";
-import { parseKey, sendKey } from "@/lib/waves";
+import { parseKey, sendKey, tuningSongs } from "@/lib/waves";
+import { TuningExtras } from "@/components/services/SongKeys";
 import { LiveStatus } from "@/components/services/MicPanel";
 import { useProAction, useProState } from "@/components/pro/ProControl";
 
@@ -108,15 +109,17 @@ export function TuningWidget({ o }: { o: O }) {
   const settings = useQuery({ queryKey: qk.settings, queryFn: Api.settings, staleTime: 30_000 });
   const waves = settings.data?.waves;
   const [sent, setSent] = useState<string | null>(null);
-  const songs = (plan.data?.items ?? []).filter((i) => i.kind === "song");
+  const songs = tuningSongs(plan.data?.items ?? [], waves);
   const press = async (id: string, keyId?: string) => {
     if (!waves?.enabled || !keyId) return;
     try { await sendKey(waves, keyId); setSent(id); } catch (e) { toast.error("Couldn’t send to Waves", { description: (e as Error).message }); }
   };
   return (
     <Frame title={next ? `Tuning · ${next.title}` : "Tuning"} icon={AudioLines} right={waves?.enabled ? <span className="text-[10px] font-normal text-ok">Waves ready</span> : null}>
-      {!songs.length ? <div className="grid h-full place-items-center text-sm text-ink-faint">No songs on the next service</div> : (
+      {!songs.length && !waves?.enabled ? <div className="grid h-full place-items-center text-sm text-ink-faint">No songs on the next service</div> : (
         <div className="flex h-full gap-2 overflow-x-auto">
+          {waves?.enabled && <TuningExtras big waves={waves} sent={sent} onPress={(id) => void press(id, id)} />}
+          {!songs.length && <div className="grid flex-1 place-items-center text-sm text-ink-faint">No songs on the next service</div>}
           {songs.map((s, i) => {
             const k = parseKey(s.songKey);
             return (

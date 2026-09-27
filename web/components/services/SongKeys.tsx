@@ -9,15 +9,15 @@ import { AudioLines, Check, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { PlanDetail } from "@shared/types";
+import { TUNING_EXTRAS, type PlanDetail, type WavesSettings } from "@shared/types";
 import { Api, qk } from "@/lib/api";
-import { parseKey, sendKey } from "@/lib/waves";
+import { parseKey, sendKey, tuningSongs } from "@/lib/waves";
 
 export function SongKeys({ plan }: { plan: PlanDetail }) {
   const settings = useQuery({ queryKey: qk.settings, queryFn: Api.settings, staleTime: 30_000 });
   const waves = settings.data?.waves;
   const live = Boolean(waves?.enabled && waves.output);
-  const songs = plan.items.filter((i) => i.kind === "song").sort((a, b) => a.sequence - b.sequence);
+  const songs = tuningSongs(plan.items, waves).sort((a, b) => a.sequence - b.sequence);
   const [sent, setSent] = useState<string | null>(null); // item id last sent to Waves
   const [busy, setBusy] = useState<string | null>(null);
   if (!songs.length) return null;
@@ -47,6 +47,7 @@ export function SongKeys({ plan }: { plan: PlanDetail }) {
         )}
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1">
+        {waves?.enabled && <TuningExtras waves={waves} sent={sent} onPress={(id, label) => press(id, id, label)} />}
         {songs.map((s, i) => {
           const k = parseKey(s.songKey);
           const snap = k && waves?.snapshots[k.id];
@@ -68,5 +69,28 @@ export function SongKeys({ plan }: { plan: PlanDetail }) {
         })}
       </div>
     </section>
+  );
+}
+
+/** Chromatic Tune and Tuning Off: recall their own SuperRack snapshots, like a key does. */
+export function TuningExtras({ waves, sent, onPress, big }: {
+  waves: WavesSettings; sent: string | null; onPress: (id: string, label: string) => void; big?: boolean;
+}) {
+  return (
+    <div className="flex shrink-0 flex-col gap-2">
+      {TUNING_EXTRAS.map((x) => {
+        const snap = waves.snapshots[x.id];
+        return (
+          <button key={x.id} onClick={() => onPress(x.id, x.label)}
+            title={snap != null ? `Recall SuperRack snapshot ${snap}` : `Set a snapshot for ${x.label} in Settings → Waves`}
+            className={clsx("flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 text-center font-semibold transition active:scale-[0.97]",
+              big ? "min-w-[120px] text-sm" : "w-[120px] py-1.5 text-xs",
+              sent === x.id ? "border-ok/60 bg-ok-soft text-ok" : x.id === "OFF" ? "border-line bg-raised text-ink-soft hover:border-bad/50" : "border-line bg-raised text-violet hover:border-violet/60",
+              snap == null && "opacity-50")}>
+            {sent === x.id && <Check size={12} />}{x.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }

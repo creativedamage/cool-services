@@ -175,7 +175,12 @@ banks), so ID 139 is Bank 1 / Program 14. ("Numbers are → Program numbers" swi
   Program Changes on Channel** to your channel, and give each snapshot an External ID.
 
 Keys come from Planning Center (the key chosen on the service item, otherwise the arrangement's key).
-C# and Db (and every other sharp/flat pair) are matched separately; a minor key uses its letter's snapshot (F#m → F#).
+The keys with their own snapshot are C, Db, D, Eb, E, F, F#, Gb, G, Ab, A, Bb and B. A song in C#, D#,
+G# or A# uses the flat's snapshot (C# → Db), and a minor key uses its letter's (F#m → F#).
+
+**Chromatic Tune** and **Tuning Off** buttons sit before the songs on the Tuning bar and the
+dashboard; give each a snapshot in Settings → Waves. Song items that aren't songs (e.g. "Vocal Warm
+Ups") can be left off the Tuning bar under "Leave off the Tuning bar".
 
 ## Dashboard: ProPresenter outputs and Smaart
 
@@ -231,7 +236,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.9.3 && git push origin v1.9.3
+   git tag v1.9.4 && git push origin v1.9.4
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

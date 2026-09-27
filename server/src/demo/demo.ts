@@ -171,6 +171,7 @@ const SONGS: [string, string, number][] = [
 const runSheet = (w: number): PlanItem[] => {
   const s = (i: number) => SONGS[(i + w) % SONGS.length];
   const rows: Omit<PlanItem, "id" | "sequence">[] = [
+    { title: "VOCAL WARM UPS", kind: "song", lengthSec: 0, description: "Team only", songKey: null, servicePosition: "pre", notes: [] },
     { title: "Pre-Service Countdown", kind: "media", lengthSec: 300, description: "5:00 countdown on all screens", songKey: null, servicePosition: "pre", notes: [{ category: "Production", body: "House music fades at 0:30" }] },
     { title: "Worship", kind: "header", lengthSec: 0, description: null, songKey: null, servicePosition: "during", notes: [] },
     { title: s(0)[0], kind: "song", lengthSec: s(0)[2], description: null, songKey: s(0)[1], servicePosition: "during", notes: [{ category: "Lighting", body: "Full stage wash, haze on" }, { category: "Audio", body: "Band in from the count-in. Vox 1 lead." }, { category: "Video", body: "Wide on the band for the intro, then lyrics lower third on stream" }] },

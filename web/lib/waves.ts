@@ -16,14 +16,25 @@
  * SuperRack on another computer: use a Network MIDI session (Audio MIDI Setup → Network).
  */
 import { useEffect, useState } from "react";
-import { KEY_ROOTS, type KeyRoot, type WavesSettings } from "@shared/types";
+import { KEY_ROOTS, TUNING_EXTRAS, type KeyRoot, type WavesSettings } from "@shared/types";
 
 /** Spellings that aren't in the list are the same pitch as one that is. */
-const SAME_AS: Record<string, KeyRoot> = { "E#": "F", "B#": "C", Cb: "B", Fb: "E" };
+const SAME_AS: Record<string, KeyRoot> = { "C#": "Db", "D#": "Eb", "G#": "Ab", "A#": "Bb", "E#": "F", "B#": "C", Cb: "B", Fb: "E" };
+
+const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
+/** Songs for the Tuning bar, in service order, without the ones listed to leave out (e.g. Vocal Warm Ups). */
+export function tuningSongs<T extends { kind: string; title: string }>(items: T[], w: WavesSettings | undefined): T[] {
+  const hide = new Set((w?.hideFromTuning ?? ["Vocal Warm Ups"]).map(norm));
+  return items.filter((i) => i.kind === "song" && !hide.has(norm(i.title)));
+}
+
+/** A name for a snapshot slot: "C", "Chromatic Tune"… */
+export const slotLabel = (id: string) => TUNING_EXTRAS.find((x) => x.id === id)?.label ?? id;
 
 /**
- * "A", "Db", "C#", "F#m", "Bb (capo 1)" → { root, id }. Sharps and flats each have their own snapshot
- * (C# and Db are matched separately); a minor key uses its letter's snapshot (F#m → F#).
+ * "A", "Db", "C#", "F#m", "Bb (capo 1)" → { root, id }. F# and Gb have their own snapshots; C#, D#, G#
+ * and A# use their flats (C# → Db); a minor key uses its letter's snapshot (F#m → F#). The label
+ * stays as written in Planning Center.
  */
 export function parseKey(raw: string | null | undefined): { root: KeyRoot; minor: boolean; id: string; label: string } | null {
   if (!raw) return null;
@@ -73,7 +84,7 @@ export function snapshotMidi(n: number, numbering: WavesSettings["numbering"] = 
 export async function sendKey(w: WavesSettings, keyId: string): Promise<number> {
   if (!w.enabled) throw new WavesError("Turn on Waves SuperRack in Settings first.");
   const snap = w.snapshots[keyId];
-  if (snap == null) throw new WavesError(`No Waves snapshot is matched to ${keyId} in Settings.`);
+  if (snap == null) throw new WavesError(`No Waves snapshot is set for ${slotLabel(keyId)} in Settings.`);
   if (!w.output) throw new WavesError("Choose the MIDI output for SuperRack in Settings.");
   const a = await midiAccess();
   const out = [...a.outputs.values()].find((o) => o.name === w.output);

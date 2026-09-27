@@ -35,7 +35,8 @@ const Patch = z.object({
     enabled: z.boolean(),
     output: z.string().max(200).nullable(),
     channel: z.number().int().min(1).max(16),
-    snapshots: z.record(z.string().regex(/^[A-G][#b]?m?$/), z.number().int().min(0).max(999).nullable()),
+    snapshots: z.record(z.string().regex(/^([A-G][#b]?m?|CHROMATIC|OFF)$/), z.number().int().min(0).max(999).nullable()),
+    hideFromTuning: z.array(z.string().trim().min(1).max(100)).max(30),
     numbering: z.enum(["externalId", "program"]),
   }).partial().optional(),
 });

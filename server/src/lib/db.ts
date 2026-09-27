@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { config } from "../config.js";
-import { KEY_ROOTS } from "../../../shared/types.js";
+import { KEY_ROOTS, TUNING_EXTRAS } from "../../../shared/types.js";
 import type { RunSheetView } from "../../../shared/types.js";
 import type { AppSettings, MicAssignment, MicSetup, Ministry, MinistryPaging, PagingConfig, StagePlot } from "../../../shared/types.js";
 
@@ -214,8 +214,8 @@ const defaultSettings = (): AppSettings => ({
   ndi: { enabled: false, name: "Cool Services Stage Plot", resolution: "1080p", fps: 30, serviceTypeId: null, showHeader: true, background: "black" },
   // Nothing matched until someone enters their own SuperRack snapshot numbers.
   waves: {
-    enabled: false, output: null, channel: 1, numbering: "externalId",
-    snapshots: Object.fromEntries(KEY_ROOTS.map((k) => [k, null])),
+    enabled: false, output: null, channel: 1, numbering: "externalId", hideFromTuning: ["Vocal Warm Ups"],
+    snapshots: Object.fromEntries([...KEY_ROOTS, ...TUNING_EXTRAS.map((x) => x.id)].map((k) => [k, null])),
   },
 });
 const settingsListeners = new Set<(s: AppSettings) => void>();

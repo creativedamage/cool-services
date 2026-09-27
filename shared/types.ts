@@ -289,9 +289,19 @@ export interface NdiStatus {
   error?: string;
 }
 
-/** Every key as it's written: sharps and flats are listed (and matched to snapshots) separately. */
-export const KEY_ROOTS = ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"] as const;
+/**
+ * The keys that get their own snapshot. F# and Gb are separate; C#, D#, G# and A# aren't used, so a
+ * song in one of those uses its flat (C# → Db, D# → Eb, G# → Ab, A# → Bb).
+ */
+export const KEY_ROOTS = ["C", "Db", "D", "Eb", "E", "F", "F#", "Gb", "G", "Ab", "A", "Bb", "B"] as const;
 export type KeyRoot = (typeof KEY_ROOTS)[number];
+
+/** Extra Tuning buttons that recall a snapshot of their own. */
+export const TUNING_EXTRAS = [
+  { id: "CHROMATIC", label: "Chromatic Tune", short: "Chromatic" },
+  { id: "OFF", label: "Tuning Off", short: "Off" },
+] as const;
+export type TuningExtraId = (typeof TUNING_EXTRAS)[number]["id"];
 
 /**
  * Waves SuperRack over MIDI. SuperRack recalls snapshot N from Bank LSB (CC 32) = floor((N-1)/128)
@@ -302,7 +312,7 @@ export interface WavesSettings {
   /** MIDI output name on this Mac, e.g. "IAC Driver Bus 1" or "Network Session 1". */
   output: string | null;
   channel: number; // 1–16
-  /** Key as written ("C", "C#", "Db" … "B") → SuperRack snapshot (its External ID, 0–999). */
+  /** Key ("C", "Db" … "B") or Tuning button ("CHROMATIC", "OFF") → SuperRack snapshot (its External ID, 0–999). */
   snapshots: Record<string, number | null>;
   /**
    * How a number turns into Bank LSB + Program Change:
@@ -310,6 +320,8 @@ export interface WavesSettings {
    *  - "program": plain snapshot numbers from 1, 128 per bank: n = bank × 128 + program + 1.
    */
   numbering?: "externalId" | "program";
+  /** Song items whose titles are here aren't on the Tuning bar (e.g. "Vocal Warm Ups"). */
+  hideFromTuning?: string[];
 }
 
 export interface AppSettings {
