@@ -9,7 +9,7 @@
  * - Only the security code goes to the screen.
  */
 import crypto from "node:crypto";
-import { MINISTRIES, type Ministry, type MinistryPaging, type PageEvent, type PagingConfig, type PagingStatus } from "../../../shared/types.js";
+import { MINISTRIES, type Ministry, type MinistryPaging, type PageEvent, type PageRequest, type PagingConfig, type PagingStatus } from "../../../shared/types.js";
 import { audit, pagingStore, type PagingStored } from "./db.js";
 import { ProPresenter, ProPresenterError } from "./propresenter.js";
 
@@ -31,6 +31,7 @@ const defaults = (): PagingStored => ({
     onScreenSeconds: 15,
     ipads: { enabled: false, port: KIOSK_PORT },
     ministries: { nursery: defaultMinistry("nursery"), kids: defaultMinistry("kids") },
+    approval: true,
   },
   pins: {},
   kioskSessions: [],
@@ -168,6 +169,8 @@ export function status(): PagingStatus {
     onScreenUntil: locked ? new Date(onScreenUntil).toISOString() : null,
     current: locked ? current : null,
     recent: recent.filter((e) => Date.parse(e.at) >= day.getTime()).slice(0, 25),
+    requests: requests.filter((r) => Date.parse(r.requestedAt) >= day.getTime() || r.state === "waiting" || r.state === "released").slice(0, 40),
+    approval: cfg.approval,
     serverTime: new Date().toISOString(),
   };
 }
@@ -242,3 +245,70 @@ export async function page(m: Ministry, rawCode: string, opts: { by: string; act
 
 /** Send a test page (a made-up code) — still respects the on-screen lock. */
 export const testPage = (m: Ministry, by: string, actorId: string) => page(m, "TEST", { by, actorId, childName: "Test" });
+
+/* ───────────── Page requests (approval) ───────────── */
+
+/**
+ * With approval on, an iPad's page becomes a request. It waits (a banner in Cool Services shows it)
+ * until someone sends it; then it goes on the screens as soon as nothing else is showing, one after
+ * another. Kept in memory: requests are for the service that's happening now.
+ */
+const requests: PageRequest[] = [];
+let pumpTimer: NodeJS.Timeout | null = null;
+const requestListeners = new Set<(r: PageRequest) => void>();
+export const onPageRequest = (fn: (r: PageRequest) => void) => { requestListeners.add(fn); return () => requestListeners.delete(fn); };
+
+export function requestPage(m: Ministry, rawCode: string, opts: { by: string; actorId: string; childName?: string | null }): PageRequest {
+  const code = cleanCode(rawCode);
+  const cfg = stored().config;
+  if (!cfg.ministries[m].enabled) throw new PagingError("disabled", `${cfg.ministries[m].title} paging is turned off.`);
+  // The same code asked for twice: one request.
+  const same = requests.find((r) => r.ministry === m && r.code === code && (r.state === "waiting" || r.state === "released"));
+  if (same) return same;
+  const r: PageRequest = { id: crypto.randomUUID(), ministry: m, code, childName: opts.childName ?? null, by: opts.by, requestedAt: new Date().toISOString(), state: "waiting" };
+  requests.unshift(r);
+  requests.splice(200);
+  void audit(opts.actorId, "page.request", "ministry", m, { code, by: opts.by });
+  for (const fn of requestListeners) fn(r);
+  return r;
+}
+
+function finish(r: PageRequest, state: PageRequest["state"], error?: string) {
+  r.state = state; r.doneAt = new Date().toISOString(); if (error) r.error = error;
+}
+
+/** Send the next released request when the screen is free. */
+async function pump() {
+  if (pumpTimer) { clearTimeout(pumpTimer); pumpTimer = null; }
+  const next = [...requests].reverse().find((r) => r.state === "released"); // oldest first
+  if (!next) return;
+  const wait = onScreenUntil - Date.now();
+  if (wait > 0) { pumpTimer = setTimeout(() => void pump(), wait + 400); return; }
+  try {
+    await page(next.ministry, next.code, { by: next.by, actorId: "request", childName: next.childName });
+    finish(next, "sent");
+  } catch (e) {
+    if (e instanceof PagingError && e.code === "on_screen") { pumpTimer = setTimeout(() => void pump(), 1000); return; }
+    finish(next, "failed", (e as Error).message);
+  }
+  if (requests.some((r) => r.state === "released")) pumpTimer = setTimeout(() => void pump(), Math.max(0, onScreenUntil - Date.now()) + 400);
+}
+
+export function sendRequest(id: string): PageRequest {
+  const r = requests.find((x) => x.id === id);
+  if (!r) throw new PagingError("no_code", "That request isn’t there any more.", 404);
+  if (r.state === "waiting" || r.state === "failed") { r.state = "released"; delete r.error; void pump(); }
+  return r;
+}
+
+export function sendAllRequests(m?: Ministry) {
+  for (const r of requests) if (r.state === "waiting" && (!m || r.ministry === m)) r.state = "released";
+  void pump();
+}
+
+export function cancelRequest(id: string): PageRequest {
+  const r = requests.find((x) => x.id === id);
+  if (!r) throw new PagingError("no_code", "That request isn’t there any more.", 404);
+  if (r.state === "waiting" || r.state === "released" || r.state === "failed") finish(r, "cancelled");
+  return r;
+}

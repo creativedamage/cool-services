@@ -231,6 +231,16 @@ Ups") can be left off the Tuning bar under "Leave off the Tuning bar".
   the full data format, so if readings don't appear, open "What Smaart is sending" in Settings, press
   Copy and send it to us.
 
+## Page requests (you decide when pages go up)
+
+With **Hold iPad pages until I send them** on (Preferences → Network Connections → ProPresenter,
+on by default), the Kids and Nursery iPads **request** a page instead of putting it straight on the
+screens. A bar across the top of every Cool Services screen shows each request (ministry, code,
+child, how long ago) with **Send now** and **Cancel**, plus **Send all** when there are several.
+Sent pages go up as soon as nothing else is on screen, one after another. The iPads show each
+request as "Waiting for the auditorium", "On the screens" or "Not sent". Pages started in Cool
+Services itself go straight up. Requests are kept while Cool Services is open.
+
 ## Friendly iPad addresses (kids.yourchurch.org)
 
 Preferences → Network Connections → Kids & Nursery iPads → **Friendly addresses**: enter e.g.
@@ -286,7 +296,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.10.2 && git push origin v1.10.2
+   git tag v1.11.0 && git push origin v1.11.0
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

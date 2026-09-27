@@ -19,7 +19,7 @@ import { MINISTRIES, type KioskChild, type KioskInfo, type Ministry } from "../.
 import { pcoForUser } from "./auth/oauth.js";
 import type { PcoApi } from "./pco/api.js";
 import { settings } from "./lib/db.js";
-import { kioskSession, onPagingChange, page, PagingError, status, stored, unlock } from "./lib/paging.js";
+import { kioskSession, onPagingChange, page, PagingError, requestPage, status, stored, unlock } from "./lib/paging.js";
 
 const cookieName = (m: Ministry) => `cs_ipad_${m}`;
 const cookieOpts = { httpOnly: true, sameSite: "strict" as const, path: "/", maxAge: 400 * 864e5 };
@@ -51,7 +51,11 @@ async function church(): Promise<string> {
 /** Status for one ministry's iPads: the shared on-screen lock, and only their own recent pages. */
 function forMinistry(m: Ministry) {
   const s = status();
-  return { ...s, recent: s.recent.filter((e) => e.ministry === m).map(({ by: _by, ...e }) => ({ ...e, by: "" })) };
+  return {
+    ...s,
+    recent: s.recent.filter((e) => e.ministry === m).map(({ by: _by, ...e }) => ({ ...e, by: "" })),
+    requests: s.requests.filter((r) => r.ministry === m).map(({ by: _by, ...r }) => ({ ...r, by: "" })),
+  };
 }
 
 export const kioskRouter = Router();
@@ -72,7 +76,7 @@ const needIpad = (req: Request, res: Response, next: NextFunction) => {
 kioskRouter.get("/:ministry/info", h(async (req, res) => {
   const m = req.params.ministry as Ministry;
   const cfg = stored().config.ministries[m];
-  const info: KioskInfo = { ministry: m, title: cfg.title, church: await church(), logo: settings.get().logo, unlocked: signedIn(req), enabled: cfg.enabled };
+  const info: KioskInfo = { ministry: m, title: cfg.title, church: await church(), logo: settings.get().logo, unlocked: signedIn(req), enabled: cfg.enabled, approval: stored().config.approval };
   res.json(info);
 }));
 
@@ -130,6 +134,10 @@ kioskRouter.post("/:ministry/page", needIpad, h(async (req, res) => {
     childName = child.name;
   }
   const title = stored().config.ministries[m].title;
+  if (stored().config.approval) {
+    const request = requestPage(m, code, { by: `${title} iPad`, actorId: `ipad:${m}`, childName });
+    return res.json({ ok: true, requested: true, request: { ...request, by: "" }, status: forMinistry(m) });
+  }
   await page(m, code, { by: `${title} iPad`, actorId: `ipad:${m}`, childName });
   res.json({ ok: true, status: forMinistry(m) });
 }));

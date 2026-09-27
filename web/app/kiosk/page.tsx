@@ -5,9 +5,9 @@
  * rooms; tap a child, then "Page the Auditorium" to put their security code on the screens.
  */
 import clsx from "clsx";
-import { BellRing, Check, Delete, Keyboard, Lock, Search, X } from "lucide-react";
+import { BellRing, Check, Clock, Delete, Keyboard, Lock, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { KioskChild, KioskChildren, KioskInfo, Ministry, PagingStatus } from "@shared/types";
+import type { KioskChild, KioskChildren, KioskInfo, Ministry, PageRequest, PagingStatus } from "@shared/types";
 import { useOnScreenSeconds } from "@/lib/paging";
 
 class KErr extends Error { constructor(public status: number, message: string, public data?: any) { super(message); } }
@@ -174,8 +174,10 @@ function Board({ m, info, onLocked }: { m: Ministry; info: KioskInfo; onLocked: 
   const [picked, setPicked] = useState<KioskChild | null>(null);
   const [manual, setManual] = useState(false);
   const [done, setDone] = useState<string | null>(null);
-  const left = useOnScreenSeconds(status, statusAt);
-  const locked = left > 0;
+  const onScreenLeft = useOnScreenSeconds(status, statusAt);
+  // With approval on, the iPad only asks: the screen being busy doesn't stop a request.
+  const left = info.approval ? 0 : onScreenLeft;
+  const locked = onScreenLeft > 0;
 
   const onErr = useCallback((e: unknown) => {
     if (e instanceof KErr && e.status === 401) return onLocked();
@@ -201,10 +203,10 @@ function Board({ m, info, onLocked }: { m: Ministry; info: KioskInfo; onLocked: 
 
   const send = async (body: { checkInId?: string; code?: string }, label: string) => {
     try {
-      const r = await k<{ status: PagingStatus }>(m, "page", body);
+      const r = await k<{ status: PagingStatus; requested?: boolean }>(m, "page", body);
       setStatus(r.status); setStatusAt(Date.now());
       setPicked(null); setManual(false);
-      setDone(label);
+      setDone(r.requested ? `${label.replace(/^Paged/, "Requested")}. The auditorium will put it up.` : label);
       setTimeout(() => setDone(null), 4000);
     } catch (e) {
       if (e instanceof KErr && e.data?.status) { setStatus(e.data.status); setStatusAt(Date.now()); }
@@ -241,7 +243,7 @@ function Board({ m, info, onLocked }: { m: Ministry; info: KioskInfo; onLocked: 
           <div className="flex items-center gap-3 bg-warn-soft px-5 py-2.5 text-warn">
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-warn" />
             <span className="font-medium">On the screens now: <b className="font-mono tracking-wider">{current.code}</b></span>
-            <span className="ml-auto tabular-nums">You can page again in {left}s</span>
+            <span className="ml-auto tabular-nums">{info.approval ? `${onScreenLeft}s` : `You can page again in ${onScreenLeft}s`}</span>
           </div>
         ) : done ? (
           <div className="flex items-center gap-2 bg-ok-soft px-5 py-2.5 font-medium text-ok"><Check size={18} /> {done}</div>
@@ -276,15 +278,16 @@ function Board({ m, info, onLocked }: { m: Ministry; info: KioskInfo; onLocked: 
             {list.length === 0 && <p className="mt-10 text-center text-ink-muted">No one matches “{q}”.</p>}
           </>
         )}
+        {info.approval && <Requests status={status} />}
         <Recent status={status} />
       </main>
 
       {picked && (
         <ConfirmSheet title={picked.name} subtitle={`${picked.room}${picked.securityCode ? ` · Tag ${picked.securityCode}` : ""}`} code={picked.securityCode}
-          left={left} onClose={() => setPicked(null)}
+          left={left} approval={info.approval} onClose={() => setPicked(null)}
           onPage={() => send({ checkInId: picked.id }, `Paged ${picked.securityCode} for ${picked.name.split(" ")[0]}`)} />
       )}
-      {manual && <ManualSheet left={left} onClose={() => setManual(false)} onPage={(code) => send({ code }, `Paged ${code}`)} />}
+      {manual && <ManualSheet left={left} approval={info.approval} onClose={() => setManual(false)} onPage={(code) => send({ code }, `Paged ${code}`)} />}
     </Shell>
   );
 }
@@ -307,20 +310,20 @@ function Sheet({ children, onClose }: { children: React.ReactNode; onClose: () =
   );
 }
 
-function PageButton({ left, busy, disabled, onClick }: { left: number; busy: boolean; disabled?: boolean; onClick: () => void }) {
+function PageButton({ left, busy, disabled, approval, onClick }: { left: number; busy: boolean; disabled?: boolean; approval?: boolean; onClick: () => void }) {
   const locked = left > 0;
   return (
     <button disabled={locked || busy || disabled} onClick={onClick}
       className={clsx("mt-6 flex w-full items-center justify-center gap-3 rounded-2xl py-5 text-xl font-semibold transition active:scale-[0.98]",
         locked ? "bg-hover text-ink-muted" : "bg-accent text-white disabled:opacity-40")}>
       <BellRing size={24} />
-      {busy ? "Paging…" : locked ? `Screens busy · ${left}s` : "Page the Auditorium"}
+      {busy ? (approval ? "Sending request…" : "Paging…") : locked ? `Screens busy · ${left}s` : approval ? "Request a Page" : "Page the Auditorium"}
     </button>
   );
 }
 
-function ConfirmSheet({ title, subtitle, code, left, onClose, onPage }: {
-  title: string; subtitle: string; code: string | null; left: number; onClose: () => void; onPage: () => Promise<void>;
+function ConfirmSheet({ title, subtitle, code, left, approval, onClose, onPage }: {
+  title: string; subtitle: string; code: string | null; left: number; approval: boolean; onClose: () => void; onPage: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -336,10 +339,11 @@ function ConfirmSheet({ title, subtitle, code, left, onClose, onPage }: {
       {code ? (
         <p className="mt-5 rounded-xl bg-hover px-4 py-3 text-center text-ink-soft">
           The screens will show <b className="font-mono text-lg tracking-wider text-ink">{code}</b>
+          {approval && <span className="mt-1 block text-sm text-ink-muted">The auditorium team puts it up at the right moment in the service.</span>}
         </p>
       ) : <p className="mt-5 text-bad">This child has no security code, so they can’t be paged from here.</p>}
       {err && <p className="mt-3 text-sm text-bad">{err}</p>}
-      <PageButton left={left} busy={busy} disabled={!code} onClick={async () => {
+      <PageButton left={left} busy={busy} disabled={!code} approval={approval} onClick={async () => {
         setBusy(true); setErr(null);
         try { await onPage(); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
       }} />
@@ -347,7 +351,7 @@ function ConfirmSheet({ title, subtitle, code, left, onClose, onPage }: {
   );
 }
 
-function ManualSheet({ left, onClose, onPage }: { left: number; onClose: () => void; onPage: (code: string) => Promise<void> }) {
+function ManualSheet({ left, approval, onClose, onPage }: { left: number; approval: boolean; onClose: () => void; onPage: (code: string) => Promise<void> }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -361,7 +365,7 @@ function ManualSheet({ left, onClose, onPage }: { left: number; onClose: () => v
         onChange={(e) => setCode(e.target.value.replace(/[^a-z0-9]/gi, "").toUpperCase())}
         className="input mt-5 py-4 text-center font-mono text-3xl tracking-[0.3em]" placeholder="K7X4" />
       {err && <p className="mt-3 text-sm text-bad">{err}</p>}
-      <PageButton left={left} busy={busy} disabled={!code} onClick={async () => {
+      <PageButton left={left} busy={busy} disabled={!code} approval={approval} onClick={async () => {
         setBusy(true); setErr(null);
         try { await onPage(code); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
       }} />
@@ -383,6 +387,30 @@ function Recent({ status }: { status: PagingStatus | undefined }) {
             <span className="text-ink-muted">{e.childName ?? ""}</span>
             <span className="ml-auto tabular-nums text-ink-muted">{new Date(e.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
             {!e.ok && <span className="text-xs text-bad">{e.error}</span>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** This ministry's requests today: waiting for the auditorium, on the screens, or not sent. */
+function Requests({ status }: { status: PagingStatus | undefined }) {
+  const list = status?.requests ?? [];
+  if (!list.length) return null;
+  const label = (r: PageRequest) => r.state === "waiting" ? "Waiting for the auditorium"
+    : r.state === "released" ? "Going up next" : r.state === "sent" ? "On the screens" : r.state === "cancelled" ? "Not sent" : "Couldn’t be paged";
+  return (
+    <section className="mt-8">
+      <h2 className="label mb-2">Requests today</h2>
+      <ul className="divide-y divide-line/60 rounded-2xl border border-line bg-raised">
+        {list.slice(0, 10).map((r) => (
+          <li key={r.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+            {r.state === "sent" ? <Check size={15} className="text-ok" /> : r.state === "waiting" || r.state === "released" ? <Clock size={15} className="animate-pulse text-warn" /> : <X size={15} className="text-ink-faint" />}
+            <span className="font-mono tracking-wider">{r.code}</span>
+            <span className="text-ink-muted">{r.childName ?? ""}</span>
+            <span className={clsx("ml-auto text-xs", r.state === "waiting" || r.state === "released" ? "text-warn" : r.state === "sent" ? "text-ok" : "text-ink-muted")}>{label(r)}</span>
+            <span className="w-16 text-right tabular-nums text-ink-muted">{new Date(r.requestedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
           </li>
         ))}
       </ul>

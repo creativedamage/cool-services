@@ -475,6 +475,25 @@ export interface PagingConfig {
    */
   ipads: { enabled: boolean; port: number; hostnames?: Partial<Record<Ministry, string>> };
   ministries: Record<Ministry, MinistryPaging>;
+  /**
+   * Hold iPad pages until someone sends them from Cool Services (a banner shows each request).
+   * Off: iPads put codes straight on the screens.
+   */
+  approval: boolean;
+}
+
+/** A page an iPad asked for, waiting for the production team to send it. */
+export interface PageRequest {
+  id: string;
+  ministry: Ministry;
+  code: string;
+  childName: string | null;
+  by: string;
+  requestedAt: string;
+  /** waiting → (sent | cancelled); "released" = sent from Cool Services, goes up as soon as the screen is free. */
+  state: "waiting" | "released" | "sent" | "cancelled" | "failed";
+  doneAt?: string;
+  error?: string;
 }
 
 /** Settings → iPad addresses for each ministry. */
@@ -501,6 +520,9 @@ export interface PagingStatus {
   onScreenUntil: string | null;
   current: PageEvent | null;
   recent: PageEvent[];
+  /** Today's page requests from the iPads (when pages need approval). */
+  requests: PageRequest[];
+  approval: boolean;
   serverTime: string;
 }
 
@@ -522,6 +544,8 @@ export interface KioskInfo {
   logo: string | null;
   unlocked: boolean;
   enabled: boolean;
+  /** Pages go to the production team first (the iPad "requests" a page). */
+  approval: boolean;
 }
 
 export interface KioskChildren { children: KioskChild[]; fetchedAt: string }

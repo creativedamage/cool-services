@@ -7,7 +7,7 @@ import QRCode from "qrcode";
 import { z } from "zod";
 import { MINISTRIES, type KioskAddresses, type Ministry } from "../../../shared/types.js";
 import { discover, ProPresenter, ProPresenterError } from "../lib/propresenter.js";
-import { page, PagingError, pp, publicConfig, saveConfig, setPin, signOutIpads, status, stored, testPage } from "../lib/paging.js";
+import { cancelRequest, page, PagingError, pp, publicConfig, saveConfig, sendAllRequests, sendRequest, setPin, signOutIpads, status, stored, testPage } from "../lib/paging.js";
 import { childrenFor, kioskState } from "../kiosk.js";
 import { checkInsDenied } from "../auth/oauth.js";
 
@@ -35,6 +35,7 @@ const MinistryPatch = z.object({
 const ConfigPatch = z.object({
   propresenter: z.object({ host: z.string().trim().max(255).regex(/^[A-Za-z0-9.\-:]*$/, "Enter an IP address or computer name"), port: z.number().int().min(0).max(65535) }).partial(),
   onScreenSeconds: z.number().int().min(3).max(600),
+  approval: z.boolean(),
   ipads: z.object({
     enabled: z.boolean(),
     port: z.number().int().max(65535).refine((p) => p === 80 || p >= 1024, "Use 80, or a port from 1024 up").refine((p) => p !== 3000 && p !== 3001, "Ports 3000 and 3001 aren't allowed"),
@@ -102,6 +103,11 @@ pagingRouter.get("/children", h(async (req, res) => {
 }));
 
 pagingRouter.get("/status", h(async (_req, res) => res.json(status())));
+
+/* Page requests from the iPads: send when you're ready, or cancel. */
+pagingRouter.post("/requests/:id/send", h(async (req, res) => { sendRequest(req.params.id); res.json(status()); }));
+pagingRouter.post("/requests/:id/cancel", h(async (req, res) => { cancelRequest(req.params.id); res.json(status()); }));
+pagingRouter.post("/requests/send-all", h(async (_req, res) => { sendAllRequests(); res.json(status()); }));
 
 pagingRouter.post("/page", h(async (req, res) => {
   const b = z.object({ ministry, code: z.string().max(20), childName: z.string().max(120).nullable().optional() }).parse(req.body);

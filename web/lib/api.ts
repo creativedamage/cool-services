@@ -149,6 +149,9 @@ export const Api = {
   proMessages: () => api<ProMessageOption[]>("/paging/messages"),
   checkInLocations: () => api<CheckInLocation[]>("/paging/locations"),
   pagingStatus: () => api<PagingStatus>("/paging/status"),
+  sendPageRequest: (id: string) => api<PagingStatus>(`/paging/requests/${id}/send`, { method: "POST" }),
+  cancelPageRequest: (id: string) => api<PagingStatus>(`/paging/requests/${id}/cancel`, { method: "POST" }),
+  sendAllPageRequests: () => api<PagingStatus>("/paging/requests/send-all", { method: "POST" }),
   page: (ministry: Ministry, code: string, childName?: string | null) =>
     api<{ event: PageEvent; status: PagingStatus }>("/paging/page", { method: "POST", json: { ministry, code, childName } }),
   testPage: (m: Ministry) => api<{ event: PageEvent; status: PagingStatus }>(`/paging/test/${m}`, { method: "POST" }),

@@ -137,6 +137,17 @@ function ProPresenterSection({ c, save }: { c: PagingConfig; save: (p: PagingPat
           Match your ProPresenter message time (15 seconds by default). While a page is on screen, nobody (in the app or on an iPad) can page again, so one page never replaces another.
         </span>
       </label>
+
+      <label className="mt-4 flex items-start gap-3 rounded-lg border border-line p-3">
+        <input type="checkbox" className="mt-0.5" checked={c.approval} onChange={(e) => save({ approval: e.target.checked })} />
+        <span>
+          <span className="block text-sm font-medium">Hold iPad pages until I send them</span>
+          <span className="block text-[12px] text-ink-muted">
+            The Kids and Nursery iPads <b>request</b> a page. A bar across the top of Cool Services shows each request with <b>Send now</b> and
+            <b> Cancel</b>, so pages only go up when it suits the service. Sent pages go up one after another. Off: iPads put codes straight on the screens.
+          </span>
+        </span>
+      </label>
     </section>
   );
 }

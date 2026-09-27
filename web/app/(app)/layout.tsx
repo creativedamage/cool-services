@@ -14,6 +14,7 @@ import { ScheduleModal } from "@/components/scheduling/ScheduleModal";
 import { Logo } from "@/components/Logo";
 import { routes } from "@/lib/routes";
 import { PrefsLink } from "@/components/settings/PrefsLink";
+import { PageRequestsBar } from "@/components/paging/PageRequests";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return <Suspense><Shell>{children}</Shell></Suspense>;
@@ -114,9 +115,10 @@ function Shell({ children }: { children: React.ReactNode }) {
 
       <main className="relative flex min-w-0 flex-1 flex-col">
         {me.data?.demo && (
-          <div className="absolute right-4 top-3.5 z-10"><Badge tone="violet">Demo data</Badge></div>
+          <div className="pointer-events-none absolute bottom-3 right-4 z-10"><Badge tone="violet">Demo data</Badge></div>
         )}
-        {children}
+        <PageRequestsBar />
+        <div className="relative flex min-h-0 flex-1 flex-col">{children}</div>
       </main>
 
       <ScheduleModal />
