@@ -282,7 +282,12 @@ function Rooms({ m, list, error, onChange }: { m: MinistryPaging; list: CheckInL
     <div>
       <span className="label">{m.title} rooms (Check-Ins)</span>
       <p className="mt-0.5 text-[11px] text-ink-faint">Children checked in to these rooms today show on the {m.title} iPad page.</p>
-      {error ? <p className="mt-2 text-xs text-bad">{error.message}</p> : !list ? <div className="mt-2"><Spinner /></div> : (
+      {error ? (
+        <p className="mt-2 text-xs text-bad">
+          {error.message}
+          {(error as { data?: { error?: string } }).data?.error === "checkins_signin" && <> <a className="underline" href="/api/auth/login?return=/paging">Sign in again</a></>}
+        </p>
+      ) : !list ? <div className="mt-2"><Spinner /></div> : (
         <div className="mt-2 max-h-64 space-y-3 overflow-y-auto rounded-lg border border-line p-3">
           {groups.length === 0 && <p className="text-xs text-ink-muted">No Check-Ins rooms found.</p>}
           {groups.map(([name, rooms]) => {

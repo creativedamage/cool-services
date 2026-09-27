@@ -233,8 +233,12 @@ Ups") can be left off the Tuning bar under "Leave off the Tuning bar".
 
 ## Check-ins permission
 
-Check-ins need Planning Center **Check-Ins** access. The first time someone opens the Check-ins tab
-after updating, the app asks them to sign in again once to approve it.
+Check-ins need Planning Center **Check-Ins** access. Someone who signed in before Check-Ins was
+added is asked to sign in again once (and comes back to the same page). If Planning Center still
+says no after that, their Planning Center account doesn't have Check-Ins permission: the Check-ins
+tab says so (with Planning Center's own message) instead of asking to sign in again. An
+administrator can give access in Planning Center People → the person → Permissions → Check-Ins.
+With a shared personal access token, that token's account needs Check-Ins access.
 
 ## If something feels slow
 
@@ -266,7 +270,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.10.0 && git push origin v1.10.0
+   git tag v1.10.1 && git push origin v1.10.1
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

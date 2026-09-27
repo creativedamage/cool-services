@@ -9,6 +9,7 @@ import { MINISTRIES, type KioskAddresses, type Ministry } from "../../../shared/
 import { discover, ProPresenter, ProPresenterError } from "../lib/propresenter.js";
 import { page, PagingError, pp, publicConfig, saveConfig, setPin, signOutIpads, status, stored, testPage } from "../lib/paging.js";
 import { childrenFor, kioskState } from "../kiosk.js";
+import { checkInsDenied } from "../auth/oauth.js";
 
 export const pagingRouter = Router();
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch((e: unknown) => {
@@ -78,7 +79,7 @@ pagingRouter.get("/locations", h(async (req, res) => {
   try {
     res.json(await req.pco.listCheckInLocations());
   } catch (e: any) {
-    if (e?.status === 403 || e?.status === 401) return res.status(403).json({ error: "checkins_access", message: "Sign in again to allow Check-Ins." });
+    if (e?.status === 403 || e?.status === 401) return res.status(403).json(checkInsDenied(req, e));
     throw e;
   }
 }));

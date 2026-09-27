@@ -36,6 +36,9 @@ declare global {
 const SID = "cc_sid";
 const STATE = "cc_oauth_state";
 const VERIFIER = "cc_pkce";
+const RETURN = "cc_return";
+/** Only our own pages ("/services/checkins?…"), never another site. */
+const safeReturn = (v: unknown) => (typeof v === "string" && /^\/(?!\/)[\w\-/?=&.%#]*$/.test(v) ? v : null);
 const cookieOpts = { httpOnly: true, sameSite: "lax" as const, secure: config.appUrl.startsWith("https:"), path: "/" };
 const demoApi = new DemoPco();
 const web = (p: string) => `${config.webOrigin}${p}`;
@@ -78,7 +81,7 @@ authRouter.get("/status", h(async (_req, res) => {
 /* ───────────── Sign in ───────────── */
 
 /** Step 1 — send the browser to Planning Center's sign-in / consent screen. */
-authRouter.get("/login", h(async (_req, res) => {
+authRouter.get("/login", h(async (req, res) => {
   const clientId = config.pco.clientId;
   if (!clientId) return res.redirect(web("/?error=sign_in_not_available"));
 
@@ -87,6 +90,9 @@ authRouter.get("/login", h(async (_req, res) => {
   const challenge = b64url(crypto.createHash("sha256").update(verifier).digest());
   res.cookie(STATE, state, { ...cookieOpts, maxAge: 10 * 60_000 });
   res.cookie(VERIFIER, verifier, { ...cookieOpts, maxAge: 10 * 60_000 });
+  // "Sign in again" from a page comes back to that page.
+  const back = safeReturn(req.query.return);
+  if (back) res.cookie(RETURN, back, { ...cookieOpts, maxAge: 10 * 60_000 }); else res.clearCookie(RETURN, cookieOpts);
 
   const url = new URL(`${config.pco.base}/oauth/authorize`);
   url.search = new URLSearchParams({
@@ -128,7 +134,9 @@ authRouter.get("/callback", h(async (req, res) => {
     });
     if (!patClient) await saveTokens(user.id, tokens); // shared-token mode doesn't need personal tokens
     await startSession(res, user.id);
-    res.redirect(web("/start"));
+    const back = safeReturn(req.cookies?.[RETURN]);
+    res.clearCookie(RETURN, cookieOpts);
+    res.redirect(web(back ?? "/start"));
   } catch (e) {
     console.error("[oauth] callback failed", e);
     res.redirect(web("/?error=token_exchange_failed"));
@@ -201,4 +209,32 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   } catch (e) {
     next(e);
   }
+}
+
+/**
+ * Planning Center said no to Check-Ins. Signing in again only helps if this sign-in was made before
+ * Cool Services asked for Check-Ins access (the token doesn't include it) or has expired. Otherwise
+ * the Planning Center account itself doesn't have Check-Ins permission, and signing in again would
+ * just loop, so say that instead.
+ */
+export function checkInsDenied(req: Request, e: { status?: number; body?: unknown }) {
+  const detail = ((e.body as { errors?: { detail?: string; title?: string }[] })?.errors?.[0]);
+  const pcoSays = detail?.detail || detail?.title || null;
+  if (e.status === 401) return { error: "checkins_signin", message: "Your Planning Center sign-in has expired. Sign in again.", pcoSays };
+  if (patClient) {
+    return { error: "checkins_permission", shared: true, pcoSays,
+      message: "The Planning Center account Cool Services uses on this Mac (its personal access token) doesn’t have access to Check-Ins. Give that account Check-Ins access in Planning Center, or remove the token so people use their own sign-in." };
+  }
+  const scope = (req.user ? tokenStore.get(req.user.id)?.scope : "") ?? "";
+  if (!scope.split(/[\s,]+/).includes("check_ins")) {
+    // Just signed in and Planning Center still left Check-Ins out: another sign-in won't help.
+    const last = req.user ? Date.parse(users.get(req.user.id)?.lastLoginAt ?? "") : NaN;
+    if (Date.now() - last < 10 * 60_000) {
+      return { error: "checkins_permission", shared: false, pcoSays,
+        message: `Planning Center didn’t include Check-Ins when you signed in (it allowed: ${scope || "nothing"}). Check that the Planning Center account you sign in with can use Check-Ins${config.pco.scopes.includes("check_ins") ? "" : ", and that PCO_SCOPES includes check_ins"}.` };
+    }
+    return { error: "checkins_signin", message: "Sign in again and approve Check-Ins. It only takes a moment.", pcoSays };
+  }
+  return { error: "checkins_permission", shared: false, pcoSays,
+    message: "Your Planning Center account doesn’t have permission to see Check-Ins. A Planning Center administrator can turn it on for you in People → your profile → Permissions → Check-Ins. Signing in again won’t change this." };
 }

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { audit } from "../lib/db.js";
 import { lowPriority } from "../pco/client.js";
+import { checkInsDenied } from "../auth/oauth.js";
 
 export const servicesRouter = Router();
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
@@ -86,8 +87,7 @@ servicesRouter.get("/plans/:st/:plan/checkins", h(async (req, res) => {
   try {
     res.json(await req.pco.getCheckIns(req.params.st, req.params.plan));
   } catch (e: any) {
-    // Signed in before Check-Ins access was added: ask to sign in again (once).
-    if (e?.status === 403 || e?.status === 401) return res.status(403).json({ error: "checkins_access", message: "Sign in again to allow Check-Ins." });
+    if (e?.status === 403 || e?.status === 401) return res.status(403).json(checkInsDenied(req, e));
     throw e;
   }
 }));

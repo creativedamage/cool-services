@@ -66,7 +66,9 @@ export function CheckInsView({ serviceTypeId, planId }: { serviceTypeId: string;
   const count = (k: CheckInRow["kind"]) => scoped.filter((r) => r.kind === k).length;
   const out = scoped.filter((r) => r.checkedOutAt).length;
   const ago = data.dataUpdatedAt ? Math.max(0, Math.round((Date.now() - data.dataUpdatedAt) / 1000)) : null;
-  const needsAccess = data.error instanceof ApiError && data.error.status === 403;
+  const denied = data.error instanceof ApiError && data.error.status === 403 ? (data.error.data as { error?: string; message?: string; pcoSays?: string | null } | undefined) : undefined;
+  const needsAccess = Boolean(denied);
+  const canFixBySignIn = denied?.error !== "checkins_permission";
 
   return (
     <div className="h-full overflow-y-auto">
@@ -85,9 +87,12 @@ export function CheckInsView({ serviceTypeId, planId }: { serviceTypeId: string;
         {needsAccess ? (
           <div className="panel mx-auto max-w-lg p-6 text-center">
             <UserCheck className="mx-auto text-accent" />
-            <h2 className="mt-2 font-semibold">Allow Check-Ins</h2>
-            <p className="mt-1 text-sm text-ink-muted">Cool Services needs permission to read Planning Center Check-Ins. Sign in again and approve Check-Ins. It only takes a moment.</p>
-            <a href="/api/auth/login" className="btn-primary mt-4">Sign in again</a>
+            <h2 className="mt-2 font-semibold">{canFixBySignIn ? "Allow Check-Ins" : "No access to Check-Ins"}</h2>
+            <p className="mt-1 text-sm text-ink-muted">{denied?.message ?? "Sign in again and approve Check-Ins."}</p>
+            {denied?.pcoSays && <p className="mt-2 text-[11px] text-ink-faint">Planning Center said: “{denied.pcoSays}”</p>}
+            {canFixBySignIn
+              ? <a href={`/api/auth/login?return=${encodeURIComponent(location.pathname + location.search)}`} className="btn-primary mt-4">Sign in again</a>
+              : <button className="btn-outline mt-4" onClick={() => void data.refetch()}>Try again</button>}
           </div>
         ) : data.isLoading ? (
           <div className="space-y-3"><Skeleton className="h-20" /><Skeleton className="h-64" /></div>
