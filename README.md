@@ -157,6 +157,25 @@ Notes:
   plans can't be reached from the network. A wrong PIN 5 times locks that iPad out for a minute (doubling).
 - Changing a PIN signs out that ministry's iPads.
 
+## Matrix
+
+Services → a service type → **Matrix**: several weeks side by side.
+
+- **Drag** someone onto another position or week to move them there (hold **⌥ Option** to copy
+  instead). **Send requests** (top) decides whether Planning Center sends a scheduling request.
+- **Hover** someone for **Profile**, **Target** (keeps them highlighted everywhere until you clear it),
+  **Change…** (someone else in that spot, or them in another position) and **Remove**.
+- **Click** someone for their profile: emails, phones, address, what they're scheduled for, blockouts,
+  and **Send an email**. Planning Center's API only sends email to people in a workflow (it goes from
+  you and is logged on their card); for anyone else **Open in Mail** starts it addressed to them.
+
+## Campuses
+
+Preferences → **Campuses**: add campuses, choose the campus each service type belongs to, and set **My
+default campus**. Cool Services opens on your default campus; the switcher at the top of the sidebar
+shows another campus (or all) for now. The Services list, the sidebar and Schedule in Services
+follow it (Schedule has an "All campuses" link). Campuses are kept on this Mac; the default is per person.
+
 ## Preferences
 
 **Cool Services → Preferences…** (⌘,) opens Preferences in their own window (the ⚙ next to your
@@ -296,7 +315,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.11.0 && git push origin v1.11.0
+   git tag v1.12.0 && git push origin v1.12.0
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

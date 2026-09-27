@@ -2,7 +2,7 @@
  * LivePco — PcoApi backed by the real Planning Center API.
  * Endpoint notes live in docs/ARCHITECTURE.md §3.
  */
-import type {
+import type { PersonProfile,
   Board, Candidate, CheckInLocation, ItemInput, ItemTimes, Matrix, NoteCategory, RunSheetData, RunSheetLive, SongArrangement, SongHit, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanItem, PlanSummary, PlanTime, Person,
   RosterStatus, ScheduleRequest, ServiceType, StaffMe, Team, TeamMember, WorkflowCard, WorkflowSummary,
 } from "../../../shared/types.js";
@@ -137,6 +137,42 @@ export class LivePco implements PcoApi {
 
   async getPerson(personId: string) {
     return (await this.people([personId])).get(personId)!;
+  }
+
+  /** The person panel: contact details, upcoming schedule and blockouts, and active workflow cards. */
+  async getProfile(personId: string): Promise<PersonProfile> {
+    const today = new Date().toISOString().slice(0, 10);
+    const [p, schedules, blockouts, cards] = await Promise.all([
+      this.c.get(`${P}/people/${personId}?include=emails,phone_numbers,addresses`),
+      this.c.list(`${S}/people/${personId}/schedules?order=sort_date&per_page=50`, 1).catch(() => [] as Flat[]),
+      this.c.list(`${S}/people/${personId}/blockouts?order=starts_at&per_page=25`, 1).catch(() => [] as Flat[]),
+      this.c.list(`${P}/people/${personId}/workflow_cards?include=workflow`, 1).catch(() => [] as Flat[]),
+    ]);
+    const person = this.person(p, p.rel.emails ?? [], p.rel.phone_numbers ?? []);
+    const addr = (p.rel.addresses ?? []).find((a: Flat) => a.primary) ?? p.rel.addresses?.[0];
+    const status = (s: string): "C" | "U" | "D" => (s === "C" || s === "D" ? s : "U");
+    return {
+      person,
+      emails: (p.rel.emails ?? []).map((e: Flat) => ({ address: e.address, location: e.location ?? null, primary: Boolean(e.primary) })),
+      phones: (p.rel.phone_numbers ?? []).map((n: Flat) => ({ number: n.number, location: n.location ?? null, primary: Boolean(n.primary) })),
+      address: addr ? [addr.street ?? addr.street_line_1, addr.street_line_2, [addr.city, addr.state].filter(Boolean).join(", "), addr.zip].filter(Boolean).join(" · ") : null,
+      birthdate: p.birthdate ?? null,
+      membership: p.membership ?? null,
+      schedule: schedules
+        .filter((s) => String(s.sort_date ?? s.dates ?? "").slice(0, 10) >= today)
+        .map((s) => ({
+          planId: s.rel.plan?.id ?? s.plan_id ?? null, serviceTypeId: s.rel.service_type?.id ?? null,
+          serviceTypeName: s.service_type_name ?? "", date: s.sort_date ?? s.dates, teamName: s.team_name ?? "",
+          position: s.team_position_name ?? "", status: status(s.status),
+        })),
+      blockouts: blockouts
+        .filter((b) => String(b.ends_at ?? "").slice(0, 10) >= today)
+        .map((b) => ({ id: b.id, reason: b.reason ?? b.description ?? null, startsAt: b.starts_at, endsAt: b.ends_at })),
+      cards: cards
+        .filter((c) => !c.completed_at && !c.removed_at)
+        .map((c) => ({ id: c.id, workflowName: c.rel.workflow?.name ?? "Workflow" })),
+      url: `https://people.planningcenteronline.com/people/AC${personId}`,
+    };
   }
 
   async getContacts(personIds: string[]): Promise<Record<string, { email: string | null; phone: string | null; mobile: string | null }>> {

@@ -8,16 +8,18 @@ import { Api, planQuery, qk } from "@/lib/api";
 import { usePlans } from "@/lib/plans";
 import { Skeleton } from "@/components/ui";
 import { routes } from "@/lib/routes";
+import { useCampus } from "@/lib/campus";
 
 export default function ServicesPage() {
   const plans = usePlans({ refetchInterval: 60_000 });
-  const types = { data: plans.types };
+  const { campus, shows } = useCampus();
+  const types = { data: plans.types?.filter((t) => shows(t.id)) };
   const [type, setType] = useState<string | null>(null);
-  const list = (plans.data ?? []).filter((p) => !type || p.serviceTypeId === type);
+  const list = (plans.data ?? []).filter((p) => (type ? p.serviceTypeId === type : shows(p.serviceTypeId)));
 
   return (
     <div className="overflow-y-auto p-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Upcoming services</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Upcoming services{campus ? <span className="text-ink-muted"> · {campus.name}</span> : null}</h1>
       <p className="mt-1 text-sm text-ink-muted">Every plan at a glance. Open one to fill slots and handle responses.</p>
 
       <div className="mt-5 flex flex-wrap gap-1.5">
@@ -38,7 +40,7 @@ export default function ServicesPage() {
       <div className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3">
         {plans.isLoading && [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-36" />)}
         {list.map((p) => <PlanTile key={p.id} p={p} />)}
-        {!plans.isLoading && plans.pending.filter((t) => !type || t.id === type).map((t) => (
+        {!plans.isLoading && plans.pending.filter((t) => (type ? t.id === type : shows(t.id))).map((t) => (
           <div key={t.id} className="panel grid h-[104px] place-items-center text-xs text-ink-faint">Loading {t.name}…</div>
         ))}
       </div>

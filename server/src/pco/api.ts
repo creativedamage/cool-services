@@ -2,7 +2,7 @@
  * Domain-level interface over Planning Center. Routes depend only on this, so the live
  * implementation (LivePco) and the in-memory demo (DemoPco) are interchangeable.
  */
-import type {
+import type { PersonProfile,
   Board, Candidate, ItemInput, ItemTimes, Matrix, NoteCategory, PlanItem, RunSheetData, RunSheetLive, SongArrangement, SongHit, CheckInLocation, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanSummary, Person, RosterStatus,
   ScheduleRequest, ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary,
 } from "../../../shared/types.js";
@@ -18,6 +18,7 @@ export interface PcoApi {
   /** Email + phone for board cards, loaded after the board itself. */
   getContacts(personIds: string[]): Promise<Record<string, { email: string | null; phone: string | null; mobile: string | null }>>;
   getPerson(personId: string): Promise<Person>;
+  getProfile(personId: string): Promise<PersonProfile>;
   getNotes(personId: string, cardId: string): Promise<Note[]>;
   addCardNote(personId: string, cardId: string, body: string): Promise<Note>;
   sendCardEmail(personId: string, cardId: string, subject: string, body: string): Promise<void>;

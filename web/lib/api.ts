@@ -1,7 +1,7 @@
 import type {
   AppSettings, NdiStatus, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, StagePlot, PlanSummary, RosterStatus, ScheduleRequest,
   ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary,
-  DashboardWidget, HomeService, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
+  DashboardWidget, HomeService, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 
@@ -100,6 +100,11 @@ export const Api = {
   smaartStatus: () => api<SmaartStatusView>("/smaart/status"),
   dashboard: () => api<DashboardWidget[] | null>("/dashboard"),
   home: () => api<HomeService>("/dashboard/home"),
+  campuses: () => api<CampusSettings>("/campuses"),
+  saveCampuses: (c: Campus[]) => api<CampusSettings>("/campuses", { method: "PUT", json: c }),
+  setDefaultCampus: (campusId: string | null) => api<CampusSettings>("/campuses/default", { method: "PUT", json: { campusId } }),
+  profile: (personId: string) => api<PersonProfile>(`/people/${personId}/profile`),
+  emailPerson: (personId: string, p: { subject: string; body: string; cardId?: string }) => api<{ ok: boolean; via: string }>(`/people/${personId}/email`, { method: "POST", json: p }),
   consoleConfig: () => api<ConsoleSettingsView>("/console/config"),
   saveConsole: (p: Partial<ConsoleSettingsView>) => api<ConsoleSettingsView>("/console/config", { method: "PUT", json: p }),
   testConsole: () => api<{ ok: boolean; input1?: string | null; note?: string; error?: string }>("/console/test", { method: "POST" }),
@@ -203,6 +208,8 @@ export const qk = {
   smaartStatus: ["smaartStatus"] as const,
   dashboard: ["dashboard"] as const,
   home: ["home"] as const,
+  campuses: ["campuses"] as const,
+  profile: (personId: string) => ["profile", personId] as const,
   consoleConfig: ["consoleConfig"] as const,
   consolePreview: (plan: string) => ["consolePreview", plan] as const,
   ndiSources: ["ndiSources"] as const,

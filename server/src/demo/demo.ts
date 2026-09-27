@@ -2,7 +2,7 @@
  * DemoPco — in-memory Planning Center stand-in with realistic Cool Church data.
  * Lets every screen run without PCO credentials (DEMO_MODE=true).
  */
-import type {
+import type { PersonProfile,
   Board, Candidate, CheckInLocation, ItemInput, ItemTimes, Matrix, NoteCategory, RunSheetData, RunSheetLive, SongArrangement, SongHit, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanItem, PlanSummary, Person, RosterStatus,
   ScheduleRequest, ServiceType, StaffMe, Team, TeamMember, WorkflowCard, WorkflowStep, WorkflowSummary,
 } from "../../../shared/types.js";
@@ -307,6 +307,29 @@ export class DemoPco implements PcoApi {
 
   async getPerson(personId: string) {
     return personById(personId);
+  }
+
+  async getProfile(personId: string): Promise<PersonProfile> {
+    const person = personById(personId);
+    const schedule = plans
+      .filter((pl) => Date.parse(pl.sortDate) > Date.now() - 864e5)
+      .flatMap((pl) => (roster.get(pl.id) ?? []).filter((m) => m.personId === personId).map((m) => ({
+        planId: pl.id, serviceTypeId: pl.serviceTypeId, serviceTypeName: serviceTypes.find((t) => t.id === pl.serviceTypeId)?.name ?? "",
+        date: pl.sortDate, teamName: m.teamName, position: m.positionName, status: m.status,
+      })))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    return {
+      person,
+      emails: person.email ? [{ address: person.email, location: "Home", primary: true }] : [],
+      phones: [person.mobile ? { number: person.mobile, location: "Mobile", primary: true } : null, person.phone && person.phone !== person.mobile ? { number: person.phone, location: "Home", primary: false } : null].filter(Boolean) as PersonProfile["phones"],
+      address: "1200 Palm Ave · Miramar, FL · 33025",
+      birthdate: null,
+      membership: "Member",
+      schedule,
+      blockouts: Number(personId.replace(/\D/g, "")) % 4 === 0 ? [{ id: "b1", reason: "Out of town", startsAt: new Date(Date.now() + 9 * 864e5).toISOString(), endsAt: new Date(Date.now() + 12 * 864e5).toISOString() }] : [],
+      cards: cards.filter((c) => c.personId === personId).map((c) => ({ id: c.id, workflowName: workflows.find((w) => w.id === c.workflowId)?.name ?? "Workflow" })),
+      url: `https://people.planningcenteronline.com/people/AC${personId}`,
+    };
   }
 
   async getNotes(personId: string, cardId: string): Promise<Note[]> {

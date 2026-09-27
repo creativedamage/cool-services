@@ -15,6 +15,7 @@ import { Logo } from "@/components/Logo";
 import { routes } from "@/lib/routes";
 import { PrefsLink } from "@/components/settings/PrefsLink";
 import { PageRequestsBar } from "@/components/paging/PageRequests";
+import { useCampus } from "@/lib/campus";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return <Suspense><Shell>{children}</Shell></Suspense>;
@@ -52,6 +53,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <div className="truncate text-[11px] text-ink-muted">{me.data?.orgName ?? "\u00a0"}</div>
           </div>
         </div>
+        <CampusSwitcher />
 
         <nav className="space-y-0.5 px-2">
           {nav.map(({ href, label, icon: Icon }) => (
@@ -136,10 +138,12 @@ function ServicesNav({ activeSt, activePlan, tab }: { activeSt: string | null; a
   const qc = useQueryClient();
   const plans = usePlans();
   const list = plans.data ?? [];
+  const { shows } = useCampus();
   // In Planning Center's service type order; each type appears as soon as its plans arrive.
+  // On the overview, only the campus you're looking at.
   const types = (plans.types ?? []).map((t) => [t.id, t.name] as [string, string])
-    .filter(([id]) => (!activeSt || id === activeSt) && list.some((p) => p.serviceTypeId === id));
-  const waiting = plans.pending.filter((t) => !activeSt || t.id === activeSt);
+    .filter(([id]) => (activeSt ? id === activeSt : shows(id)) && list.some((p) => p.serviceTypeId === id));
+  const waiting = plans.pending.filter((t) => (activeSt ? t.id === activeSt : shows(t.id)));
 
   return (
     <div className="mt-6 flex-1 overflow-y-auto px-2">
@@ -241,3 +245,17 @@ function PagingNav() {
 }
 
 /** Sidebar on Settings: jump to a section. */
+
+/** Which campus you're looking at (starts at your default from Preferences → Campuses). */
+function CampusSwitcher() {
+  const { campuses, campus, myDefault, setCampus } = useCampus();
+  if (!campuses.length) return null;
+  return (
+    <div className="px-3 pb-2">
+      <select className="input w-full py-1 text-xs" value={campus?.id ?? ""} onChange={(e) => setCampus(e.target.value || null)} title="Campus">
+        <option value="">All campuses</option>
+        {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}{c.id === myDefault ? " (default)" : ""}</option>)}
+      </select>
+    </div>
+  );
+}

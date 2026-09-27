@@ -13,6 +13,7 @@ import { Api, planQuery, qk } from "@/lib/api";
 import { usePlans } from "@/lib/plans";
 import { shortDate } from "@/lib/format";
 import { useUi } from "@/lib/store";
+import { useCampus } from "@/lib/campus";
 import { Avatar, Modal, Skeleton, Spinner } from "@/components/ui";
 
 export function ScheduleModal() {
@@ -26,6 +27,9 @@ export function ScheduleModal() {
   useEffect(() => { setPlan(null); setSlot(null); setShowAll(false); }, [person?.personId]);
 
   const plans = usePlans({ enabled: !!person });
+  const { campus, shows } = useCampus();
+  const [everyCampus, setEveryCampus] = useState(false);
+  const shown = (plans.data ?? []).filter((p) => everyCampus || shows(p.serviceTypeId));
   const detail = useQuery({
     ...planQuery(plan?.serviceTypeId ?? "", plan?.id ?? ""),
     enabled: !!plan,
@@ -58,12 +62,20 @@ export function ScheduleModal() {
   return (
     <Modal open onClose={closeSchedule} width={640}
       title={<span className="flex items-center gap-2.5"><Avatar name={person.name} src={person.avatarUrl} size={26} /> Schedule {person.name}</span>}>
-      <div className="grid max-h-[70vh] grid-cols-[230px_1fr] divide-x divide-line">
+      {/* A fixed height, and each side scrolls on its own, so the list never runs over the Schedule button. */}
+      <div className="grid h-[min(62vh,560px)] grid-cols-[230px_1fr] grid-rows-[minmax(0,1fr)] divide-x divide-line">
         {/* 1 — service */}
-        <div className="overflow-y-auto p-3">
-          <div className="label px-1 pb-2">1 · Service</div>
+        <div className="min-h-0 overflow-y-auto p-3">
+          <div className="flex items-center justify-between px-1 pb-2">
+            <span className="label">1 · Service</span>
+            {campus && (
+              <button className="text-[10px] text-accent hover:underline" onClick={() => setEveryCampus(!everyCampus)}>
+                {everyCampus ? `Only ${campus.name}` : "All campuses"}
+              </button>
+            )}
+          </div>
           {plans.isLoading && [0, 1, 2, 3].map((i) => <Skeleton key={i} className="mb-1.5 h-12" />)}
-          {plans.data?.map((p) => (
+          {shown.map((p) => (
             <button key={p.id} onClick={() => { setPlan(p); setSlot(null); }}
               onMouseEnter={() => void qc.prefetchQuery(planQuery(p.serviceTypeId, p.id))}
               className={clsx("mb-1 w-full rounded-lg px-2.5 py-2 text-left transition",
@@ -78,7 +90,7 @@ export function ScheduleModal() {
         </div>
 
         {/* 2 — position */}
-        <div className="flex min-h-[340px] flex-col overflow-y-auto p-4">
+        <div className="flex min-h-0 flex-col overflow-y-auto p-4">
           {!plan && <div className="m-auto text-sm text-ink-faint">Pick a service on the left</div>}
           {plan && (
             <>

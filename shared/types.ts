@@ -15,6 +15,24 @@ export interface Person {
   mobile?: string | null;
 }
 
+/** Everything the person panel shows (Matrix → click a person). */
+export interface PersonProfile {
+  person: Person;
+  emails: { address: string; location: string | null; primary: boolean }[];
+  phones: { number: string; location: string | null; primary: boolean }[];
+  address: string | null;
+  birthdate: string | null;
+  membership: string | null;
+  /** Upcoming Services schedule (every service type). */
+  schedule: { planId: string | null; serviceTypeId: string | null; serviceTypeName: string; date: string; teamName: string; position: string; status: "C" | "U" | "D" }[];
+  /** Upcoming blockouts. */
+  blockouts: { id: string; reason: string | null; startsAt: string; endsAt: string }[];
+  /** Active workflow cards: Planning Center can send email through these. */
+  cards: { id: string; workflowName: string }[];
+  /** The person's page in Planning Center People. */
+  url: string;
+}
+
 export interface StaffMe extends Person {
   orgName: string;
   demo: boolean;
@@ -256,6 +274,10 @@ export interface PlanMics {
   usual: Record<string, string>;
 }
 
+
+/** A campus: a name and the service types that belong to it. */
+export interface Campus { id: string; name: string; serviceTypeIds: string[] }
+export interface CampusSettings { campuses: Campus[]; /** This person's default campus (null = all). */ myDefault: string | null }
 
 /** Allen & Heath dLive / Avantis connection (Preferences → Audio). */
 export interface ConsoleSettingsView { enabled: boolean; model: "dlive" | "avantis"; host: string; port: number; midiChannel: number }
