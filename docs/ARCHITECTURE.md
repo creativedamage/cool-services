@@ -139,7 +139,8 @@ uses its own chosen plot, or else its service type's default (only one default p
 `desktop/src/ndi.ts` opens an invisible off-screen Electron window on `/ndi` at 720p, 1080p or 4K.
 Each painted frame is kept as BGRA and re-sent at the chosen frame rate with
 `@stagetimerio/grandiose` (NDI SDK 6, N-API). It's an optionalDependency (npm skips it quietly if it
-can't compile), so `build.mjs` checks it: it retries the build out loud, builds the other processor's
+can't compile), so `build.mjs` checks it: if it isn't built it builds it again out loud in a temp folder (its
+build breaks when the project path has a space, e.g. "cool-services 9"), builds the other processor's
 slice and joins them with `lipo`, and copies `dist/` (grandiose.node + libndi.dylib) to
 `app/native/grandiose`, which is unpacked from the asar. `desktop/src/ndiLib.ts` loads that copy
 (falling back to node_modules when running from source). `build.mjs --dist` fails if the add-on

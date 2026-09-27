@@ -55,24 +55,49 @@ const NDI_PKG = "@stagetimerio/grandiose";
 const ndiVersion = JSON.parse(fs.readFileSync(path.join(here, "package.json"), "utf8")).optionalDependencies?.[NDI_PKG];
 const findNdi = () => { try { return path.dirname(require.resolve(`${NDI_PKG}/package.json`, { paths: [here, root] })); } catch { return null; } };
 const built = (dir) => Boolean(dir) && fs.existsSync(path.join(dir, "dist", "grandiose.node"));
-const sh = (cmd, cwd = root) => { try { execSync(cmd, { cwd, stdio: "inherit" }); return true; } catch { return false; } };
+const sh = (cmd, cwd = root, env = process.env) => { try { execSync(cmd, { cwd, stdio: "inherit", env }); return true; } catch { return false; } };
+// npm run -w desktop passes its workspace setting down; npm commands in the temp folder must not see it.
+const plainEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^npm_config_(workspace|workspaces|include_workspace_root|prefix)$/i.test(k)));
+
+/** The add-on's test tools (vitest) aren't needed to build it, and trip up npm. */
+function dropDevDeps(dir) {
+  const f = path.join(dir, "package.json");
+  const p = JSON.parse(fs.readFileSync(f, "utf8"));
+  delete p.devDependencies;
+  fs.writeFileSync(f, JSON.stringify(p, null, 2));
+  return true;
+}
+
+/** Build the add-on from its npm package in a temp folder (no spaces in the path). */
+function buildNdiInTemp() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cool-ndi-"));
+  const pkg = path.join(tmp, "package");
+  const ok = sh(`npm pack ${NDI_PKG}@${ndiVersion} --pack-destination "${tmp}" --silent`, tmp, plainEnv)
+    && sh(`tar -xzf "$(ls *.tgz | head -1)"`, tmp, plainEnv)
+    && dropDevDeps(pkg)
+    && sh("npm install --ignore-scripts --omit=dev --no-audit --no-fund --no-package-lock --silent", pkg, plainEnv)
+    && sh("node scripts/ndi.js", pkg, plainEnv)
+    && sh("npx --yes node-gyp rebuild", pkg, plainEnv)
+    && sh("node scripts/dist.js", pkg, plainEnv);
+  return ok && built(pkg) ? pkg : null;
+}
 
 function prepareNdi() {
   if (process.env.COOL_SKIP_NDI) { console.log("• NDI: skipped (COOL_SKIP_NDI)"); return; }
   let dir = findNdi();
   if (!built(dir) && process.platform === "darwin") {
-    // npm skips a failed optional install without saying much. Try again, out loud.
+    // npm skips a failed optional install quietly. Build it again, out loud, in a temporary folder:
+    // the add-on's build breaks when the project's folder has a space in its name
+    // (e.g. "cool-services 9"), and the temp folder never does.
     console.log(`• NDI: the add-on isn't built yet. Building ${NDI_PKG}@${ndiVersion} (downloads the NDI SDK, then compiles)…`);
-    if (dir) sh(`npm rebuild ${NDI_PKG} --foreground-scripts`);
-    dir = findNdi();
-    if (!built(dir)) sh(`npm install --no-save --foreground-scripts -w desktop ${NDI_PKG}@${ndiVersion}`);
-    dir = findNdi();
+    dir = buildNdiInTemp() ?? dir;
   }
   if (!built(dir)) {
     const why = [
       process.platform !== "darwin" ? "- this isn't a Mac (the Mac NDI add-on can only be built on a Mac)" : null,
       "- Apple's command-line developer tools are missing: run  xcode-select --install  then try again",
       "- the NDI SDK download (downloads.ndi.tv) was blocked or failed",
+      "- not enough free disk space",
       "Scroll up for the error from the build.",
     ].filter(Boolean).join("\n  ");
     if (forDist) {
@@ -95,7 +120,7 @@ function prepareNdi() {
     try {
       fs.cpSync(dir, tmp, { recursive: true, filter: (f) => !f.includes(`${path.sep}node_modules${path.sep}`) && !f.endsWith(`${path.sep}build`) });
       fs.rmSync(path.join(tmp, "build"), { recursive: true, force: true });
-      if (sh(`npx --yes node-gyp rebuild --arch=${other}`, tmp)) {
+      if (sh(`npx --yes node-gyp rebuild --arch=${other}`, tmp, plainEnv)) {
         const node = path.join(outDir, "grandiose.node");
         execSync(`lipo -create "${node}" "${path.join(tmp, "build", "Release", "grandiose.node")}" -output "${node}.u" && mv "${node}.u" "${node}"`);
         console.log(`• NDI: add-on built for ${process.arch} + ${other}`);
