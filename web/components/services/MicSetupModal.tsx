@@ -2,7 +2,7 @@
 /** Set up mics: the Shure receivers on the network and the channels (Vox 1, AG Pack…) on them. */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus, Trash2, Wifi } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { MicChannel, MicSetup, Receiver, ShureModel } from "@shared/types";
 import { Api, qk } from "@/lib/api";
@@ -33,7 +33,7 @@ export function MicSetupModal({ setup, positions, onClose }: { setup: MicSetup; 
   }
 
   return (
-    <Modal open onClose={onClose} width={860} title="Set up mics">
+    <Modal open onClose={onClose} width={1040} title="Set up mics">
       <div className="max-h-[70vh] space-y-6 overflow-y-auto p-5">
         <section>
           <div className="mb-1 flex items-center justify-between">
@@ -81,13 +81,14 @@ export function MicSetupModal({ setup, positions, onClose }: { setup: MicSetup; 
           <p className="mb-3 text-xs text-ink-muted">
             “For positions” drives Auto-assign: e.g. Vox 1 → Worship Leader, Vox 2–4 → Vocals, AG Pack → Acoustic Guitar.
             People go back on the same mic they had last time when it fits.
+            <b> Console</b> sends the person’s name to that Allen &amp; Heath input (a second input for a double patch, e.g. in-ears).
           </p>
           <datalist id="cs-positions">{positions.map((p) => <option key={p} value={p} />)}</datalist>
           <div className="space-y-2">
             {chs.map((c) => {
               const rx = rxs.find((r) => r.id === c.receiverId);
               return (
-                <div key={c.id} className="grid grid-cols-[130px_110px_1fr_80px_1.3fr_auto] items-center gap-2">
+                <div key={c.id} className="grid grid-cols-[110px_105px_1fr_84px_1fr_170px_auto] items-center gap-2">
                   <input className="input py-1.5" value={c.label} onChange={(e) => upCh(c.id, { label: e.target.value })} placeholder="Vox 1" />
                   <select className="input py-1.5" value={c.kind} onChange={(e) => upCh(c.id, { kind: e.target.value as MicChannel["kind"] })}>
                     <option value="vocal">Vocal mic</option><option value="pack">Pack</option><option value="other">Other</option>
@@ -102,6 +103,7 @@ export function MicSetupModal({ setup, positions, onClose }: { setup: MicSetup; 
                   <input className="input py-1.5" list="cs-positions" value={c.positions.join(", ")} placeholder="For positions (comma-separated)"
                     onChange={(e) => upCh(c.id, { positions: e.target.value.split(",").map((s) => s.trimStart()).filter((s, i, a) => s || i === a.length - 1) })}
                     onBlur={(e) => upCh(c.id, { positions: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
+                  <ConsoleCell c={c} onChange={(consoleInputs) => upCh(c.id, { consoleInputs })} />
                   <button className="btn-ghost p-1.5" title="Remove" onClick={() => setChs(chs.filter((x) => x.id !== c.id))}><Trash2 size={14} /></button>
                 </div>
               );
@@ -114,5 +116,31 @@ export function MicSetupModal({ setup, positions, onClose }: { setup: MicSetup; 
         <button className="btn-primary" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending && <Spinner />} Save</button>
       </footer>
     </Modal>
+  );
+}
+
+/** Console: tick to send this mic's name to an Allen & Heath input, plus an optional second input. */
+function ConsoleCell({ c, onChange }: { c: MicChannel; onChange: (inputs: number[]) => void }) {
+  const ins = c.consoleInputs ?? [];
+  const on = ins.length > 0;
+  return (
+    <div className="flex items-center gap-1.5" title="Allen & Heath input(s) that get this mic’s name">
+      <label className="flex items-center gap-1 text-[11px] text-ink-muted">
+        <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked ? [1] : [])} /> Console
+      </label>
+      <NumBox disabled={!on} placeholder="In" label="Console input" value={ins[0]} onCommit={(n) => onChange(n ? [n, ...ins.slice(1)] : ins)} />
+      <NumBox disabled={!on} placeholder="2nd" label="Second console input (double patch, e.g. in-ears)" value={ins[1]}
+        onCommit={(n) => onChange(n ? [ins[0] ?? 1, n] : ins.slice(0, 1))} />
+    </div>
+  );
+}
+
+function NumBox({ value, onCommit, disabled, placeholder, label }: { value: number | undefined; onCommit: (n: number | null) => void; disabled: boolean; placeholder: string; label: string }) {
+  const [v, setV] = useState(value ? String(value) : "");
+  useEffect(() => setV(value ? String(value) : ""), [value]);
+  const commit = () => { const n = Number(v); onCommit(n >= 1 && n <= 128 ? n : null); if (!(n >= 1 && n <= 128)) setV(value && placeholder === "In" ? String(value) : ""); };
+  return (
+    <input className="input w-12 px-1.5 py-1.5 text-center font-mono text-xs" disabled={disabled} placeholder={placeholder} value={v} aria-label={label} title={label}
+      onChange={(e) => setV(e.target.value.replace(/\D/g, "").slice(0, 3))} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && commit()} />
   );
 }

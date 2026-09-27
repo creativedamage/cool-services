@@ -13,6 +13,7 @@ import { Api, qk } from "@/lib/api";
 import { clock } from "@/lib/format";
 import { Avatar, Skeleton, Spinner } from "@/components/ui";
 import { PagerBar, usePager } from "@/components/paging/Pager";
+import { PrefsLink } from "@/components/settings/PrefsLink";
 
 export default function PagingPage() {
   const pager = usePager();
@@ -33,7 +34,7 @@ export default function PagingPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Parent paging</h1>
           <p className="mt-1 text-sm text-ink-muted">Shows a child’s tag code on the auditorium screens through ProPresenter.</p>
         </div>
-        <Link href="/settings#paging" className="btn-ghost ml-auto py-1 text-xs"><Settings2 size={13} /> Paging settings</Link>
+        <PrefsLink section="paging" className="btn-ghost ml-auto py-1 text-xs"><Settings2 size={13} /> Paging settings</PrefsLink>
       </div>
 
       <div className="mt-5"><PagerBar pager={pager} /></div>
@@ -70,7 +71,7 @@ function MinistryList({ title, list, error, pager, ministry, noRooms }: {
       </header>
       {error ? <p className="p-4 text-sm text-bad">{error.message}</p>
         : !list ? <div className="p-4"><Skeleton className="h-24" /></div>
-        : noRooms ? <p className="p-4 text-sm text-ink-muted">Choose {title}’s Check-Ins rooms in <Link className="text-accent underline" href="/settings#paging">Settings</Link>.</p>
+        : noRooms ? <p className="p-4 text-sm text-ink-muted">Choose {title}’s Check-Ins rooms in <PrefsLink className="text-accent underline" section="paging">Preferences → Network Connections</PrefsLink>.</p>
         : list.length === 0 ? <p className="p-4 text-sm text-ink-muted">No children checked in yet today.</p>
         : (
           <ul className="divide-y divide-line/60">

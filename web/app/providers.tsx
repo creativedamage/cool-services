@@ -1,14 +1,20 @@
 "use client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Api } from "@/lib/api";
-import { currentTheme, setTheme } from "@/lib/theme";
+import { THEME_KEY, currentTheme, setTheme } from "@/lib/theme";
+import { CHANGES } from "@/lib/prefs";
+import type { ThemePref } from "@shared/types";
+
+// Saving in one window (e.g. Preferences) refreshes the others.
+const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(CHANGES) : null;
 import { Toaster } from "sonner";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
     () =>
       new QueryClient({
+        mutationCache: new MutationCache({ onSuccess: () => channel?.postMessage("saved") }),
         defaultOptions: {
           queries: { staleTime: 15_000, refetchOnWindowFocus: true, retry: 1 },
         },
@@ -20,8 +26,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
     Api.settings().then((s) => { setTheme(s.theme); setToastTheme(currentTheme()); }).catch(() => {});
     const obs = new MutationObserver(() => setToastTheme(currentTheme()));
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => obs.disconnect();
-  }, []);
+    const onStorage = (e: StorageEvent) => { if (e.key === THEME_KEY && e.newValue) setTheme(e.newValue as ThemePref); };
+    window.addEventListener("storage", onStorage);
+    const onSaved = () => void client.invalidateQueries();
+    channel?.addEventListener("message", onSaved);
+    return () => { obs.disconnect(); window.removeEventListener("storage", onStorage); channel?.removeEventListener("message", onSaved); };
+  }, [client]);
   return (
     <QueryClientProvider client={client}>
       {children}

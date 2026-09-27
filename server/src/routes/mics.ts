@@ -18,6 +18,7 @@ const Setup = z.object({
     id: z.string(), label: z.string().min(1).max(40), kind: z.enum(["vocal", "pack", "other"]),
     receiverId: z.string().nullable(), channel: z.number().int().min(1).max(4),
     positions: z.array(z.string().max(60)).max(20),
+    consoleInputs: z.array(z.number().int().min(1).max(128)).max(2).optional(),
   })),
 });
 

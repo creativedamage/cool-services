@@ -90,7 +90,7 @@ async function boot() {
   session.defaultSession.setPermissionCheckHandler((_wc, _perm, requestingOrigin) => ours(requestingOrigin));
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { startServer, ndiBridge, setUpdateBridge, setEmbedBridge, setNdiViewer } = require("./server.cjs") as typeof import("../../server/src/app");
+  const { startServer, ndiBridge, setUpdateBridge, setEmbedBridge, setNdiViewer, setPrefsOpener } = require("./server.cjs") as typeof import("../../server/src/app");
   await startServer({ port, webDir: path.join(__dirname, "web") });
 
   // Check for Updates (GitHub Releases). Only the packaged app can replace itself.
@@ -106,6 +106,7 @@ async function boot() {
   embed = createEmbed(() => win); // Planning Center Chat inside the window
   setEmbedBridge(embed);
   setNdiViewer(createNdiViewer()); // ProPresenter outputs (sent as NDI) on the dashboard
+  setPrefsOpener((section) => openPreferences(section));
   updater.start();
   buildMenu(updater);
 
@@ -148,7 +149,7 @@ async function checkFromMenu(updater: Updater) {
     });
     if (r.response === 0) {
       if (st.installProblem) return void dialog.showMessageBox(parent!, { type: "warning", message: "Can’t update here", detail: st.installProblem });
-      show("/settings#updates");
+      openPreferences("updates");
       void updater.install();
     } else if (r.response === 2) {
       void shell.openExternal(st.latest.url);
@@ -166,7 +167,7 @@ function buildMenu(updater: Updater) {
         { role: "about" },
         { label: "Check for Updates…", click: () => void checkFromMenu(updater) },
         { type: "separator" },
-        { label: "Settings…", accelerator: "CmdOrCtrl+,", click: () => show("/settings") },
+        { label: "Preferences…", accelerator: "CmdOrCtrl+,", click: () => openPreferences() },
         { type: "separator" },
         { role: "services" },
         { type: "separator" },
@@ -190,6 +191,35 @@ function isInApp(url: string) {
   } catch {
     return false;
   }
+}
+
+/** Preferences in their own window (Cool Services → Preferences…). One at a time. */
+let prefsWin: BrowserWindow | null = null;
+function openPreferences(section = "") {
+  if (!origin) return;
+  const url = `${origin}/preferences${section ? `#${section}` : ""}`;
+  if (prefsWin) {
+    if (section) void prefsWin.webContents.executeJavaScript(`location.hash = ${JSON.stringify(section)}`);
+    prefsWin.show(); prefsWin.focus();
+    return;
+  }
+  prefsWin = new BrowserWindow({
+    width: 980, height: 720, minWidth: 820, minHeight: 560,
+    title: "Preferences", backgroundColor: "#0A0C10", show: false,
+    fullscreenable: false,
+    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+  });
+  prefsWin.once("ready-to-show", () => prefsWin?.show());
+  prefsWin.webContents.setWindowOpenHandler(({ url: u }) => { void shell.openExternal(u); return { action: "deny" }; });
+  prefsWin.webContents.on("will-navigate", (e, u) => {
+    // Preferences stay on their own page; anything else opens in the main window or the browser.
+    const same = u.startsWith(`${origin}/preferences`);
+    if (same) return;
+    e.preventDefault();
+    if (u.startsWith(origin)) { show(u.slice(origin.length)); } else void shell.openExternal(u);
+  });
+  void prefsWin.loadURL(url);
+  prefsWin.on("closed", () => { prefsWin = null; });
 }
 
 function createWindow() {
@@ -219,8 +249,8 @@ function createWindow() {
   win.webContents.on("did-navigate", () => embed?.apply({ action: "hide" }));
 
   void win.loadURL(`${origin}/`);
-  win.on("closed", () => { win = null; });
+  win.on("closed", () => { win = null; prefsWin?.close(); });
 }
 
 app.on("activate", () => { if (!win && origin) createWindow(); });
-app.on("window-all-closed", () => app.quit());
+app.on("window-all-closed", () => app.quit()); // closing the main window also closes Preferences (above)

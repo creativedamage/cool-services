@@ -17,11 +17,12 @@ import { settingsRouter } from "./routes/settings.js";
 import { stageRouter } from "./routes/stage.js";
 import { pagingRouter } from "./routes/paging.js";
 import { setUpdateBridge, updatesRouter } from "./routes/updates.js";
-import { desktopRouter, setEmbedBridge, setNdiViewer } from "./routes/desktop.js";
+import { desktopRouter, setEmbedBridge, setNdiViewer, setPrefsOpener } from "./routes/desktop.js";
 import { runSheetViewsRouter } from "./routes/runsheetViews.js";
 import { proRouter } from "./routes/pro.js";
 import { smaartRouter, startSmaart } from "./routes/smaart.js";
 import { dashboardRouter } from "./routes/dashboard.js";
+import { consoleRouter } from "./routes/console.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
 import { PcoError } from "./pco/client.js";
 import { flush, settings } from "./lib/db.js";
@@ -46,6 +47,7 @@ export function createApp(webDir?: string) {
   app.use("/api/pro", requireAuth, proRouter);
   app.use("/api/smaart", requireAuth, smaartRouter);
   app.use("/api/dashboard", requireAuth, dashboardRouter);
+  app.use("/api/console", requireAuth, consoleRouter);
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
   app.use("/api", requireAuth, peopleRouter);
   app.use("/api", (_req, res) => res.status(404).json({ error: "not_found" }));
@@ -111,4 +113,4 @@ export const ndiBridge = {
 };
 
 /** Used by the Mac app to plug its updater into /api/updates. */
-export { setUpdateBridge, setEmbedBridge, setNdiViewer };
+export { setUpdateBridge, setEmbedBridge, setNdiViewer, setPrefsOpener };

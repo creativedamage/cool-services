@@ -13,6 +13,7 @@ import { Avatar, Badge } from "@/components/ui";
 import { ScheduleModal } from "@/components/scheduling/ScheduleModal";
 import { Logo } from "@/components/Logo";
 import { routes } from "@/lib/routes";
+import { PrefsLink } from "@/components/settings/PrefsLink";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return <Suspense><Shell>{children}</Shell></Suspense>;
@@ -70,7 +71,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         ) : path.startsWith("/chat") || path.startsWith("/propresenter") || path.startsWith("/dashboard") ? (
           <div className="flex-1" />
         ) : path.startsWith("/settings") ? (
-          <SettingsNav />
+          <div className="flex-1" />
         ) : (
           <>
             <div className="label mt-6 px-4 pb-2">Workflows</div>
@@ -97,12 +98,12 @@ function Shell({ children }: { children: React.ReactNode }) {
               <div className="truncate text-[13px] font-medium">{me.data.name}</div>
               <div className="truncate text-[11px] text-ink-muted">{me.data.orgName}{version ? ` · v${version}` : ""}</div>
               {updates.data?.state === "available" && (
-                <Link href="/settings#updates" className="mt-1 inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent hover:bg-accent/20">
+                <PrefsLink section="updates" className="mt-1 inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent hover:bg-accent/20">
                   Update to {updates.data.latest?.version}
-                </Link>
+                </PrefsLink>
               )}
             </div>
-            <Link href="/settings" className={clsx("btn-ghost p-1.5", path === "/settings" && "text-accent")} title="Settings"><Settings size={15} /></Link>
+            <PrefsLink section="about" className="btn-ghost p-1.5" title="Preferences (⌘,)"><Settings size={15} /></PrefsLink>
             <button className="btn-ghost p-1.5" title="Sign out"
               onClick={async () => { await Api.logout(); window.location.href = "/"; }}>
               <LogOut size={15} />
@@ -231,29 +232,10 @@ function PagingNav() {
             <span className="text-[10px] tabular-nums text-ink-faint">{new Date(e.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
           </div>
         ))}
-        <Link href="/settings#paging" className="block px-2.5 pt-2 text-[11px] text-ink-muted hover:text-accent">Paging settings →</Link>
+        <PrefsLink section="paging" className="block px-2.5 pt-2 text-[11px] text-ink-muted hover:text-accent">Paging settings →</PrefsLink>
       </div>
     </>
   );
 }
 
 /** Sidebar on Settings: jump to a section. */
-function SettingsNav() {
-  const sections: [string, string][] = [
-    ["appearance", "Appearance"], ["logo", "Logo"], ["start", "When Cool Services opens"], ["updates", "Updates"], ["ndi", "Stage plot over NDI"],
-    ["waves", "Waves SuperRack"], ["smaart", "Smaart (SPL)"], ["paging", "ProPresenter & paging"], ["ipads", "Kids & Nursery iPads"], ["pro-computers", "ProPresenter computers"],
-  ];
-  return (
-    <>
-      <div className="label mt-6 px-4 pb-2">Settings</div>
-      <div className="flex-1 space-y-0.5 overflow-y-auto px-2">
-        {sections.map(([id, label]) => (
-          <button key={id} onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            className="block w-full rounded-lg px-2.5 py-1.5 text-left text-[13px] text-ink-soft transition hover:bg-hover/60">
-            {label}
-          </button>
-        ))}
-      </div>
-    </>
-  );
-}

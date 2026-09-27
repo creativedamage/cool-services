@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { TUNING_EXTRAS, type PlanDetail, type WavesSettings } from "@shared/types";
 import { Api, qk } from "@/lib/api";
 import { parseKey, sendKey, tuningSongs } from "@/lib/waves";
+import { PrefsLink } from "@/components/settings/PrefsLink";
 
 export function SongKeys({ plan }: { plan: PlanDetail }) {
   const settings = useQuery({ queryKey: qk.settings, queryFn: Api.settings, staleTime: 30_000 });
@@ -43,7 +44,7 @@ export function SongKeys({ plan }: { plan: PlanDetail }) {
           {live ? `Press a key to recall it in Waves SuperRack · ${waves!.output}` : "Song keys in service order"}
         </span>
         {!waves?.enabled && (
-          <Link href="/settings#waves" className="btn-ghost ml-auto py-1 text-[11px]"><Settings2 size={12} /> Connect Waves</Link>
+          <PrefsLink section="waves" className="btn-ghost ml-auto py-1 text-[11px]"><Settings2 size={12} /> Connect Waves</PrefsLink>
         )}
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -82,7 +83,7 @@ export function TuningExtras({ waves, sent, onPress, big }: {
         const snap = waves.snapshots[x.id];
         return (
           <button key={x.id} onClick={() => onPress(x.id, x.label)}
-            title={snap != null ? `Recall SuperRack snapshot ${snap}` : `Set a snapshot for ${x.label} in Settings → Waves`}
+            title={snap != null ? `Recall SuperRack snapshot ${snap}` : `Set a snapshot for ${x.label} in Preferences → Audio`}
             className={clsx("flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 text-center font-semibold transition active:scale-[0.97]",
               big ? "min-w-[120px] text-sm" : "w-[120px] py-1.5 text-xs",
               sent === x.id ? "border-ok/60 bg-ok-soft text-ok" : x.id === "OFF" ? "border-line bg-raised text-ink-soft hover:border-bad/50" : "border-line bg-raised text-violet hover:border-violet/60",

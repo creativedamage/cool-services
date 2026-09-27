@@ -11,6 +11,10 @@ const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any,
 settingsRouter.get("/", h(async (_req, res) => res.json(settings.get())));
 
 const Start = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("dashboard") }),
+  z.object({ kind: z.literal("propresenter") }),
+  z.object({ kind: z.literal("paging") }),
+  z.object({ kind: z.literal("next-runsheet"), serviceTypeId: z.string().nullable() }),
   z.object({ kind: z.literal("workflows") }),
   z.object({ kind: z.literal("workflow"), workflowId: z.string() }),
   z.object({ kind: z.literal("services") }),

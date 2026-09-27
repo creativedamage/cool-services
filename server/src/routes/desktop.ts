@@ -13,7 +13,18 @@ export const setEmbedBridge = (b: EmbedBridge) => { embed = b; };
 let ndi: NdiViewerBridge | null = null;
 export const setNdiViewer = (b: NdiViewerBridge) => { ndi = b; };
 
+let prefs: ((section: string) => void) | null = null;
+/** The Mac app opens Preferences in their own window. */
+export const setPrefsOpener = (fn: (section: string) => void) => { prefs = fn; };
+
 export const desktopRouter = Router();
+
+desktopRouter.post("/preferences", (req, res) => {
+  if (!prefs) return res.status(404).json({ error: "unavailable" });
+  const { section } = z.object({ section: z.string().regex(/^[a-z-]{1,30}$/).default("about") }).parse(req.body ?? {});
+  prefs(section);
+  res.json({ ok: true });
+});
 
 /* ── NDI previews (ProPresenter outputs on the dashboard) ── */
 desktopRouter.get("/ndi/sources", async (_req, res) => {

@@ -15,6 +15,7 @@ import { parseKey, sendKey, tuningSongs } from "@/lib/waves";
 import { TuningExtras } from "@/components/services/SongKeys";
 import { LiveStatus } from "@/components/services/MicPanel";
 import { useProAction, useProState } from "@/components/pro/ProControl";
+import { PrefsLink } from "@/components/settings/PrefsLink";
 
 type O = DashboardWidget["options"];
 
@@ -196,8 +197,8 @@ export function SplWidget({ o }: { o: O }) {
   const tone = !r ? "text-ink-faint" : r.value >= limit ? "text-bad" : r.value >= limit - 3 ? "text-warn" : "text-ok";
   const h = hist.current, lo = Math.min(...h, limit - 15), hi = Math.max(...h, limit + 3);
   return (
-    <Frame title={(o.label as string) || (r ? r.label : "SPL")} icon={Gauge} right={<Link href="/settings#smaart" className="text-[10px] font-normal text-ink-faint hover:text-accent">Smaart</Link>}>
-      {!st.data || st.data.state === "off" ? <div className="grid h-full place-items-center text-center text-sm text-ink-faint">Connect Smaart in Settings.</div>
+    <Frame title={(o.label as string) || (r ? r.label : "SPL")} icon={Gauge} right={<PrefsLink section="smaart" className="text-[10px] font-normal text-ink-faint hover:text-accent">Smaart</PrefsLink>}>
+      {!st.data || st.data.state === "off" ? <div className="grid h-full place-items-center text-center text-sm text-ink-faint">Connect Smaart in Preferences → Audio.</div>
         : st.data.state !== "connected" || !r ? <div className="grid h-full place-items-center text-center text-xs text-ink-faint">{st.data.error ?? (st.data.measurements.length ? `Connected to Smaart (${st.data.measurements.map((m) => m.name).join(", ")}). Waiting for level data…` : "Waiting for SPL from Smaart…")}</div> : (
           <div className="flex h-full flex-col justify-center">
             <div className={clsx("font-mono text-6xl font-semibold tabular-nums", tone)}>{r.value.toFixed(1)}<span className="ml-1 text-lg text-ink-muted">dB</span></div>
@@ -257,7 +258,7 @@ export function ProWidget({ o }: { o: O }) {
   const name = machines.data?.find((m) => m.id === id)?.name ?? "ProPresenter";
   return (
     <Frame title={name} icon={MonitorUp} right={id && <Link href={`/propresenter?m=${id}`} className="text-[11px] font-normal text-accent hover:underline">Open</Link>}>
-      {!id ? <div className="grid h-full place-items-center text-sm text-ink-faint">Add a ProPresenter computer in Settings.</div>
+      {!id ? <div className="grid h-full place-items-center text-sm text-ink-faint">Add a ProPresenter computer in Preferences → Video.</div>
         : !s ? null : !s.ok ? <div className="text-xs text-bad">{s.error}</div> : (
           <div className="flex h-full flex-col gap-2">
             <div className="flex items-center gap-2">

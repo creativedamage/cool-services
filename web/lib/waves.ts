@@ -82,13 +82,13 @@ export function snapshotMidi(n: number, numbering: WavesSettings["numbering"] = 
 }
 
 export async function sendKey(w: WavesSettings, keyId: string): Promise<number> {
-  if (!w.enabled) throw new WavesError("Turn on Waves SuperRack in Settings first.");
+  if (!w.enabled) throw new WavesError("Turn on Waves SuperRack in Preferences → Audio first.");
   const snap = w.snapshots[keyId];
-  if (snap == null) throw new WavesError(`No Waves snapshot is set for ${slotLabel(keyId)} in Settings.`);
-  if (!w.output) throw new WavesError("Choose the MIDI output for SuperRack in Settings.");
+  if (snap == null) throw new WavesError(`No Waves snapshot is set for ${slotLabel(keyId)} in Preferences → Audio.`);
+  if (!w.output) throw new WavesError("Choose the MIDI output for SuperRack in Preferences → Audio.");
   const a = await midiAccess();
   const out = [...a.outputs.values()].find((o) => o.name === w.output);
-  if (!out) throw new WavesError(`“${w.output}” isn’t connected. Check Audio MIDI Setup, or choose another output in Settings.`);
+  if (!out) throw new WavesError(`“${w.output}” isn’t connected. Check Audio MIDI Setup, or choose another output in Preferences → Audio.`);
   const ch = Math.min(15, Math.max(0, w.channel - 1));
   const { bank, program } = snapshotMidi(snap, w.numbering);
   out.send([0xb0 | ch, 32, bank]); // Bank LSB

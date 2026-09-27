@@ -206,6 +206,11 @@ export interface MicChannel {
   channel: number; // 1-based channel on the receiver
   /** Positions this mic is for, used by Auto-assign (e.g. ["Worship Leader"], ["Vocals"]). */
   positions: string[];
+  /**
+   * Allen & Heath console inputs that get this mic's name (dLive / Avantis). Empty or missing: not
+   * sent. Two inputs = a double patch (e.g. a second input for in-ears).
+   */
+  consoleInputs?: number[];
 }
 
 export interface MicSetup {
@@ -252,11 +257,23 @@ export interface PlanMics {
 }
 
 
+/** Allen & Heath dLive / Avantis connection (Preferences → Audio). */
+export interface ConsoleSettingsView { enabled: boolean; model: "dlive" | "avantis"; host: string; port: number; midiChannel: number }
+/** What "Send names to console" writes: each mic's name to its input(s). */
+export interface ConsolePreview {
+  rows: { micId: string; micLabel: string; inputs: number[]; person: string | null; name: string }[];
+  sent?: number;
+}
+
 /* ───────────── Settings ───────────── */
 
 export type ThemePref = "dark" | "light" | "system";
 
 export type StartView =
+  | { kind: "dashboard" }
+  | { kind: "propresenter" }
+  | { kind: "paging" }
+  | { kind: "next-runsheet"; serviceTypeId: string | null }
   | { kind: "workflows" }
   | { kind: "workflow"; workflowId: string }
   | { kind: "services" }

@@ -32,7 +32,7 @@ Services scheduling faster.
 - **ProPresenter**: watch and take over any ProPresenter computer (e.g. side screens): click a slide
   to show it, previous / next, clear layers, clear groups and looks, timers (start, stop, reset,
   change the time, ±30 s / 1 min), stage message and each stage screen's layout. Add computers in
-  Settings → ProPresenter computers; the Kids & Nursery one from paging is included automatically.
+  Preferences → Video; the Kids & Nursery one from paging is included automatically.
 - **Chat**: Planning Center Chat inside Cool Services (sidebar → Chat): current conversations, new
   ones, teams and direct messages. Planning Center has no public Chat API, so this is Planning
   Center's own Chat shown in the app window, using your Planning Center sign-in.
@@ -91,7 +91,7 @@ To try the app without making a DMG: `npm run app`.
 ### Updating
 
 Cool Services updates itself from this project's GitHub Releases: **Cool Services → Check for
-Updates…** in the menu bar, or **Settings → Updates**. It also checks on its own a few seconds after
+Updates…** in the menu bar, or **Preferences → About**. It also checks on its own a few seconds after
 opening and every six hours, and shows "Update to x.y.z" at the bottom of the sidebar when there's
 one. **Update now** downloads it, checks it against the release's checksums, closes Cool Services,
 replaces the app in Applications and opens the new version. Sign-ins, settings, notes and stage plots
@@ -123,7 +123,7 @@ With an Apple Developer account ($99/year), sign and notarize the app so it open
 
 ## NDI output
 
-Settings → **Stage plot over NDI** → turn it on. Cool Services renders the next service's stage
+Preferences → **NDI** → Stage plot over NDI → turn it on. Cool Services renders the next service's stage
 plot in the background and sends it over NDI. It updates on its own as mics and the team change,
 and moves on to the following service after Sunday. In ProPresenter, add it as a video input
 (Screens/Inputs → NDI) and place it on your multiview. The Settings screen shows a live preview,
@@ -135,7 +135,7 @@ on an Apple Silicon Mac. NDI® is a registered trademark of Vizrt NDI AB (https:
 ## Parent paging and the Kids & Nursery iPads
 
 1. In ProPresenter (7.9 or newer): **Settings → Network → Enable Network**. Note the port.
-2. In Cool Services: **Settings → ProPresenter** → **Find automatically** (or type the computer's IP
+2. In Cool Services: **Preferences → Network Connections → ProPresenter** → **Find automatically** (or type the computer's IP
    and port) → the status turns green. Set **Page stays on screen for** to match your ProPresenter
    message time (15 seconds by default).
 3. **Parent paging**, for Nursery and for Kids:
@@ -157,9 +157,39 @@ Notes:
   plans can't be reached from the network. A wrong PIN 5 times locks that iPad out for a minute (doubling).
 - Changing a PIN signs out that ministry's iPads.
 
+## Preferences
+
+**Cool Services → Preferences…** (⌘,) opens Preferences in their own window (the ⚙ next to your
+name does too):
+
+- **About**: version, and Check for Updates.
+- **Appearance**: dark / light / system, and your logo.
+- **Default Startup**: what opens first: the Dashboard, Services, the next service, its run sheet or
+  check-ins (for "your service" from the Dashboard, or a chosen type), a workflow, ProPresenter or
+  Parent paging.
+- **NDI**: the stage plot NDI output, and the NDI sources on the network.
+- **Audio**: Allen & Heath console, Waves SuperRack, Smaart.
+- **Network Connections**: ProPresenter for paging, Kids & Nursery paging and the iPad pages.
+- **Video**: ProPresenter computers.
+
+## Allen & Heath dLive / Avantis channel names
+
+Put the names from a service's Mics tab on the console's channels.
+
+1. **Preferences → Audio → Allen & Heath console**: turn it on, choose dLive (MixRack or Surface) or
+   Avantis, and enter its IP address. The port fills in (dLive MixRack / Avantis 51325, dLive Surface
+   51328). **MIDI ch.** is the console's base MIDI channel (dLive: Utility → Control → MIDI, usually
+   1; Avantis: usually 12). **Test connection** reads input 1's name.
+2. **Set up mics** (⚙ on a service's Mics panel): tick **Console** on each mic and enter its input.
+   For a double patch (e.g. a second input for in-ears), enter the second input too; both get the
+   same name. Campuses without a double patch just leave it empty.
+3. On a service, **Names to dLive** shows what will be written and sends it: first names (with a last
+   initial when two people share one), at most 8 characters; mics nobody is on get their own label
+   back ("Vox 3"). Only channel names change on the console.
+
 ## Waves SuperRack (Tuning keys)
 
-Settings → **Waves SuperRack**: turn it on, choose the MIDI output and channel, and enter each key's
+Preferences → **Audio → Waves SuperRack**: turn it on, choose the MIDI output and channel, and enter each key's
 snapshot **External ID** as SuperRack shows it (0139 → 139). Pressing a key on a service's Tuning bar
 sends Bank LSB (CC 32) + Program Change. SuperRack's External IDs run 125 to a bank (1,000 over 8
 banks), so ID 139 is Bank 1 / Program 14. ("Numbers are → Program numbers" switches to plain
@@ -179,7 +209,7 @@ The keys with their own snapshot are C, Db, D, Eb, E, F, F#, Gb, G, Ab, A, Bb an
 G# or A# uses the flat's snapshot (C# → Db), and a minor key uses its letter's (F#m → F#).
 
 **Chromatic Tune** and **Tuning Off** buttons sit before the songs on the Tuning bar and the
-dashboard; give each a snapshot in Settings → Waves. Song items that aren't songs (e.g. "Vocal Warm
+dashboard; give each a snapshot in Preferences → Audio. Song items that aren't songs (e.g. "Vocal Warm
 Ups") can be left off the Tuning bar under "Leave off the Tuning bar".
 
 ## Dashboard: ProPresenter outputs and Smaart
@@ -193,7 +223,7 @@ Ups") can be left off the Tuning bar under "Leave off the Tuning bar".
   Previews use NDI's low-bandwidth stream (about 5 frames a second). Needs the NDI add-on (see
   "Build the DMG").
 - **Smaart v9 SPL**: in Smaart, start logging on a calibrated input and turn on Options → API
-  (default port 26000, optional password). In Cool Services, Settings → Smaart (SPL): enter the
+  (default port 26000, optional password). In Cool Services, Preferences → Audio → Smaart (SPL): enter the
   computer and password, then Save and connect. Cool Services lists Smaart's measurements (e.g. RTA
   MIC, REF) and streams each one. SPL values Smaart sends are used as they are; otherwise the overall
   level is worked out from the measurement's spectrum (marked ≈, accurate only if the input is
@@ -236,7 +266,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.9.4 && git push origin v1.9.4
+   git tag v1.10.0 && git push origin v1.10.0
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the
@@ -302,6 +332,8 @@ server/src/lib/shure.ts    Shure receiver status, read-only (TCP 2202)
 server/src/lib/propresenter.ts  ProPresenter API client + finding it on the network
 server/src/routes/pro.ts   ProPresenter control (slides, timers, stage) for any computer
 server/src/lib/smaart.ts   Smaart v9 API client (SPL readings)
+server/src/lib/ahConsole.ts Allen & Heath dLive / Avantis channel names (MIDI over TCP)
+web/components/settings/Preferences.tsx  the Preferences window (tabs)
 desktop/src/ndiIn.ts       NDI previews of ProPresenter outputs for the dashboard
 desktop/src/embed.ts       Planning Center Chat inside the window
 server/src/lib/paging.ts   Parent paging: the on-screen lock, messages, PINs

@@ -15,6 +15,7 @@ import { Api, ApiError, qk } from "@/lib/api";
 import { MINISTRY_LABEL, useOnScreenSeconds } from "@/lib/paging";
 import { clock } from "@/lib/format";
 import { Spinner } from "@/components/ui";
+import { PrefsLink } from "@/components/settings/PrefsLink";
 
 export function usePager() {
   const qc = useQueryClient();
@@ -68,7 +69,7 @@ export function PagerBar({ pager }: { pager: Pager }) {
       <div className="panel flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
         <MonitorUp size={16} className="text-accent" />
         <span className="text-ink-soft">Page parents on the auditorium screens through ProPresenter.</span>
-        <Link href="/settings#paging" className="btn-outline ml-auto py-1 text-xs"><Settings2 size={13} /> Set up in Settings</Link>
+        <PrefsLink section="paging" className="btn-outline ml-auto py-1 text-xs"><Settings2 size={13} /> Set up in Preferences</PrefsLink>
       </div>
     );
   }

@@ -1,7 +1,7 @@
 import type {
   AppSettings, NdiStatus, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, StagePlot, PlanSummary, RosterStatus, ScheduleRequest,
   ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary,
-  DashboardWidget, HomeService, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
+  DashboardWidget, HomeService, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 
@@ -100,6 +100,11 @@ export const Api = {
   smaartStatus: () => api<SmaartStatusView>("/smaart/status"),
   dashboard: () => api<DashboardWidget[] | null>("/dashboard"),
   home: () => api<HomeService>("/dashboard/home"),
+  consoleConfig: () => api<ConsoleSettingsView>("/console/config"),
+  saveConsole: (p: Partial<ConsoleSettingsView>) => api<ConsoleSettingsView>("/console/config", { method: "PUT", json: p }),
+  testConsole: () => api<{ ok: boolean; input1?: string | null; note?: string; error?: string }>("/console/test", { method: "POST" }),
+  consolePreview: (plan: string) => api<ConsolePreview>(`/console/plans/${plan}`),
+  sendConsole: (plan: string) => api<ConsolePreview>(`/console/plans/${plan}/send`, { method: "POST" }),
   saveHome: (h: HomeService) => api<HomeService>("/dashboard/home", { method: "PUT", json: h }),
   saveDashboard: (w: DashboardWidget[]) => api<DashboardWidget[]>("/dashboard", { method: "PUT", json: w }),
   ndiSources: () => api<{ available: boolean; error?: string; sources: { name: string }[] }>("/desktop/ndi/sources"),
@@ -195,6 +200,8 @@ export const qk = {
   smaartStatus: ["smaartStatus"] as const,
   dashboard: ["dashboard"] as const,
   home: ["home"] as const,
+  consoleConfig: ["consoleConfig"] as const,
+  consolePreview: (plan: string) => ["consolePreview", plan] as const,
   ndiSources: ["ndiSources"] as const,
   proState: (id: string) => ["proState", id] as const,
   pagingChildren: ["pagingChildren"] as const,

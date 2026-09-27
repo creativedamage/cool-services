@@ -243,3 +243,20 @@ hide the option with `ALLOW_DEMO=false`.
 - `npm run dist:mac` (on a Mac) → `desktop/release/Cool-Services-<version>.dmg` (universal: Apple
   Silicon + Intel). It's ad-hoc signed. For friction-free installs on other Macs, sign with an
   Apple Developer ID and notarize (see README).
+
+## 5m. Allen & Heath consoles and the Preferences window
+
+`server/src/lib/ahConsole.ts` speaks A&H "MIDI over TCP/IP" (dLive MixRack / Avantis 51325, dLive
+Surface 51328, unencrypted): SysEx `F0 00 00 1A 50 10 01 00 0N 03 CH <ASCII> F7` sets input CH+1's
+name on base MIDI channel N+1; `0N 01 CH` asks for a name (reply `0N 02 CH <ASCII>`), used by Test
+connection. `MicChannel.consoleInputs` (0–2 inputs; two = a double patch) says where each mic's
+name goes. `/api/console/plans/:plan` previews and `/send` writes: first names (last initial when
+two people share one), ASCII, 8 characters; unassigned mics get their label back. Config lives in
+`extras.console`.
+
+Preferences are one component (`web/components/settings/Preferences.tsx`) with tabs picked by the
+URL hash (section ids map to tabs in `web/lib/prefs.ts`). The Mac app opens `/preferences` in its
+own BrowserWindow (menu, ⌘, or `POST /api/desktop/preferences`); in a browser it's a page, and old
+`/settings` links render the same component. Windows keep each other current: every successful
+mutation posts on a BroadcastChannel and the other windows invalidate their queries; the theme
+follows through the `storage` event.

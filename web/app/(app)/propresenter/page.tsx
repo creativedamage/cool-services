@@ -9,6 +9,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Api, qk } from "@/lib/api";
 import { ProControl, useProState } from "@/components/pro/ProControl";
 import { Spinner } from "@/components/ui";
+import { PrefsLink } from "@/components/settings/PrefsLink";
 
 function Page() {
   const machines = useQuery({ queryKey: qk.proMachines, queryFn: Api.proMachines });
@@ -30,12 +31,12 @@ function Page() {
         <div className="ml-4 flex flex-wrap gap-1">
           {machines.data?.map((m) => <MachineTab key={m.id} id={m.id} name={m.name} active={sel === m.id} onClick={() => setSel(m.id)} />)}
         </div>
-        <Link href="/settings#pro-computers" className="btn-ghost ml-auto py-1 text-xs"><Settings2 size={13} /> ProPresenter computers</Link>
+        <PrefsLink section="pro-computers" className="btn-ghost ml-auto py-1 text-xs"><Settings2 size={13} /> ProPresenter computers</PrefsLink>
       </header>
       {machines.isLoading ? <div className="p-8"><Spinner /></div>
         : !machines.data?.length ? (
           <div className="m-8 max-w-lg rounded-xl border border-dashed border-line p-6 text-sm text-ink-muted">
-            No ProPresenter computers yet. Add your side screens computer in <Link className="text-accent underline" href="/settings#pro-computers">Settings → ProPresenter computers</Link>.
+            No ProPresenter computers yet. Add your side screens computer in <PrefsLink className="text-accent underline" section="pro-computers">Preferences → Video</PrefsLink>.
           </div>
         ) : sel && <ProControl key={sel} id={sel} />}
     </div>

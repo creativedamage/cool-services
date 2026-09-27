@@ -15,6 +15,7 @@ import { Api, qk } from "@/lib/api";
 import { assignChannel, autoAssign, fitsChannel, servingPeople } from "@/lib/mics";
 import { Avatar, Skeleton } from "@/components/ui";
 import { MicSetupModal } from "./MicSetupModal";
+import { ConsoleSendButton } from "./ConsoleSend";
 
 const KIND: Record<MicKind, { label: string; icon: typeof Mic }> = {
   vocal: { label: "Vocal mics", icon: Mic },
@@ -80,6 +81,7 @@ export function MicPanel({ plan }: { plan: PlanDetail }) {
           </span>
         )}
         <div className="ml-auto flex items-center gap-1.5">
+          {channels.some((c) => c.consoleInputs?.length) && <ConsoleSendButton planId={plan.id} />}
           <button className="btn-outline py-1 text-xs" onClick={runAuto} disabled={!channels.length || save.isPending}>
             <Sparkles size={13} /> Auto-assign
           </button>
