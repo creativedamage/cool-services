@@ -35,7 +35,14 @@ const MinistryPatch = z.object({
 const ConfigPatch = z.object({
   propresenter: z.object({ host: z.string().trim().max(255).regex(/^[A-Za-z0-9.\-:]*$/, "Enter an IP address or computer name"), port: z.number().int().min(0).max(65535) }).partial(),
   onScreenSeconds: z.number().int().min(3).max(600),
-  ipads: z.object({ enabled: z.boolean(), port: z.number().int().min(1024).max(65535).refine((p) => p !== 3000 && p !== 3001, "Ports 3000 and 3001 aren't allowed") }).partial(),
+  ipads: z.object({
+    enabled: z.boolean(),
+    port: z.number().int().max(65535).refine((p) => p === 80 || p >= 1024, "Use 80, or a port from 1024 up").refine((p) => p !== 3000 && p !== 3001, "Ports 3000 and 3001 aren't allowed"),
+    hostnames: z.object({
+      nursery: z.string().trim().toLowerCase().max(200).regex(/^([a-z0-9-]+(\.[a-z0-9-]+)+)?$/, "Enter a name like nursery.yourchurch.org"),
+      kids: z.string().trim().toLowerCase().max(200).regex(/^([a-z0-9-]+(\.[a-z0-9-]+)+)?$/, "Enter a name like kids.yourchurch.org"),
+    }).partial(),
+  }).partial(),
   ministries: z.object({ nursery: MinistryPatch, kids: MinistryPatch }).partial(),
 }).partial();
 
@@ -118,7 +125,10 @@ export function kioskAddresses(): KioskAddresses {
   const host = os.hostname();
   const local = host ? (host.endsWith(".local") ? host : `${host}.local`) : null;
   const s = kioskState();
-  return { urls: [...ips, ...(local ? [local] : [])].map((h) => `http://${h}:${port}`), port, running: s.running, error: s.error };
+  const withPort = (h: string) => `http://${h}${port === 80 ? "" : `:${port}`}`;
+  const names = stored().config.ipads.hostnames ?? {};
+  const friendly = Object.fromEntries(MINISTRIES.filter((m) => names[m]).map((m) => [m, withPort(names[m]!)]));
+  return { urls: [...ips, ...(local ? [local] : [])].map(withPort), port, running: s.running, error: s.error, friendly };
 }
 
 pagingRouter.get("/ipads", h(async (_req, res) => res.json(kioskAddresses())));
@@ -126,7 +136,8 @@ pagingRouter.get("/ipads", h(async (_req, res) => res.json(kioskAddresses())));
 /** QR code (SVG) for one of our own iPad addresses. */
 pagingRouter.get("/qr", h(async (req, res) => {
   const url = String(req.query.url ?? "");
-  const ok = kioskAddresses().urls.some((u) => url === `${u}/nursery` || url === `${u}/kids`);
+  const a = kioskAddresses();
+  const ok = a.urls.some((u) => url === `${u}/nursery` || url === `${u}/kids`) || Object.values(a.friendly).includes(url);
   if (!ok) return res.status(400).json({ error: "not_our_address" });
   res.type("image/svg+xml").send(await QRCode.toString(url, { type: "svg", margin: 1, errorCorrectionLevel: "M" }));
 }));

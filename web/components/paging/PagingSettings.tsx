@@ -355,7 +355,8 @@ function IpadSection({ c, save }: { c: PagingConfig; save: (p: PagingPatch) => v
   useEffect(() => setPort(String(c.ipads.port)), [c.ipads.port]);
   const [which, setWhich] = useState<Ministry>("nursery");
   const base = ipads.data?.urls[0];
-  const url = base ? `${base}/${which}` : null;
+  const url = ipads.data?.friendly[which] ?? (base ? `${base}/${which}` : null);
+  const macIp = base ? new URL(base).hostname : null;
   return (
     <section id="ipads" className="panel scroll-mt-6 p-5">
       <div className="flex items-start justify-between gap-4">
@@ -387,6 +388,7 @@ function IpadSection({ c, save }: { c: PagingConfig; save: (p: PagingPatch) => v
             </div>
             <span className="label mt-3 block">Address for the {c.ministries[which].title} iPads</span>
             <ul className="mt-1 space-y-1">
+              {ipads.data.friendly[which] && <li className="select-all font-mono text-sm font-semibold text-accent">{ipads.data.friendly[which]}</li>}
               {ipads.data.urls.map((u) => <li key={u} className="select-all font-mono text-sm">{u}/{which}</li>)}
             </ul>
             {!c.ministries[which].hasPin && <p className="mt-2 text-xs text-warn">Set a {c.ministries[which].title} PIN above first.</p>}
@@ -409,10 +411,45 @@ function IpadSection({ c, save }: { c: PagingConfig; save: (p: PagingPatch) => v
         <input className="input mt-1 w-28 font-mono text-sm" inputMode="numeric" value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, ""))}
           onBlur={() => { const n = Number(port); if (n && n !== c.ipads.port) save({ ipads: { port: n } }); }} />
         <span className="mt-1 block text-[11px] text-ink-faint">
-          This Mac must stay on and awake with Cool Services open during services. The first time, macOS asks whether Cool Services
+          Use <b>80</b> for friendly addresses (below), so nobody has to type a port. This Mac must stay on and awake with Cool Services open during services. The first time, macOS asks whether Cool Services
           may accept incoming network connections: choose <b>Allow</b>. The iPad pages use your Planning Center access to read Check-Ins.
         </span>
       </label>
+
+      <FriendlyNames c={c} save={save} macIp={macIp} />
     </section>
+  );
+}
+
+/**
+ * Friendly addresses: kids.yourchurch.org / nursery.yourchurch.org point at this Mac in the church's
+ * DNS; opening one goes straight to that ministry's page.
+ */
+function FriendlyNames({ c, save, macIp }: { c: PagingConfig; save: (p: PagingPatch) => void; macIp: string | null }) {
+  const names = c.ipads.hostnames ?? {};
+  const [v, setV] = useState({ nursery: names.nursery ?? "", kids: names.kids ?? "" });
+  useEffect(() => setV({ nursery: names.nursery ?? "", kids: names.kids ?? "" }), [names.nursery, names.kids]);
+  const commit = (m: Ministry) => { const x = v[m].trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, ""); if (x !== (names[m] ?? "")) save({ ipads: { hostnames: { ...names, [m]: x } } }); };
+  return (
+    <div className="mt-5 border-t border-line pt-4">
+      <span className="label">Friendly addresses (optional)</span>
+      <p className="mt-0.5 text-[12px] text-ink-muted">
+        So your team can just type <b>kids.yourchurch.org</b> or <b>nursery.yourchurch.org</b> on the church network.
+      </p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        {(["kids", "nursery"] as Ministry[]).map((m) => (
+          <label key={m} className="block"><span className="text-[11px] text-ink-muted">{c.ministries[m].title}</span>
+            <input className="input mt-0.5 font-mono text-sm" placeholder={`${m}.yourchurch.org`} value={v[m]}
+              onChange={(e) => setV({ ...v, [m]: e.target.value })} onBlur={() => commit(m)} onKeyDown={(e) => e.key === "Enter" && commit(m)} />
+          </label>
+        ))}
+      </div>
+      <ol className="mt-3 list-decimal space-y-1 pl-4 text-[12px] text-ink-muted">
+        <li>Give this Mac a fixed IP address on the church network (a DHCP reservation in your router/firewall){macIp ? <>. Right now it’s <b className="font-mono">{macIp}</b></> : ""}.</li>
+        <li>Add a DNS <b>A record</b> for each name pointing at that IP: in your router/firewall’s local DNS (UniFi, Meraki, pfSense, Windows DNS…), or in your domain’s public DNS (it only works on the church network, since the IP is private).</li>
+        <li>Set <b>Port</b> above to <b>80</b>.</li>
+        <li>On the iPads, open <b>http://kids.yourchurch.org</b> (with http://) and enter the PIN again once. Add it to the Home Screen again too.</li>
+      </ol>
+    </div>
   );
 }

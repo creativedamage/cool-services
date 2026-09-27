@@ -231,6 +231,22 @@ Ups") can be left off the Tuning bar under "Leave off the Tuning bar".
   the full data format, so if readings don't appear, open "What Smaart is sending" in Settings, press
   Copy and send it to us.
 
+## Friendly iPad addresses (kids.yourchurch.org)
+
+Preferences → Network Connections → Kids & Nursery iPads → **Friendly addresses**: enter e.g.
+`kids.libertychurch.net` and `nursery.libertychurch.net`. Then:
+
+1. Give the Cool Services Mac a fixed IP (a DHCP reservation in the router/firewall).
+2. Add a DNS **A record** for each name pointing at that IP: in the router/firewall's local DNS, or
+   in the domain's public DNS (it only resolves to something useful on the church network, since the
+   IP is private).
+3. Set the iPad **Port** to **80** so nobody has to type a port.
+4. On the iPads open `http://kids.libertychurch.net` (with `http://`), enter the PIN once, and add it
+   to the Home Screen again.
+
+Any address starting with `kids.` or `nursery.` goes to that page, even before the names are
+entered in Preferences.
+
 ## Check-ins permission
 
 Check-ins need Planning Center **Check-Ins** access. Someone who signed in before Check-Ins was
@@ -270,7 +286,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.10.1 && git push origin v1.10.1
+   git tag v1.10.2 && git push origin v1.10.2
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

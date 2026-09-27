@@ -154,6 +154,15 @@ function createKioskApp() {
   if (webRoot && fs.existsSync(webRoot)) {
     const page = path.join(webRoot, "kiosk.html");
     const send = (_req: Request, res: Response) => res.set("Cache-Control", "no-cache").sendFile(page);
+    // A friendly address (kids.yourchurch.org) goes straight to that ministry's page.
+    app.get("/", (req, res, next) => {
+      const host = String(req.headers.host ?? "").toLowerCase().replace(/:\d+$/, "");
+      const names = stored().config.ipads.hostnames ?? {};
+      const m = MINISTRIES.find((x) => names[x] && names[x] === host)
+        ?? MINISTRIES.find((x) => host.split(".")[0] === x); // kids.… / nursery.…
+      if (m) return res.redirect(302, `/${m}`);
+      next();
+    });
     app.get(["/", "/nursery", "/kids"], send);
     // Only what the iPad page needs: its scripts/styles, the PDF-free static bundle and icons.
     app.use("/_next/static", express.static(path.join(webRoot, "_next", "static"), { immutable: true, maxAge: "365d" }));

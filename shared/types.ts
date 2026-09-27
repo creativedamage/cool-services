@@ -469,12 +469,20 @@ export interface PagingConfig {
   /** How long a page stays on screen. Nobody can page again until it's gone (default 15s). */
   onScreenSeconds: number;
   /** iPad pages on the church network. */
-  ipads: { enabled: boolean; port: number };
+  /**
+   * hostnames: optional friendly addresses (e.g. kids.libertychurch.net) that point at this Mac in the
+   * church's DNS. Opening one goes straight to that ministry's page.
+   */
+  ipads: { enabled: boolean; port: number; hostnames?: Partial<Record<Ministry, string>> };
   ministries: Record<Ministry, MinistryPaging>;
 }
 
 /** Settings → iPad addresses for each ministry. */
-export interface KioskAddresses { urls: string[]; port: number; running: boolean; error?: string }
+export interface KioskAddresses {
+  urls: string[]; port: number; running: boolean; error?: string;
+  /** Friendly address per ministry, e.g. { kids: "http://kids.libertychurch.net" }. */
+  friendly: Partial<Record<Ministry, string>>;
+}
 
 export interface PageEvent {
   id: string;

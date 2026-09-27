@@ -73,7 +73,7 @@ export function saveConfig(patch: Partial<Omit<PagingConfig, "ministries">> & { 
     config: {
       ...s.config, ...patch,
       propresenter: { ...s.config.propresenter, ...patch.propresenter },
-      ipads: { ...s.config.ipads, ...patch.ipads },
+      ipads: { ...s.config.ipads, ...patch.ipads, hostnames: { ...s.config.ipads.hostnames, ...patch.ipads?.hostnames } },
       ministries: {
         nursery: { ...s.config.ministries.nursery, ...patch.ministries?.nursery },
         kids: { ...s.config.ministries.kids, ...patch.ministries?.kids },
