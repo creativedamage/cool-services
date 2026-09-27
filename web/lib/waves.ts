@@ -2,14 +2,15 @@
 /**
  * Waves SuperRack over MIDI (Web MIDI, from this Mac).
  *
- * SuperRack recalls snapshot N when it receives Bank LSB (CC 32) = floor((N-1)/128) and then
- * Program Change (N-1) % 128 on its MIDI input. Each song key is mapped to a snapshot in Settings,
+ * SuperRack recalls a snapshot by its External ID when it receives Bank LSB (CC 32) and then a
+ * Program Change. SuperRack's External IDs run 125 to a bank (1,000 over 8 banks): ID 139 is
+ * Bank 1 / Program 14. (Confirmed on a real SuperRack; Waves' own help page says 128 a bank.) Each song key is mapped to a snapshot in Settings,
  * so pressing a key recalls the snapshot that has your tuning set up for it.
  *
  * SuperRack side: add the MIDI Controller module (Controllers section), tick this MIDI input in its
  * settings, and give each snapshot an External ID. SuperRack recalls by External ID, not by where
- * a snapshot sits in the list: "snapshot N" here means External ID Bank floor((N-1)/128),
- * PC (N-1) % 128 — i.e. snapshot 1 = Bank 0 / PC 0.
+ * a snapshot sits in the list. "program" numbering (1 = Bank 0 / PC 0, 128 a bank) is there for other
+ * setups.
  *
  * SuperRack on this Mac: turn on the IAC Driver (Audio MIDI Setup) and pick it in both apps.
  * SuperRack on another computer: use a Network MIDI session (Audio MIDI Setup → Network).
@@ -62,17 +63,24 @@ export function useMidiOutputs(enabled = true) {
 export class WavesError extends Error {}
 
 /** Recall the SuperRack snapshot mapped to this key. Returns the snapshot number sent. */
+/** The Bank LSB and Program Change that recall a snapshot number. */
+export function snapshotMidi(n: number, numbering: WavesSettings["numbering"] = "externalId"): { bank: number; program: number } {
+  return numbering === "program"
+    ? { bank: Math.floor((n - 1) / 128), program: (n - 1) % 128 }
+    : { bank: Math.floor(n / 125), program: n % 125 };
+}
+
 export async function sendKey(w: WavesSettings, keyId: string): Promise<number> {
   if (!w.enabled) throw new WavesError("Turn on Waves SuperRack in Settings first.");
   const snap = w.snapshots[keyId];
-  if (!snap) throw new WavesError(`No Waves snapshot is matched to ${keyId} in Settings.`);
+  if (snap == null) throw new WavesError(`No Waves snapshot is matched to ${keyId} in Settings.`);
   if (!w.output) throw new WavesError("Choose the MIDI output for SuperRack in Settings.");
   const a = await midiAccess();
   const out = [...a.outputs.values()].find((o) => o.name === w.output);
   if (!out) throw new WavesError(`“${w.output}” isn’t connected. Check Audio MIDI Setup, or choose another output in Settings.`);
   const ch = Math.min(15, Math.max(0, w.channel - 1));
-  const n = snap - 1;
-  out.send([0xb0 | ch, 32, Math.floor(n / 128)]); // Bank LSB
-  out.send([0xc0 | ch, n % 128]); // Program Change
+  const { bank, program } = snapshotMidi(snap, w.numbering);
+  out.send([0xb0 | ch, 32, bank]); // Bank LSB
+  out.send([0xc0 | ch, program]); // Program Change
   return snap;
 }

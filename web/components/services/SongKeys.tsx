@@ -53,7 +53,7 @@ export function SongKeys({ plan }: { plan: PlanDetail }) {
           const Tag = waves?.enabled ? "button" : "div";
           return (
             <Tag key={s.id} onClick={waves?.enabled ? () => press(s.id, k?.id, `Song ${i + 1} · ${k?.label ?? "?"}`) : undefined}
-              title={waves?.enabled ? (k ? (snap ? `Recall SuperRack snapshot ${snap}` : `No Waves snapshot matched to ${k.root}`) : "No key in Planning Center") : s.title}
+              title={waves?.enabled ? (k ? (snap != null ? `Recall SuperRack snapshot ${snap}` : `No Waves snapshot matched to ${k.root}`) : "No key in Planning Center") : s.title}
               className={clsx("relative flex w-[132px] shrink-0 flex-col items-center rounded-xl border px-3 pb-2.5 pt-2 text-center transition",
                 sent === s.id ? "border-ok/60 bg-ok-soft" : "border-line bg-raised",
                 waves?.enabled && "hover:border-violet/60 active:scale-[0.97]")}>

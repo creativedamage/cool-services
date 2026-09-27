@@ -159,17 +159,20 @@ Notes:
 
 ## Waves SuperRack (Tuning keys)
 
-Settings → **Waves SuperRack**: turn it on, choose the MIDI output and channel, and enter the
-SuperRack snapshot number for each key (C, C#, Db, D … B; sharps and flats separately). Pressing a key
-on a service's Tuning bar sends Bank LSB (CC 32) + Program Change, which is how SuperRack recalls
-snapshots 1–384.
+Settings → **Waves SuperRack**: turn it on, choose the MIDI output and channel, and enter each key's
+snapshot **External ID** as SuperRack shows it (0139 → 139). Pressing a key on a service's Tuning bar
+sends Bank LSB (CC 32) + Program Change. SuperRack's External IDs run 125 to a bank (1,000 over 8
+banks), so ID 139 is Bank 1 / Program 14. ("Numbers are → Program numbers" switches to plain
+1-based numbering, 128 to a bank, for other setups.)
 
 - SuperRack on the same Mac: Audio MIDI Setup → Window → Show MIDI Studio → IAC Driver → tick
   **Device is online**, then choose "IAC Driver Bus 1".
-- SuperRack on another computer: Audio MIDI Setup → MIDI Studio → Network. Create and connect a
-  session on both Macs (rtpMIDI on Windows), then choose that session.
-- In SuperRack: Controllers → MIDI Controller → gear → tick that port under MIDI IN. Save one
-  snapshot per key (e.g. Waves Tune Real-Time set to that key).
+- SuperRack on another Mac: Audio MIDI Setup → MIDI Studio → Network. Create and connect a session on
+  both Macs (rtpMIDI on Windows) and choose it in Cool Services. On the SuperRack Mac, if SuperRack
+  doesn't react to a "Network MIDI 2.0" session, route the session into IAC Driver Bus 1 (Live
+  Routings, incoming only; routing both ways makes a MIDI loop) and have SuperRack listen to Bus 1.
+- In SuperRack: Controllers → MIDI Controller → gear → tick that port under MIDI IN, set **Follow
+  Program Changes on Channel** to your channel, and give each snapshot an External ID.
 
 Keys come from Planning Center (the key chosen on the service item, otherwise the arrangement's key).
 C# and Db (and every other sharp/flat pair) are matched separately; a minor key uses its letter's snapshot (F#m → F#).
@@ -228,7 +231,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.9.2 && git push origin v1.9.2
+   git tag v1.9.3 && git push origin v1.9.3
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

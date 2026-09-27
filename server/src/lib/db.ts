@@ -214,7 +214,7 @@ const defaultSettings = (): AppSettings => ({
   ndi: { enabled: false, name: "Cool Services Stage Plot", resolution: "1080p", fps: 30, serviceTypeId: null, showHeader: true, background: "black" },
   // Nothing matched until someone enters their own SuperRack snapshot numbers.
   waves: {
-    enabled: false, output: null, channel: 1,
+    enabled: false, output: null, channel: 1, numbering: "externalId",
     snapshots: Object.fromEntries(KEY_ROOTS.map((k) => [k, null])),
   },
 });

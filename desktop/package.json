@@ -1,7 +1,7 @@
 {
   "name": "cool-services",
   "productName": "Cool Services",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "description": "Volunteer workflows and service scheduling, powered by Planning Center.",
   "author": "Wayne Goodman Productions",
   "private": true,

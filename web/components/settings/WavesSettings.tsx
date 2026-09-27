@@ -5,7 +5,7 @@ import { AudioLines, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { KEY_ROOTS, type WavesSettings as W } from "@shared/types";
-import { sendKey, useMidiOutputs } from "@/lib/waves";
+import { sendKey, snapshotMidi, useMidiOutputs } from "@/lib/waves";
 
 export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial<W>) => void }) {
   const { outputs, error } = useMidiOutputs(true);
@@ -17,9 +17,9 @@ export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial
   const test = async (id: string) => {
     try {
       const n = await sendKey({ ...w, enabled: true }, id);
-      const b = Math.floor((n - 1) / 128), pc = (n - 1) % 128, hex = (x: number) => x.toString(16).toUpperCase().padStart(2, "0");
+      const { bank: b, program: pc } = snapshotMidi(n, w.numbering), hex = (x: number) => x.toString(16).toUpperCase().padStart(2, "0");
       toast.success(`Sent ${id} → snapshot ${n}`, {
-        description: `To “${w.output}”, channel ${w.channel}: Bank LSB (CC 32) = ${b}, Program Change = ${pc} (MIDI bytes ${hex(0xb0 + w.channel - 1)} 20 ${hex(b)} · ${hex(0xc0 + w.channel - 1)} ${hex(pc)}). In SuperRack, the snapshot's External ID must be Bank ${b} / PC ${pc}.`,
+        description: `To “${w.output}”, channel ${w.channel}: Bank LSB (CC 32) = ${b}, Program Change = ${pc} (MIDI bytes ${hex(0xb0 + w.channel - 1)} 20 ${hex(b)} · ${hex(0xc0 + w.channel - 1)} ${hex(pc)}). ${w.numbering === "program" ? "" : `That recalls the snapshot whose External ID is ${n}.`}`,
         duration: 9000,
       });
     } catch (e) { toast.error("Couldn’t send", { description: (e as Error).message }); }
@@ -51,7 +51,7 @@ export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial
           : w.output ? `“${w.output}” isn’t connected right now.` : "Choose the MIDI output that goes to SuperRack."}
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_140px]">
+      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_140px_220px]">
         <label className="block"><span className="label">MIDI output</span>
           <select className="input mt-1" value={w.output ?? ""} onChange={(e) => onChange({ output: e.target.value || null })}>
             <option value="">Choose…</option>
@@ -64,6 +64,12 @@ export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial
             {Array.from({ length: 16 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
           </select>
         </label>
+        <label className="block"><span className="label">Numbers are</span>
+          <select className="input mt-1" value={w.numbering ?? "externalId"} onChange={(e) => onChange({ numbering: e.target.value as W["numbering"] })}>
+            <option value="externalId">SuperRack External IDs</option>
+            <option value="program">Program numbers (1 = Bank 0 / PC 0)</option>
+          </select>
+        </label>
       </div>
       {outputs && outputs.length === 0 && (
         <p className="mt-2 text-xs text-warn">No MIDI outputs found. See the steps below to add one.</p>
@@ -72,14 +78,14 @@ export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial
       <div className="mt-5">
         <span className="label">Match each key to its Waves snapshot</span>
         <p className="mt-0.5 text-[11px] text-ink-faint">
-          Type the SuperRack snapshot number for each key you use. Sharps and flats each have their own snapshot, and a
+          Type each key’s snapshot {(w.numbering ?? "externalId") === "externalId" ? "External ID exactly as SuperRack shows it (0139 → 139)" : "number"}. Sharps and flats each have their own snapshot, and a
           minor key uses its letter’s snapshot (F#m → F#). Leave keys you don’t use empty. ▶ sends it now.
         </p>
         <div className="mt-3 grid gap-x-6 gap-y-1.5 sm:grid-flow-col sm:grid-cols-2 sm:grid-rows-9">
           {KEY_ROOTS.map((k) => (
             <div key={k} className="flex items-center gap-3 rounded-lg border border-line px-3 py-1.5">
               <span className="w-10 font-mono text-base font-semibold text-violet">{k}</span>
-              <span className="text-[11px] text-ink-faint">Snapshot</span>
+              <span className="text-[11px] text-ink-faint">{(w.numbering ?? "externalId") === "externalId" ? "External ID" : "Snapshot"}</span>
               <SnapInput value={w.snapshots[k]} onSave={(v) => onChange({ snapshots: { [k]: v } })} onTest={() => test(k)} />
             </div>
           ))}
@@ -96,29 +102,29 @@ export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial
           <li>In SuperRack: Controllers → add <b>MIDI Controller</b> → the gear icon → under MIDI IN tick the IAC or network port.</li>
           <li>Save a SuperRack snapshot for each key you use (e.g. Waves Tune Real-Time set to A).</li>
           <li><b>Give each snapshot an External ID</b> (the arrow next to the snapshot → External ID). SuperRack only recalls
-            snapshots that have one. Snapshot number here = External ID: <b>1 = Bank 0 / PC 0</b>, 2 = Bank 0 / PC 1 … 129 = Bank 1 / PC 0.</li>
+            snapshots that have one. Type the External ID next to the key here (0139 → 139).</li>
           <li>Not recalling? Press ▶ next to a key: the message shows exactly what was sent. The free app
             <b> MIDI Monitor</b> (snoize.com) shows whether it arrives on the IAC bus.</li>
         </ol>
-        <p className="mt-2">Cool Services sends Bank LSB (CC 32) and a Program Change, which is how SuperRack recalls snapshots 1–384.</p>
+        <p className="mt-2">Cool Services sends Bank LSB (CC 32) and a Program Change. SuperRack’s External IDs run 125 to a bank, so ID 139 is Bank 1 / Program 14.</p>
       </details>
     </section>
   );
 }
 
 function SnapInput({ value, onSave, onTest }: { value: number | null | undefined; onSave: (v: number | null) => void; onTest: () => void }) {
-  const [v, setV] = useState(value ? String(value) : "");
-  useEffect(() => setV(value ? String(value) : ""), [value]);
+  const [v, setV] = useState(value != null ? String(value) : "");
+  useEffect(() => setV(value != null ? String(value) : ""), [value]);
   const commit = () => {
-    const n = v ? Math.min(384, Math.max(1, Number(v))) : null;
-    setV(n ? String(n) : "");
+    const n = v ? Math.min(999, Math.max(0, Number(v))) : null;
+    setV(n != null ? String(n) : "");
     if (n !== (value ?? null)) onSave(n);
   };
   return (
     <div className="ml-auto flex items-center gap-1">
       <input className="input w-20 py-1 text-center font-mono text-sm" inputMode="numeric" placeholder="—" value={v}
-        onChange={(e) => setV(e.target.value.replace(/\D/g, "").slice(0, 3))} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && commit()} />
-      <button className="btn-ghost p-1" title="Send now" disabled={!value} onClick={onTest}><Play size={12} /></button>
+        onChange={(e) => setV(e.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 3))} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && commit()} />
+      <button className="btn-ghost p-1" title="Send now" disabled={value == null} onClick={onTest}><Play size={12} /></button>
     </div>
   );
 }

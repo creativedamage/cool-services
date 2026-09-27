@@ -302,8 +302,14 @@ export interface WavesSettings {
   /** MIDI output name on this Mac, e.g. "IAC Driver Bus 1" or "Network Session 1". */
   output: string | null;
   channel: number; // 1–16
-  /** Key as written ("C", "C#", "Db" … "B") → SuperRack snapshot number (1–384). */
+  /** Key as written ("C", "C#", "Db" … "B") → SuperRack snapshot (its External ID, 0–999). */
   snapshots: Record<string, number | null>;
+  /**
+   * How a number turns into Bank LSB + Program Change:
+   *  - "externalId" (default): SuperRack's External ID, 125 per bank: ID = bank × 125 + program.
+   *  - "program": plain snapshot numbers from 1, 128 per bank: n = bank × 128 + program + 1.
+   */
+  numbering?: "externalId" | "program";
 }
 
 export interface AppSettings {

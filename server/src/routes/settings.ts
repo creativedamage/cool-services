@@ -35,7 +35,8 @@ const Patch = z.object({
     enabled: z.boolean(),
     output: z.string().max(200).nullable(),
     channel: z.number().int().min(1).max(16),
-    snapshots: z.record(z.string().regex(/^[A-G][#b]?m?$/), z.number().int().min(1).max(384).nullable()),
+    snapshots: z.record(z.string().regex(/^[A-G][#b]?m?$/), z.number().int().min(0).max(999).nullable()),
+    numbering: z.enum(["externalId", "program"]),
   }).partial().optional(),
 });
 
