@@ -33,7 +33,8 @@ export interface JsonApiDoc {
 export type Flat = { id: string; type: string; rel: Record<string, any>; [attr: string]: any };
 
 export class PcoError extends Error {
-  constructor(public status: number, public body: unknown, msg: string) {
+  /** productDenied: a 401 for one Planning Center product while the sign-in itself is fine. */
+  constructor(public status: number, public body: unknown, msg: string, public productDenied = false) {
     super(msg);
   }
 }
@@ -116,6 +117,14 @@ const refreshesInFlight = new Map<string, Promise<TokenSet>>();
 /** Planning Center no longer accepts this sign-in (the refresh token was refused). */
 export class SignedOutError extends Error {}
 
+/**
+ * When each access token last worked. Planning Center answers 401 (not 403) when a sign-in can't use
+ * one product (e.g. Check-Ins) while it works fine for the others; that isn't an expired token, so it
+ * must not trigger a refresh (every refresh rotates the tokens) or sign anyone out.
+ */
+const tokenLastOk = new Map<string, number>();
+const worksElsewhere = (accessToken: string) => Date.now() - (tokenLastOk.get(accessToken) ?? 0) < 15 * 60_000;
+
 export class PcoClient {
   private refreshing: Promise<TokenSet> | null = null;
   private bucket: Bucket;
@@ -195,11 +204,27 @@ export class PcoClient {
     });
 
     logSlow(method, url, Date.now() - started, res.status);
-    if (res.status === 401 && attempt === 0 && !this.basicAuth) {
-      await this.ensureFresh(true);
-      return this.raw(method, path, body, attempt + 1);
+    const where = `${method} ${path.replace(/^https?:\/\/[^/]+/, "").split("?")[0]}`;
+    if (res.ok && !this.basicAuth) tokenLastOk.set(this.tokens.accessToken, Date.now());
+    if (res.status === 401 && !this.basicAuth) {
+      const json: any = await res.clone().json().catch(() => null);
+      const detail = json?.errors?.[0]?.detail ?? json?.errors?.[0]?.title ?? "";
+      // Not sure yet? Ask Planning Center who we are with the same token (cheap, and only on a 401).
+      if (!worksElsewhere(this.tokens.accessToken) && !path.includes("/people/v2/me")) {
+        const probe = await fetch(`${config.pco.base}/people/v2/me`, { headers: { Authorization: `Bearer ${this.tokens.accessToken}`, "User-Agent": USER_AGENT, Accept: "application/json" } }).catch(() => null);
+        if (probe?.ok) tokenLastOk.set(this.tokens.accessToken, Date.now());
+      }
+      if (worksElsewhere(this.tokens.accessToken)) {
+        // The sign-in works for other things: this product just isn't allowed for it.
+        logEvent(`access: ${where} → 401 while the sign-in works elsewhere (${detail || "no detail"}); scopes: ${this.tokens.scope || "?"}`);
+        throw new PcoError(401, json, `PCO ${where} → 401: ${detail}`, true);
+      }
+      if (attempt === 0) {
+        await this.ensureFresh(true);
+        return this.raw(method, path, body, attempt + 1);
+      }
+      logEvent(`sign-in: ${where} → 401 after refreshing (${detail || "no detail"})`);
     }
-    if (res.status === 401) logEvent(`sign-in: ${method} ${path.replace(/^https?:\/\/[^/]+/, "").split("?")[0]} → 401 after refreshing`);
     // Planning Center hiccups (502/503/504): try a read once more.
     if (method === "GET" && [502, 503, 504].includes(res.status) && attempt < 2) {
       await sleep(600 + attempt * 800);

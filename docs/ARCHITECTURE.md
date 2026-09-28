@@ -258,3 +258,10 @@ refresh isn't treated as expiry (no refresh storms). If Planning Center really r
 token, the saved tokens are removed and the API answers 401 `reauth_required`; the web app then
 shows the sign-in page with "Planning Center signed you out" (it doesn't bounce back to /start) and
 signing in returns to the page you were on. Sign-in problems are written to `cool-services.log`.
+
+Planning Center answers **401** (not 403) when a sign-in can't use one product (seen with Check-Ins)
+while the same token works for Services. Treating that as an expired token rotated the tokens on
+every Check-Ins poll and eventually signed people out. `tokenLastOk` remembers when each access
+token last worked (or probes `/people/v2/me` once); a 401 from a token that works elsewhere is a
+`productDenied` PcoError: no refresh, answered as 403 `no_access` (or the Check-Ins message), and
+logged with Planning Center's reason and the token's scopes. Sign-in also logs the scopes granted.

@@ -79,6 +79,8 @@ export function createApp(webDir?: string) {
     if (err instanceof SignedOutError) return res.status(401).json({ error: "reauth_required", message: err.message });
     if (err instanceof PcoError) {
       console.error(err.message);
+      // Not allowed to use one Planning Center product: say so (a 401 would send you to sign in).
+      if (err.productDenied) return res.status(403).json({ error: "no_access", message: `Your Planning Center sign-in can’t use this part of Planning Center. ${err.message}` });
       return res.status(err.status === 401 ? 401 : 502).json({ error: err.status === 401 ? "reauth_required" : "pco_error", message: err.message });
     }
     console.error(err);

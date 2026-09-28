@@ -23,7 +23,8 @@ export function CheckInsView({ serviceTypeId, planId }: { serviceTypeId: string;
   const data = useQuery({
     queryKey: qk.checkins(planId),
     queryFn: () => Api.checkins(serviceTypeId, planId),
-    refetchInterval: 10_000,
+    // Stop asking while Planning Center says no (each try would just be refused again).
+    refetchInterval: (q) => (q.state.error instanceof ApiError && q.state.error.status === 403 ? false : 10_000),
     refetchIntervalInBackground: true,
     retry: (n, e) => !(e instanceof ApiError && e.status === 403) && n < 2,
   });

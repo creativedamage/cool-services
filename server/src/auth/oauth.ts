@@ -133,6 +133,7 @@ authRouter.get("/callback", h(async (req, res) => {
       avatarUrl: me.avatar ?? null, email: me.rel.emails?.[0]?.address ?? null,
     });
     if (!patClient) await saveTokens(user.id, tokens); // shared-token mode doesn't need personal tokens
+    logEvent(`sign-in: ${me.name} signed in; Planning Center allowed: ${tokens.scope || "(not stated)"}`);
     await startSession(res, user.id);
     const back = safeReturn(req.cookies?.[RETURN]);
     res.clearCookie(RETURN, cookieOpts);
@@ -225,10 +226,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
  * the Planning Center account itself doesn't have Check-Ins permission, and signing in again would
  * just loop, so say that instead.
  */
-export function checkInsDenied(req: Request, e: { status?: number; body?: unknown }) {
+export function checkInsDenied(req: Request, e: { status?: number; body?: unknown; productDenied?: boolean }) {
   const detail = ((e.body as { errors?: { detail?: string; title?: string }[] })?.errors?.[0]);
   const pcoSays = detail?.detail || detail?.title || null;
-  if (e.status === 401) return { error: "checkins_signin", message: "Your Planning Center sign-in has expired. Sign in again.", pcoSays };
+  if (e.status === 401 && !e.productDenied) return { error: "checkins_signin", message: "Your Planning Center sign-in has expired. Sign in again.", pcoSays };
   // Planning Center says the sign-in wasn't allowed Check-Ins: signing in again (and approving) fixes it.
   if (pcoSays && /scope/i.test(pcoSays) && !patClient) return { error: "checkins_signin", message: "Sign in again and approve Check-Ins. It only takes a moment.", pcoSays };
   if (patClient) {
@@ -237,14 +238,14 @@ export function checkInsDenied(req: Request, e: { status?: number; body?: unknow
   }
   const scope = (req.user ? tokenStore.get(req.user.id)?.scope : "") ?? "";
   if (!scope.split(/[\s,]+/).includes("check_ins")) {
-    // Just signed in and Planning Center still left Check-Ins out: another sign-in won't help.
+    // Signed in recently and Planning Center still left Check-Ins out: another sign-in won't help.
     const last = req.user ? Date.parse(users.get(req.user.id)?.lastLoginAt ?? "") : NaN;
-    if (Date.now() - last < 10 * 60_000) {
+    if (Date.now() - last < 12 * 3600e3) {
       return { error: "checkins_permission", shared: false, pcoSays,
         message: `Planning Center didn’t include Check-Ins when you signed in (it allowed: ${scope || "nothing"}). Check that the Planning Center account you sign in with can use Check-Ins${config.pco.scopes.includes("check_ins") ? "" : ", and that PCO_SCOPES includes check_ins"}.` };
     }
     return { error: "checkins_signin", message: "Sign in again and approve Check-Ins. It only takes a moment.", pcoSays };
   }
   return { error: "checkins_permission", shared: false, pcoSays,
-    message: "Your Planning Center account doesn’t have permission to see Check-Ins. A Planning Center administrator can turn it on for you in People → your profile → Permissions → Check-Ins. Signing in again won’t change this." };
+    message: "Planning Center won’t let your sign-in read Check-Ins, even though it allows Check-Ins. Your Planning Center account probably doesn’t have Check-Ins permission. A Planning Center administrator can turn it on for you in People → your profile → Permissions → Check-Ins. Signing in again won’t change this." };
 }
