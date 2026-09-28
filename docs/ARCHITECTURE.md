@@ -134,19 +134,7 @@ position) live in the data file. Backgrounds live in `<DATA_DIR>/files`. A PDF p
 a PNG on the Mac with PDF.js when it's added, so the plot never needs the PDF again. Each service
 uses its own chosen plot, or else its service type's default (only one default per type).
 
-## 5f. NDI output
-
-`desktop/src/ndi.ts` opens an invisible off-screen Electron window on `/ndi` at 720p, 1080p or 4K.
-Each painted frame is kept as BGRA and re-sent at the chosen frame rate with
-`@stagetimerio/grandiose` (NDI SDK 6, N-API). It's an optionalDependency (npm skips it quietly if it
-can't compile), so `build.mjs` checks it: if it isn't built it builds it again out loud in a temp folder (its
-build breaks when the project path has a space, e.g. "cool-services 9"), builds the other processor's
-slice and joins them with `lipo`, and copies `dist/` (grandiose.node + libndi.dylib) to
-`app/native/grandiose`, which is unpacked from the asar. `desktop/src/ndiLib.ts` loads that copy
-(falling back to node_modules when running from source). `build.mjs --dist` fails if the add-on
-isn't there, unless COOL_SKIP_NDI=1. `/ndi` resolves the next service (optionally of one type), its plot, mic assignments and team,
-and refreshes on its own. Settings changes start, stop or restart the sender through `ndiBridge`,
-and status (source name, receivers connected) is shown in Settings.
+## 5f. (NDI output was removed in 1.13)
 
 ## 5g. Parent paging and the Kids & Nursery iPads
 
@@ -201,13 +189,11 @@ toggle_control`; "you control" = the Live controller is the signed-in person. Ac
 (`web/lib/runsheet.ts`), matching another plan's items by title. Operator views are stored in the
 data file (`runSheetViews`).
 
-## 5l. Dashboard, ProPresenter control, NDI previews, Smaart
+## 5l. Dashboard, ProPresenter control, Smaart
 
 `/api/pro` aggregates a ProPresenter computer's state (active presentation with slides, slide index,
 current/next text, timers with their durations, stage message/screens/layouts, clear groups, looks)
-and performs actions; slide thumbnails are proxied and cached. NDI previews: the Mac app finds NDI
-sources and receives one at low bandwidth only while the dashboard asks for frames
-(`/api/desktop/ndi/frame`, polled), converting BGRA frames to JPEG with nativeImage. Smaart: a
+and performs actions; slide thumbnails are proxied and cached. Smaart: a
 WebSocket client to `ws://host:26000/api/v4/` (password when asked). A plain `get` lists the measurements with
 their `streamEndpoint`s; each active one is streamed over its own WebSocket. Any SPL-looking numbers
 (LAeq, LASlow, LCeq…) are kept; failing that, an approximate overall level (dBZ, and dBA when
@@ -260,3 +246,15 @@ own BrowserWindow (menu, ⌘, or `POST /api/desktop/preferences`); in a browser 
 `/settings` links render the same component. Windows keep each other current: every successful
 mutation posts on a BroadcastChannel and the other windows invalidate their queries; the theme
 follows through the `storage` event.
+
+## 5n. Staying signed in to Planning Center
+
+Access tokens last two hours; the refresh token can be used once. Every request builds its own
+`PcoClient` from the saved tokens, so two requests can find the token expired at the same moment.
+`refreshesInFlight` shares one refresh per refresh token (kept 15 minutes, so a request started with
+the old tokens gets the new ones), and each client re-reads the saved tokens before refreshing and
+again if Planning Center refuses (someone else may have just rotated them). A 401 right after a
+refresh isn't treated as expiry (no refresh storms). If Planning Center really refuses the refresh
+token, the saved tokens are removed and the API answers 401 `reauth_required`; the web app then
+shows the sign-in page with "Planning Center signed you out" (it doesn't bounce back to /start) and
+signing in returns to the page you were on. Sign-in problems are written to `cool-services.log`.

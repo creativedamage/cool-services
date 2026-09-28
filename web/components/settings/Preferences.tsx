@@ -1,15 +1,15 @@
 "use client";
 /**
- * Preferences: About, Appearance, Default Startup, NDI, Audio, Network Connections and Video.
+ * Preferences: About, Appearance, Default Startup, Campuses, Audio, Network Connections and Video.
  * In the Mac app they open in their own window (Cool Services → Preferences…, ⌘,); in a browser
  * at /preferences. A hash picks the tab (and section): /preferences#smaart opens Audio at Smaart.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { AudioLines, Building2, Cast, Info, Laptop, MonitorPlay, Moon, Network, Palette, Power, Sun, Trash2, Upload } from "lucide-react";
+import { AudioLines, Building2, Info, Laptop, MonitorPlay, Moon, Network, Palette, Power, Sun, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { AppSettings, NdiStatus, StartView, ThemePref } from "@shared/types";
+import type { AppSettings, StartView, ThemePref } from "@shared/types";
 import { Api, qk, type SettingsPatch } from "@/lib/api";
 import { usePlans } from "@/lib/plans";
 import { SECTION_TAB, type PrefsTab } from "@/lib/prefs";
@@ -29,7 +29,6 @@ const TABS: { id: PrefsTab; label: string; icon: typeof Info; blurb: string }[] 
   { id: "appearance", label: "Appearance", icon: Palette, blurb: "Theme and your logo." },
   { id: "startup", label: "Default Startup", icon: Power, blurb: "What opens first." },
   { id: "campuses", label: "Campuses", icon: Building2, blurb: "Sort service types by campus, and choose yours." },
-  { id: "ndi", label: "NDI", icon: Cast, blurb: "Stage plot output and NDI sources." },
   { id: "audio", label: "Audio", icon: AudioLines, blurb: "Allen & Heath, Waves SuperRack and Smaart." },
   { id: "network", label: "Network Connections", icon: Network, blurb: "Kids & Nursery paging and iPads." },
   { id: "video", label: "Video", icon: MonitorPlay, blurb: "ProPresenter computers." },
@@ -62,7 +61,7 @@ export function Preferences({ standalone }: { standalone?: boolean }) {
     onMutate: async (patch) => {
       await qc.cancelQueries({ queryKey: qk.settings });
       qc.setQueryData<AppSettings>(qk.settings, (s) => s && {
-        ...s, ...patch, ndi: { ...s.ndi, ...(patch.ndi ?? {}) },
+        ...s, ...patch,
         waves: { ...s.waves, ...(patch.waves ?? {}), snapshots: { ...s.waves.snapshots, ...(patch.waves?.snapshots ?? {}) } },
       });
     },
@@ -96,7 +95,6 @@ export function Preferences({ standalone }: { standalone?: boolean }) {
               {tab === "appearance" && <AppearanceSection s={s} save={save.mutate} />}
               {tab === "startup" && <StartupSection s={s} save={save.mutate} />}
               {tab === "campuses" && <CampusSettings />}
-              {tab === "ndi" && <><NdiTab s={s} save={save.mutate} /></>}
               {tab === "audio" && <><ConsoleSettings /><WavesSettings w={s.waves} onChange={(waves) => save.mutate({ waves })} /><SmaartSettings /></>}
               {tab === "network" && <PagingSettings />}
               {tab === "video" && <ProComputersSettings />}
@@ -213,125 +211,6 @@ function StartupSection({ s, save }: { s: AppSettings; save: Save }) {
         <option value="propresenter">ProPresenter</option>
         <option value="paging">Parent paging</option>
       </select>
-    </section>
-  );
-}
-
-function NdiTab({ s, save }: { s: AppSettings; save: Save }) {
-  const plans = usePlans();
-  const serviceTypes = [...new Map((plans.data ?? []).map((p) => [p.serviceTypeId, p.serviceTypeName])).entries()];
-  const ndiStatus = useQuery({ queryKey: ["ndiStatus"], queryFn: Api.ndiStatus, refetchInterval: 2000 });
-  return (
-    <>
-      <NdiSection s={s} status={ndiStatus.data} serviceTypes={serviceTypes} onChange={(ndi) => save({ ndi })} />
-      <NdiSources />
-    </>
-  );
-}
-
-/** NDI sources on the network (ProPresenter screens, cameras…), for the dashboard's output widgets. */
-function NdiSources() {
-  const q = useQuery({ queryKey: qk.ndiSources, queryFn: Api.ndiSources, refetchInterval: 5000 });
-  return (
-    <section id="ndi-sources" className="panel scroll-mt-6 p-5">
-      <h2 className="flex items-center gap-2 font-semibold"><MonitorPlay size={16} /> NDI sources on the network</h2>
-      <p className="mt-0.5 text-sm text-ink-muted">
-        ProPresenter’s screens show up here once NDI is on for them in ProPresenter (Screens → the screen → NDI). Pick them in the Dashboard’s “ProPresenter output” widgets (Edit → ✎).
-      </p>
-      <div className="mt-3">
-        {!q.data ? <Spinner /> : !q.data.available ? <p className="text-xs text-bad">{q.data.error}</p>
-          : !q.data.sources.length ? <p className="text-xs text-ink-muted">None found yet. NDI sources can take a few seconds to appear.</p>
-          : (
-            <ul className="grid gap-1 sm:grid-cols-2">
-              {q.data.sources.map((x) => <li key={x.name} className="truncate rounded-md border border-line px-2 py-1 font-mono text-xs">{x.name}</li>)}
-            </ul>
-          )}
-      </div>
-    </section>
-  );
-}
-
-function NdiSection({ s, status, serviceTypes, onChange }: {
-  s: AppSettings; status: NdiStatus | undefined; serviceTypes: [string, string][];
-  onChange: (ndi: Partial<AppSettings["ndi"]>) => void;
-}) {
-  const n = s.ndi;
-  const [name, setName] = useState(n.name);
-  useEffect(() => setName(n.name), [n.name]);
-  const unavailable = status && !status.available;
-  return (
-    <section id="ndi" className="panel scroll-mt-6 p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="flex items-center gap-2 font-semibold"><Cast size={16} /> Stage plot over NDI<sup className="text-[9px]">®</sup></h2>
-          <p className="mt-0.5 text-sm text-ink-muted">
-            Sends the next service’s stage plot as a live NDI source, so you can add it as an input in ProPresenter (or any NDI receiver) and put it on a multiview.
-          </p>
-        </div>
-        <button role="switch" aria-checked={n.enabled} disabled={unavailable} onClick={() => onChange({ enabled: !n.enabled })}
-          className={clsx("relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-40", n.enabled ? "bg-ok" : "bg-line-strong")}>
-          <span className={clsx("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition", n.enabled ? "left-[22px]" : "left-0.5")} />
-        </button>
-      </div>
-
-      <div className={clsx("mt-3 rounded-lg border px-3 py-2 text-xs",
-        unavailable || status?.error ? "border-bad/30 bg-bad-soft text-bad" : status?.running ? "border-ok/30 bg-ok-soft text-ok" : "border-line text-ink-muted")}>
-        {!status ? "Checking…"
-          : unavailable ? (status.error ?? "NDI is only available in the Cool Services Mac app.")
-          : status.error ? status.error
-          : status.running ? <>Sending <b>{status.sourceName}</b> · {status.width}×{status.height} at {status.fps} fps · {status.connections} receiver{status.connections === 1 ? "" : "s"} connected</>
-          : "Off. Turn it on to start sending."}
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="block sm:col-span-2">
-          <span className="label">NDI source name</span>
-          <input className="input mt-1" value={name} maxLength={60} onChange={(e) => setName(e.target.value)}
-            onBlur={() => name.trim() && name !== n.name && onChange({ name: name.trim() })} />
-          <span className="mt-1 block text-[11px] text-ink-faint">Receivers show it as “YOUR-MAC ({name || "…"})”.</span>
-        </label>
-        <label className="block">
-          <span className="label">Show</span>
-          <select className="input mt-1" value={n.serviceTypeId ?? ""} onChange={(e) => onChange({ serviceTypeId: e.target.value || null })}>
-            <option value="">Next service (any type)</option>
-            {serviceTypes.map(([id, nm]) => <option key={id} value={id}>Next {nm}</option>)}
-          </select>
-        </label>
-        <label className="block">
-          <span className="label">Resolution</span>
-          <select className="input mt-1" value={n.resolution} onChange={(e) => onChange({ resolution: e.target.value as AppSettings["ndi"]["resolution"] })}>
-            <option value="720p">1280 × 720</option><option value="1080p">1920 × 1080</option><option value="4k">3840 × 2160</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="label">Frame rate</span>
-          <select className="input mt-1" value={n.fps} onChange={(e) => onChange({ fps: Number(e.target.value) as 10 | 30 | 60 })}>
-            <option value={10}>10 fps (lightest)</option><option value={30}>30 fps</option><option value={60}>60 fps</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="label">Background</span>
-          <select className="input mt-1" value={n.background} onChange={(e) => onChange({ background: e.target.value as "black" | "white" })}>
-            <option value="black">Black</option><option value="white">White</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-sm text-ink-soft sm:col-span-2">
-          <input type="checkbox" checked={n.showHeader} onChange={(e) => onChange({ showHeader: e.target.checked })} />
-          Show the service title and date along the top
-        </label>
-      </div>
-
-      <div className="mt-4">
-        <span className="label">Preview</span>
-        <div className="mt-1 aspect-video w-full overflow-hidden rounded-lg border border-line bg-black">
-          <iframe src="/ndi" title="NDI preview" className="pointer-events-none h-[1080px] w-[1920px] origin-top-left border-0"
-            style={{ transform: "scale(var(--ndi-scale))" }}
-            ref={(el) => { if (el?.parentElement) el.style.setProperty("--ndi-scale", String(el.parentElement.clientWidth / 1920)); }} />
-        </div>
-      </div>
-      <p className="mt-3 text-[11px] text-ink-faint">
-        NDI® is a registered trademark of Vizrt NDI AB. <a className="underline" href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a>
-      </p>
     </section>
   );
 }

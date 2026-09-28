@@ -160,6 +160,12 @@ export const users = {
 
 export const tokens = {
   get: (userId: string) => load().tokens.find((t) => t.userId === userId) ?? null,
+  /** Planning Center no longer accepts this sign-in: forget it, so the person is asked to sign in. */
+  remove(userId: string) {
+    const d = load();
+    d.tokens = d.tokens.filter((x) => x.userId !== userId);
+    save();
+  },
   save(t: Omit<OAuthToken, "updatedAt">) {
     const d = load();
     d.tokens = d.tokens.filter((x) => x.userId !== t.userId);
@@ -211,7 +217,6 @@ export async function audit(actorId: string, action: string, targetType: string,
 
 const defaultSettings = (): AppSettings => ({
   theme: "dark", logo: null, startView: { kind: "workflows" },
-  ndi: { enabled: false, name: "Cool Services Stage Plot", resolution: "1080p", fps: 30, serviceTypeId: null, showHeader: true, background: "black" },
   // Nothing matched until someone enters their own SuperRack snapshot numbers.
   waves: {
     enabled: false, output: null, channel: 1, numbering: "externalId", hideFromTuning: ["Vocal Warm Ups"],
@@ -225,12 +230,13 @@ export const settings = {
     const d = defaultSettings();
     const s = load().settings ?? {};
     const w = (s as Partial<AppSettings>).waves;
-    return { ...d, ...s, ndi: { ...d.ndi, ...((s as Partial<AppSettings>).ndi ?? {}) }, waves: { ...d.waves, ...(w ?? {}), snapshots: { ...d.waves.snapshots, ...(w?.snapshots ?? {}) } } };
+    const { ndi: _old, ...rest } = s as Partial<AppSettings> & { ndi?: unknown }; // NDI was removed in 1.13
+    return { ...d, ...rest, waves: { ...d.waves, ...(w ?? {}), snapshots: { ...d.waves.snapshots, ...(w?.snapshots ?? {}) } } };
   },
-  save(patch: Partial<Omit<AppSettings, "ndi" | "waves">> & { ndi?: Partial<AppSettings["ndi"]>; waves?: Partial<AppSettings["waves"]> }): AppSettings {
+  save(patch: Partial<Omit<AppSettings, "waves">> & { waves?: Partial<AppSettings["waves"]> }): AppSettings {
     const cur = settings.get();
     const next = {
-      ...cur, ...patch, ndi: { ...cur.ndi, ...(patch.ndi ?? {}) },
+      ...cur, ...patch,
       waves: { ...cur.waves, ...(patch.waves ?? {}), snapshots: { ...cur.waves.snapshots, ...(patch.waves?.snapshots ?? {}) } },
     };
     load().settings = next;
@@ -238,7 +244,7 @@ export const settings = {
     for (const fn of settingsListeners) fn(next);
     return next;
   },
-  /** The Mac app listens here to start/stop NDI when settings change. */
+  /** Listeners for settings changes. */
   onChange(fn: (s: AppSettings) => void) {
     settingsListeners.add(fn);
     return () => settingsListeners.delete(fn);
@@ -450,9 +456,17 @@ export const cache = {
 /* ───────────── Slow-request log ───────────── */
 
 /** Planning Center calls slower than 1s are noted in cool-services.log, to help diagnose slowness. */
+/** A line in cool-services.log (sign-in problems etc.; never tokens or personal data). */
+export function logEvent(message: string) {
+  writeLog(`${new Date().toISOString()} ${message}\n`);
+}
+
 export function logSlow(method: string, url: string, ms: number, status: number) {
   if (ms < 1000) return;
-  const line = `${new Date().toISOString()} ${method} ${url.replace(/^https?:\/\/[^/]+/, "")} ${status} ${ms}ms\n`;
+  writeLog(`${new Date().toISOString()} ${method} ${url.replace(/^https?:\/\/[^/]+/, "")} ${status} ${ms}ms\n`);
+}
+
+function writeLog(line: string) {
   try {
     const f = path.resolve(process.cwd(), config.dataDir, "cool-services.log");
     fs.mkdirSync(path.dirname(f), { recursive: true });

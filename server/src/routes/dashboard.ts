@@ -6,11 +6,15 @@ import { extras } from "../lib/db.js";
 export const dashboardRouter = Router();
 const Widget = z.object({
   id: z.string().max(40),
-  type: z.enum(["tuning", "ndi", "spl", "wireless", "live", "clock", "pro"]),
+  type: z.enum(["tuning", "spl", "wireless", "live", "clock", "pro"]),
   size: z.enum(["s", "m", "l"]),
   options: z.record(z.string().max(40), z.union([z.string().max(300), z.number(), z.boolean(), z.null()])).default({}),
 });
-dashboardRouter.get("/", (_req, res) => res.json(extras.get("dashboard", null)));
+// NDI previews were removed in 1.13: drop those widgets from saved layouts.
+dashboardRouter.get("/", (_req, res) => {
+  const w = extras.get<{ type: string }[] | null>("dashboard", null);
+  res.json(w ? w.filter((x) => x.type !== "ndi") : null);
+});
 
 /** Your service: which service type (campus) the dashboard follows, optionally pinned to one plan. */
 dashboardRouter.get("/home", (_req, res) => res.json(extras.get("home", { serviceTypeId: null, planId: null })));

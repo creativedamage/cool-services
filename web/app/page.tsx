@@ -16,15 +16,17 @@ export default function LoginPage() {
 interface Status { signInAvailable: boolean; allowDemo: boolean }
 
 function Login() {
-  const error = useSearchParams().get("error");
+  const params = useSearchParams();
+  const error = params.get("error");
+  const back = params.get("return");
   const router = useRouter();
   const [status, setStatus] = useState<Status | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/status").then((r) => r.json()).then(setStatus).catch(() => {});
-    // Already signed in? Skip straight to the board.
-    fetch("/api/auth/me").then((r) => r.ok && router.replace("/start")).catch(() => {});
-  }, [router]);
+    // Already signed in? Skip straight in (not after being signed out: that would bounce back and forth).
+    if (!error) fetch("/api/auth/me").then((r) => r.ok && router.replace("/start")).catch(() => {});
+  }, [router, error]);
 
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden px-4">
@@ -50,11 +52,13 @@ function Login() {
                 ? "Sign-in isn’t switched on for this site yet. Please let the site administrator know."
                 : error === "access_denied"
                   ? "Planning Center sign-in was cancelled. Click the button to try again."
+                : error === "signed_out"
+                  ? "Planning Center signed you out (this happens now and then). Sign in again and you’ll be right back where you were."
                   : "Sign-in didn’t complete. Please try again."}
             </div>
           )}
 
-          <PlanningCenterButton />
+          <PlanningCenterButton href={back && back.startsWith("/") && !back.startsWith("//") ? `/api/auth/login?return=${encodeURIComponent(back)}` : undefined} />
           <p className="mt-2.5 text-center text-xs text-ink-muted">Use the same email and password you use for Planning Center.</p>
 
           {status && !status.signInAvailable && (

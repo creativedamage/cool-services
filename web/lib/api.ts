@@ -1,12 +1,11 @@
 import type {
-  AppSettings, NdiStatus, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, StagePlot, PlanSummary, RosterStatus, ScheduleRequest,
+  AppSettings, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, StagePlot, PlanSummary, RosterStatus, ScheduleRequest,
   ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary,
   DashboardWidget, HomeService, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 
-export type SettingsPatch = Partial<Omit<AppSettings, "ndi" | "waves">> & {
-  ndi?: Partial<AppSettings["ndi"]>;
+export type SettingsPatch = Partial<Omit<AppSettings, "waves">> & {
   waves?: Partial<AppSettings["waves"]>;
 };
 
@@ -29,9 +28,11 @@ async function api<T>(path: string, init?: RequestInit & { json?: unknown }): Pr
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     body: init?.json !== undefined ? JSON.stringify(init.json) : init?.body,
   });
-  // Not signed in: go to sign-in (except on the NDI output page, which just waits).
-  if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/" && !window.location.pathname.startsWith("/ndi") && !window.location.pathname.startsWith("/kiosk")) {
-    window.location.href = "/";
+  // Not signed in (or Planning Center signed you out): go to sign-in and say why. The sign-in page
+  // doesn't bounce back on its own after this, so there's no loop.
+  if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/" && !window.location.pathname.startsWith("/kiosk")) {
+    const back = window.location.pathname + window.location.search;
+    window.location.href = `/?error=signed_out&return=${encodeURIComponent(back)}`;
   }
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
@@ -57,7 +58,6 @@ export const Api = {
   settings: () => api<AppSettings>("/settings"),
   saveSettings: (patch: SettingsPatch) =>
     api<AppSettings>("/settings", { method: "PUT", json: patch }),
-  ndiStatus: () => api<NdiStatus>("/settings/ndi-status"),
   version: () => api<{ version: string }>("/health").then((h) => h.version),
   logout: () => api<{ ok: true }>("/auth/logout", { method: "POST" }),
 
@@ -112,7 +112,6 @@ export const Api = {
   sendConsole: (plan: string) => api<ConsolePreview>(`/console/plans/${plan}/send`, { method: "POST" }),
   saveHome: (h: HomeService) => api<HomeService>("/dashboard/home", { method: "PUT", json: h }),
   saveDashboard: (w: DashboardWidget[]) => api<DashboardWidget[]>("/dashboard", { method: "PUT", json: w }),
-  ndiSources: () => api<{ available: boolean; error?: string; sources: { name: string }[] }>("/desktop/ndi/sources"),
   runSheetViews: () => api<RunSheetView[]>("/runsheet-views"),
   saveRunSheetView: (v: Omit<RunSheetView, "id"> & { id?: string }) =>
     v.id ? api<RunSheetView>(`/runsheet-views/${v.id}`, { method: "PUT", json: v }) : api<RunSheetView>("/runsheet-views", { method: "POST", json: v }),
@@ -212,7 +211,6 @@ export const qk = {
   profile: (personId: string) => ["profile", personId] as const,
   consoleConfig: ["consoleConfig"] as const,
   consolePreview: (plan: string) => ["consolePreview", plan] as const,
-  ndiSources: ["ndiSources"] as const,
   proState: (id: string) => ["proState", id] as const,
   pagingChildren: ["pagingChildren"] as const,
 };

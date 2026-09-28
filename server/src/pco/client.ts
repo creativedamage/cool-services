@@ -6,7 +6,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
  *  - JSON:API flattening and links.next pagination
  */
 import { config } from "../config.js";
-import { logSlow } from "../lib/db.js";
+import { logEvent, logSlow } from "../lib/db.js";
 
 export interface TokenSet {
   accessToken: string;
@@ -106,7 +106,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /* ───────────── Client ───────────── */
 
+/**
+ * Refresh results by the refresh token they used. Planning Center accepts a refresh token only once,
+ * so a request that was started with the old tokens gets the new ones from here instead of trying
+ * the old refresh token again (which fails, and signed people out). Kept for 15 minutes.
+ */
 const refreshesInFlight = new Map<string, Promise<TokenSet>>();
+
+/** Planning Center no longer accepts this sign-in (the refresh token was refused). */
+export class SignedOutError extends Error {}
 
 export class PcoClient {
   private refreshing: Promise<TokenSet> | null = null;
@@ -119,6 +127,8 @@ export class PcoClient {
     /** Persist rotated tokens (encrypted) — called after every refresh. */
     private onRefresh: (t: TokenSet) => Promise<void>,
     userKey: string,
+    /** Newest saved tokens (another request may have refreshed them), and what to do if sign-in is dead. */
+    private store?: { reload: () => TokenSet | null; signedOut: (why: string) => void },
   ) {
     if (!buckets.has(userKey)) buckets.set(userKey, new Bucket());
     this.bucket = buckets.get(userKey)!;
@@ -133,19 +143,39 @@ export class PcoClient {
 
   private async ensureFresh(force = false) {
     if (this.basicAuth) return; // PATs don't expire
-    if (!force && this.tokens.expiresAt.getTime() - 60_000 > Date.now()) return;
-    // Shared across every client using the same refresh token (the app window and the iPad pages
-    // can hit an expired token at the same moment; Planning Center only accepts a refresh token once).
+    const left = this.tokens.expiresAt.getTime() - Date.now();
+    if (!force && left > 60_000) return;
+    // A 401 right after a refresh isn't an expired token: don't burn another refresh on it.
+    if (force && left > 110 * 60_000) return;
+    // Someone else may already have refreshed: start from the newest saved tokens.
+    const saved = this.store?.reload();
+    if (saved && saved.refreshToken !== this.tokens.refreshToken) {
+      this.tokens = saved;
+      if (!force && saved.expiresAt.getTime() - Date.now() > 60_000) return;
+    }
     const rt = this.tokens.refreshToken;
     let p = refreshesInFlight.get(rt);
     if (!p) {
-      p = refreshTokens(rt)
-        .then(async (t) => { await this.onRefresh(t); return t; })
-        .finally(() => setTimeout(() => refreshesInFlight.delete(rt), 30_000));
+      p = refreshTokens(rt).then(async (t) => { await this.onRefresh(t); return t; });
       refreshesInFlight.set(rt, p);
+      setTimeout(() => refreshesInFlight.delete(rt), 15 * 60_000).unref?.();
+      p.catch(() => refreshesInFlight.delete(rt));
     }
     this.refreshing = p;
-    this.tokens = await p;
+    try {
+      this.tokens = await p;
+    } catch (e) {
+      // Refused: maybe another request rotated it a moment ago. Use theirs if so.
+      const again = this.store?.reload();
+      if (again && again.refreshToken !== rt && again.expiresAt.getTime() - Date.now() > 60_000) { this.tokens = again; return; }
+      const why = e instanceof PcoError ? `${e.status} ${(e.body as { error?: string })?.error ?? ""}`.trim() : (e as Error).message;
+      logEvent(`sign-in: Planning Center refused the refresh token (${why})`);
+      if (e instanceof PcoError && e.status >= 400 && e.status < 500) {
+        this.store?.signedOut(why);
+        throw new SignedOutError("Planning Center signed you out. Sign in again.");
+      }
+      throw e;
+    }
   }
 
   async raw(method: string, path: string, body?: unknown, attempt = 0): Promise<JsonApiDoc | null> {
@@ -167,6 +197,12 @@ export class PcoClient {
     logSlow(method, url, Date.now() - started, res.status);
     if (res.status === 401 && attempt === 0 && !this.basicAuth) {
       await this.ensureFresh(true);
+      return this.raw(method, path, body, attempt + 1);
+    }
+    if (res.status === 401) logEvent(`sign-in: ${method} ${path.replace(/^https?:\/\/[^/]+/, "").split("?")[0]} → 401 after refreshing`);
+    // Planning Center hiccups (502/503/504): try a read once more.
+    if (method === "GET" && [502, 503, 504].includes(res.status) && attempt < 2) {
+      await sleep(600 + attempt * 800);
       return this.raw(method, path, body, attempt + 1);
     }
     if (res.status === 429 && attempt < 4) {

@@ -302,31 +302,6 @@ export type StartView =
   | { kind: "next-service"; serviceTypeId: string | null }
   | { kind: "next-checkins"; serviceTypeId: string | null };
 
-export interface NdiSettings {
-  enabled: boolean;
-  /** Shown to receivers as "<MAC NAME> (<name>)". */
-  name: string;
-  resolution: "720p" | "1080p" | "4k";
-  fps: 10 | 30 | 60;
-  /** Which service's stage plot to send: the next one of this type (null = next of any type). */
-  serviceTypeId: string | null;
-  /** Show the service title and date along the top. */
-  showHeader: boolean;
-  /** Frame color around the plot. */
-  background: "black" | "white";
-}
-
-export interface NdiStatus {
-  /** NDI is included in this build of the Mac app. */
-  available: boolean;
-  running: boolean;
-  sourceName: string | null;
-  connections: number;
-  width: number;
-  height: number;
-  fps: number;
-  error?: string;
-}
 
 /**
  * The keys that get their own snapshot. F# and Gb are separate; C#, D#, G# and A# aren't used, so a
@@ -368,7 +343,6 @@ export interface AppSettings {
   /** Custom logo as a data: URL (PNG, JPG or SVG), shown in the sidebar and on the sign-in page. */
   logo: string | null;
   startView: StartView;
-  ndi: NdiSettings;
   waves: WavesSettings;
 }
 
@@ -701,7 +675,7 @@ export interface SmaartStatusView {
 /** The service the dashboard follows: a service type (your campus), optionally pinned to one plan. */
 export interface HomeService { serviceTypeId: string | null; planId: string | null }
 
-export type WidgetType = "tuning" | "ndi" | "spl" | "wireless" | "live" | "clock" | "pro";
+export type WidgetType = "tuning" | "spl" | "wireless" | "live" | "clock" | "pro";
 export interface DashboardWidget {
   id: string;
   type: WidgetType;

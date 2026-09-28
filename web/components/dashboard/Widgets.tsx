@@ -138,51 +138,6 @@ export function TuningWidget({ o }: { o: O }) {
   );
 }
 
-/* ── ProPresenter output (NDI) ── */
-export function NdiWidget({ o }: { o: O }) {
-  const source = (o.source as string) || "";
-  const [src, setSrc] = useState<string | null>(null);
-  const [size, setSize] = useState("");
-  const [stale, setStale] = useState(false);
-  const alive = useRef(true);
-  useEffect(() => {
-    alive.current = true;
-    if (!source) return;
-    let last = Date.now();
-    let url: string | null = null;
-    // Ask for the next frame as soon as the last one arrives (about 5 a second).
-    const loop = async () => {
-      while (alive.current) {
-        try {
-          const r = await fetch(`/api/desktop/ndi/frame?source=${encodeURIComponent(source)}&t=${Date.now()}`, { credentials: "same-origin", cache: "no-store" });
-          if (r.status === 200) {
-            const blob = await r.blob();
-            const next = URL.createObjectURL(blob);
-            if (url) URL.revokeObjectURL(url);
-            url = next; setSrc(next); setSize(r.headers.get("X-Frame-Size") ?? ""); last = Date.now(); setStale(false);
-          } else if (Date.now() - last > 4000) setStale(true);
-        } catch { setStale(true); }
-        await new Promise((res) => setTimeout(res, 180));
-      }
-    };
-    void loop();
-    return () => { alive.current = false; if (url) URL.revokeObjectURL(url); };
-  }, [source]);
-  return (
-    <Frame title={(o.label as string) || source || "ProPresenter output"} icon={Tv} right={size && <span className="font-mono text-[10px] font-normal text-ink-faint">{size}</span>}>
-      <div className="relative -m-3 h-[calc(100%+1.5rem)] bg-black">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {src && <img src={src} alt="" className="h-full w-full object-contain" />}
-        {(!source || !src || stale) && (
-          <div className="absolute inset-0 grid place-items-center p-4 text-center text-xs text-white/60">
-            {!source ? "Choose an NDI source in this widget’s settings (✎)." : stale ? "No picture from this source. Is ProPresenter sending it over NDI?" : "Connecting…"}
-          </div>
-        )}
-      </div>
-    </Frame>
-  );
-}
-
 /* ── SPL (Smaart) ── */
 export function SplWidget({ o }: { o: O }) {
   const st = useQuery({ queryKey: qk.smaartStatus, queryFn: Api.smaartStatus, refetchInterval: 1000 });

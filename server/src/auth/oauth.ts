@@ -15,7 +15,7 @@
 import crypto from "node:crypto";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { config, pcoConfigured, usingPat } from "../config.js";
-import { sessions, tokens as tokenStore, users } from "../lib/db.js";
+import { logEvent, sessions, tokens as tokenStore, users } from "../lib/db.js";
 import { decrypt, encrypt, randomId } from "../lib/crypto.js";
 import { exchangeCode, PcoClient, type TokenSet } from "../pco/client.js";
 import { LivePco } from "../pco/live.js";
@@ -189,7 +189,15 @@ export function pcoForUser(userId: string, demo: boolean): PcoApi | null {
     expiresAt: new Date(t.expiresAt),
     scope: t.scope,
   };
-  const client = new PcoClient(tokens, (nt) => saveTokens(u.id, nt), u.pcoPersonId);
+  const load = (): TokenSet | null => {
+    const s = tokenStore.get(u.id);
+    return s ? { accessToken: decrypt(s.accessTokenEnc), refreshToken: decrypt(s.refreshTokenEnc), expiresAt: new Date(s.expiresAt), scope: s.scope } : null;
+  };
+  const client = new PcoClient(tokens, (nt) => saveTokens(u.id, nt), u.pcoPersonId, {
+    reload: load,
+    // Planning Center refused the sign-in: forget it so the app asks to sign in (instead of bouncing).
+    signedOut: (why) => { logEvent(`sign-in: signed out ${u.name} (${why})`); tokenStore.remove(u.id); },
+  });
   return new LivePco(client, u.pcoOrgId, undefined, u.pcoPersonId);
 }
 
@@ -221,6 +229,8 @@ export function checkInsDenied(req: Request, e: { status?: number; body?: unknow
   const detail = ((e.body as { errors?: { detail?: string; title?: string }[] })?.errors?.[0]);
   const pcoSays = detail?.detail || detail?.title || null;
   if (e.status === 401) return { error: "checkins_signin", message: "Your Planning Center sign-in has expired. Sign in again.", pcoSays };
+  // Planning Center says the sign-in wasn't allowed Check-Ins: signing in again (and approving) fixes it.
+  if (pcoSays && /scope/i.test(pcoSays) && !patClient) return { error: "checkins_signin", message: "Sign in again and approve Check-Ins. It only takes a moment.", pcoSays };
   if (patClient) {
     return { error: "checkins_permission", shared: true, pcoSays,
       message: "The Planning Center account Cool Services uses on this Mac (its personal access token) doesn’t have access to Check-Ins. Give that account Check-Ins access in Planning Center, or remove the token so people use their own sign-in." };

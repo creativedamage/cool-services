@@ -17,7 +17,7 @@ import { settingsRouter } from "./routes/settings.js";
 import { stageRouter } from "./routes/stage.js";
 import { pagingRouter } from "./routes/paging.js";
 import { setUpdateBridge, updatesRouter } from "./routes/updates.js";
-import { desktopRouter, setEmbedBridge, setNdiViewer, setPrefsOpener } from "./routes/desktop.js";
+import { desktopRouter, setEmbedBridge, setPrefsOpener } from "./routes/desktop.js";
 import { runSheetViewsRouter } from "./routes/runsheetViews.js";
 import { proRouter } from "./routes/pro.js";
 import { smaartRouter, startSmaart } from "./routes/smaart.js";
@@ -25,9 +25,8 @@ import { dashboardRouter } from "./routes/dashboard.js";
 import { consoleRouter } from "./routes/console.js";
 import { campusesRouter } from "./routes/campuses.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
-import { PcoError } from "./pco/client.js";
+import { PcoError, SignedOutError } from "./pco/client.js";
 import { flush, settings } from "./lib/db.js";
-import { ndiStatus } from "./lib/ndi-status.js";
 
 export function createApp(webDir?: string) {
   const app = express();
@@ -77,9 +76,10 @@ export function createApp(webDir?: string) {
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof ZodError) return res.status(400).json({ error: "invalid_request", issues: err.issues });
+    if (err instanceof SignedOutError) return res.status(401).json({ error: "reauth_required", message: err.message });
     if (err instanceof PcoError) {
       console.error(err.message);
-      return res.status(err.status === 401 ? 401 : 502).json({ error: "pco_error", message: err.message });
+      return res.status(err.status === 401 ? 401 : 502).json({ error: err.status === 401 ? "reauth_required" : "pco_error", message: err.message });
     }
     console.error(err);
     res.status(500).json({ error: "server_error", message: (err as Error)?.message });
@@ -107,12 +107,6 @@ export function startServer(opts: { port: number; webDir?: string }): Promise<Se
 
 process.on("exit", flush);
 
-/** Used by the Mac app (same process) to drive NDI output from Settings. */
-export const ndiBridge = {
-  settings: () => settings.get().ndi,
-  onSettings: (fn: (ndi: ReturnType<typeof settings.get>["ndi"]) => void) => settings.onChange((s) => fn(s.ndi)),
-  setStatus: ndiStatus.set,
-};
 
 /** Used by the Mac app to plug its updater into /api/updates. */
-export { setUpdateBridge, setEmbedBridge, setNdiViewer, setPrefsOpener };
+export { setUpdateBridge, setEmbedBridge, setPrefsOpener };

@@ -25,8 +25,7 @@ Services scheduling faster.
     another campus's service the same day, per item and "how far later/earlier at this item".
   - **Watch**: other services' Live position and over/under in a side panel.
   - Full screen, text size and print. Keys: F, + / −, L, E, P.
-- **Dashboard**: widgets for service flow: tuning keys (sends to Waves), ProPresenter outputs over NDI
-  (side screens, confidence monitors), SPL from Smaart, Shure wireless (who's on it, battery, RF),
+- **Dashboard**: widgets for service flow: tuning keys (sends to Waves), SPL from Smaart, Shure wireless (who's on it, battery, RF),
   Planning Center Live, a clock with the countdown to service, and ProPresenter control. Edit to
   add, remove, resize and reorder; the layout is saved on this Mac.
 - **ProPresenter**: watch and take over any ProPresenter computer (e.g. side screens): click a slide
@@ -53,9 +52,6 @@ Services scheduling faster.
 - **Stage plots**: build plots on a blank stage or on top of your own PDF (any page) or image.
   Link items to a mic or a position and each service's Stage plot tab fills in who's where. Print
   from there.
-- **Stage plot over NDI®**: send the next service's stage plot as a live NDI source (for example
-  "YOUR-MAC (Cool Services Stage Plot)"), then add it as an input in ProPresenter for a multiview.
-  Turn it on and choose the name, resolution, frame rate and service in Settings.
 - **Parent paging (ProPresenter)**: show a child's security code on the auditorium screens as a
   ProPresenter message: from **Parent paging** in the sidebar, the Page button on any service's
   Check-ins tab, or the Kids and Nursery iPads. While a page is on screen (15 seconds by default),
@@ -71,12 +67,7 @@ Services scheduling faster.
 ## Build the DMG (on your Mac)
 
 You need Node.js 22.12 or newer (`node -v` to check). Get it from https://nodejs.org (LTS).
-For NDI (stage plot output and the dashboard's ProPresenter previews) you also need Apple's
-command-line developer tools, since the NDI add-on is compiled on your Mac: run
-`xcode-select --install` once. The build downloads the NDI SDK from downloads.ndi.tv, compiles the
-add-on for Apple silicon and Intel, and copies it into the app. If that fails, `npm run dist:mac`
-stops and says why, instead of making an app that says "NDI isn't included in this build". To make
-an app without NDI anyway: `COOL_SKIP_NDI=1 npm run dist:mac`.
+Nothing is compiled during `npm install` (NDI was removed in 1.13, which is what used to make it slow).
 
 ```bash
 npm install
@@ -120,17 +111,6 @@ With an Apple Developer account ($99/year), sign and notarize the app so it open
    `"Developer ID Application: Your Name (TEAMID)"`, and add `"notarize": true` under `"mac"`.
 2. Build with your Apple ID details set:
    `APPLE_ID=… APPLE_APP_SPECIFIC_PASSWORD=… APPLE_TEAM_ID=… npm run dist:mac`
-
-## NDI output
-
-Preferences → **NDI** → Stage plot over NDI → turn it on. Cool Services renders the next service's stage
-plot in the background and sends it over NDI. It updates on its own as mics and the team change,
-and moves on to the following service after Sunday. In ProPresenter, add it as a video input
-(Screens/Inputs → NDI) and place it on your multiview. The Settings screen shows a live preview,
-the source name, and how many receivers are connected.
-
-NDI output works in the Mac app only, and on Apple Silicon Macs when you build the universal DMG
-on an Apple Silicon Mac. NDI® is a registered trademark of Vizrt NDI AB (https://ndi.video).
 
 ## Parent paging and the Kids & Nursery iPads
 
@@ -186,7 +166,7 @@ name does too):
 - **Default Startup**: what opens first: the Dashboard, Services, the next service, its run sheet or
   check-ins (for "your service" from the Dashboard, or a chosen type), a workflow, ProPresenter or
   Parent paging.
-- **NDI**: the stage plot NDI output, and the NDI sources on the network.
+- **Campuses**: group service types by campus, and your default campus.
 - **Audio**: Allen & Heath console, Waves SuperRack, Smaart.
 - **Network Connections**: ProPresenter for paging, Kids & Nursery paging and the iPad pages.
 - **Video**: ProPresenter computers.
@@ -231,16 +211,12 @@ G# or A# uses the flat's snapshot (C# → Db), and a minor key uses its letter's
 dashboard; give each a snapshot in Preferences → Audio. Song items that aren't songs (e.g. "Vocal Warm
 Ups") can be left off the Tuning bar under "Leave off the Tuning bar".
 
-## Dashboard: ProPresenter outputs and Smaart
+## Dashboard and Smaart
 
 - **Your service**: at the top of the dashboard, pick your campus (service type). The clock, Live,
   tuning and wireless widgets, and the Live widget's Run sheet link, follow that campus's next plan.
   Pick a plan in the second list to pin it; "Next one (automatic)" moves on by itself. A widget can
   still be set to another service type in its options.
-- **ProPresenter outputs**: in ProPresenter, turn on NDI for each screen you want to watch (Screens →
-  the screen → NDI). On the dashboard, add a "ProPresenter output (NDI)" widget and pick the source.
-  Previews use NDI's low-bandwidth stream (about 5 frames a second). Needs the NDI add-on (see
-  "Build the DMG").
 - **Smaart v9 SPL**: in Smaart, start logging on a calibrated input and turn on Options → API
   (default port 26000, optional password). In Cool Services, Preferences → Audio → Smaart (SPL): enter the
   computer and password, then Save and connect. Cool Services lists Smaart's measurements (e.g. RTA
@@ -315,7 +291,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.12.0 && git push origin v1.12.0
+   git tag v1.13.0 && git push origin v1.13.0
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the
@@ -383,14 +359,12 @@ server/src/routes/pro.ts   ProPresenter control (slides, timers, stage) for any 
 server/src/lib/smaart.ts   Smaart v9 API client (SPL readings)
 server/src/lib/ahConsole.ts Allen & Heath dLive / Avantis channel names (MIDI over TCP)
 web/components/settings/Preferences.tsx  the Preferences window (tabs)
-desktop/src/ndiIn.ts       NDI previews of ProPresenter outputs for the dashboard
 desktop/src/embed.ts       Planning Center Chat inside the window
 server/src/lib/paging.ts   Parent paging: the on-screen lock, messages, PINs
 server/src/kiosk.ts        Kids & Nursery iPad server (network, PIN-locked)
 server/src/demo/demo.ts    Sample data for "Explore with sample data"
 web/                       The UI (Next.js + Tailwind, exported as static files)
 desktop/src/main.ts        The Mac app (Electron)
-desktop/src/ndi.ts         Stage plot → NDI output (off-screen render + NDI SDK)
 desktop/src/updater.ts     Check for Updates (GitHub Releases → verify → replace → reopen)
 .github/workflows/         Release build on GitHub (tag → DMG + zip + checksums)
 scripts/                   set-repo, release, make-signing-cert

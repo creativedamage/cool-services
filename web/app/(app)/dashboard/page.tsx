@@ -1,6 +1,6 @@
 "use client";
 /**
- * Dashboard: widgets for running a service. Tuning keys, ProPresenter outputs (NDI), SPL from
+ * Dashboard: widgets for running a service. Tuning keys, ProPresenter control, SPL from
  * Smaart, Shure wireless, Planning Center Live, a clock, and ProPresenter control. Arrange them with
  * Edit; the layout is saved on this Mac.
  */
@@ -13,10 +13,10 @@ import type { DashboardWidget, WidgetType } from "@shared/types";
 import { Api, qk } from "@/lib/api";
 import { usePlans } from "@/lib/plans";
 import { Modal } from "@/components/ui";
-import { ClockWidget, LiveWidget, NdiWidget, ProWidget, SplWidget, TuningWidget, WirelessWidget, useHome, useNextService } from "@/components/dashboard/Widgets";
+import { ClockWidget, LiveWidget, ProWidget, SplWidget, TuningWidget, WirelessWidget, useHome, useNextService } from "@/components/dashboard/Widgets";
 
 const NAMES: Record<WidgetType, string> = {
-  tuning: "Tuning keys", ndi: "ProPresenter output (NDI)", spl: "SPL (Smaart)", wireless: "Shure wireless",
+  tuning: "Tuning keys", spl: "SPL (Smaart)", wireless: "Shure wireless",
   live: "Planning Center Live", clock: "Clock & countdown", pro: "ProPresenter control",
 };
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -25,9 +25,7 @@ const DEFAULT: DashboardWidget[] = [
   { id: "live", type: "live", size: "m", options: {} },
   { id: "spl", type: "spl", size: "s", options: {} },
   { id: "tuning", type: "tuning", size: "l", options: {} },
-  { id: "side", type: "ndi", size: "m", options: { label: "Side screens", source: "" } },
-  { id: "conf1", type: "ndi", size: "s", options: { label: "Confidence 1", source: "" } },
-  { id: "conf2", type: "ndi", size: "s", options: { label: "Confidence 2", source: "" } },
+  { id: "pro", type: "pro", size: "l", options: {} },
   { id: "wireless", type: "wireless", size: "l", options: {} },
 ];
 
@@ -84,7 +82,7 @@ export default function DashboardPage() {
           <div className="grid gap-1.5 p-4">
             {(Object.keys(NAMES) as WidgetType[]).map((t) => (
               <button key={t} className="rounded-lg border border-line px-3 py-2 text-left text-sm hover:border-accent/50"
-                onClick={() => { const w: DashboardWidget = { id: uid(), type: t, size: t === "tuning" || t === "wireless" ? "l" : t === "live" || t === "pro" ? "m" : "s", options: {} }; update([...list, w]); setAdding(false); if (t === "ndi") setOpts(w); }}>
+                onClick={() => { const w: DashboardWidget = { id: uid(), type: t, size: t === "tuning" || t === "wireless" ? "l" : t === "live" || t === "pro" ? "m" : "s", options: {} }; update([...list, w]); setAdding(false); }}>
                 {NAMES[t]}
               </button>
             ))}
@@ -101,7 +99,6 @@ function Widget({ w }: { w: DashboardWidget }) {
     case "clock": return <ClockWidget />;
     case "live": return <LiveWidget o={w.options} />;
     case "tuning": return <TuningWidget o={w.options} />;
-    case "ndi": return <NdiWidget o={w.options} />;
     case "spl": return <SplWidget o={w.options} />;
     case "wireless": return <WirelessWidget />;
     case "pro": return <ProWidget o={w.options} />;
@@ -111,7 +108,6 @@ function Widget({ w }: { w: DashboardWidget }) {
 function OptionsModal({ w, onClose, onSave }: { w: DashboardWidget; onClose: () => void; onSave: (w: DashboardWidget) => void }) {
   const [o, setO] = useState(w.options);
   const plans = usePlans();
-  const ndi = useQuery({ queryKey: qk.ndiSources, queryFn: Api.ndiSources, enabled: w.type === "ndi", refetchInterval: 5000 });
   const spl = useQuery({ queryKey: qk.smaartStatus, queryFn: Api.smaartStatus, enabled: w.type === "spl" });
   const machines = useQuery({ queryKey: qk.proMachines, queryFn: Api.proMachines, enabled: w.type === "pro" });
   const types = [...new Map((plans.data ?? []).map((p) => [p.serviceTypeId, p.serviceTypeName])).entries()];
@@ -119,20 +115,9 @@ function OptionsModal({ w, onClose, onSave }: { w: DashboardWidget; onClose: () 
   return (
     <Modal open onClose={onClose} title={NAMES[w.type]} width={480}>
       <div className="space-y-3 p-5">
-        {(w.type === "ndi" || w.type === "spl") && (
+        {w.type === "spl" && (
           <label className="block"><span className="label">Label</span>
-            <input className="input mt-1" value={(o.label as string) ?? ""} onChange={(e) => set("label", e.target.value)} placeholder={w.type === "ndi" ? "Side screens" : "Main floor"} />
-          </label>
-        )}
-        {w.type === "ndi" && (
-          <label className="block"><span className="label">NDI source</span>
-            <select className="input mt-1" value={(o.source as string) ?? ""} onChange={(e) => set("source", e.target.value)}>
-              <option value="">{ndi.isLoading ? "Looking for NDI sources…" : "Choose…"}</option>
-              {(o.source as string) && !ndi.data?.sources.some((s) => s.name === o.source) && <option value={o.source as string}>{o.source as string}</option>}
-              {ndi.data?.sources.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
-            </select>
-            {ndi.data && !ndi.data.available && <span className="mt-1 block text-xs text-bad">{ndi.data.error}</span>}
-            <span className="mt-1 block text-[11px] text-ink-faint">In ProPresenter, turn on NDI for the screen (Screens → the screen → NDI). It shows up here as “COMPUTER (screen name)”.</span>
+            <input className="input mt-1" value={(o.label as string) ?? ""} onChange={(e) => set("label", e.target.value)} placeholder="Main floor" />
           </label>
         )}
         {w.type === "spl" && (
