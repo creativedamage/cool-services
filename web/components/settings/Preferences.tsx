@@ -30,7 +30,7 @@ const TABS: { id: PrefsTab; label: string; icon: typeof Info; blurb: string }[] 
   { id: "startup", label: "Default Startup", icon: Power, blurb: "What opens first." },
   { id: "campuses", label: "Campuses", icon: Building2, blurb: "Sort service types by campus, and choose yours." },
   { id: "audio", label: "Audio", icon: AudioLines, blurb: "Allen & Heath, Waves SuperRack and Smaart." },
-  { id: "network", label: "Network Connections", icon: Network, blurb: "Kids & Nursery paging and iPads." },
+  { id: "network", label: "Network Connections", icon: Network, blurb: "Kids & Nursery paging and iPads, team check-ins on phones, FOH companions." },
   { id: "video", label: "Video", icon: MonitorPlay, blurb: "ProPresenter computers." },
 ];
 

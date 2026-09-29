@@ -309,3 +309,20 @@ In Edit mode the run sheet swaps titles, lengths, descriptions and the visible n
 `Inline` fields (with "Everyone", every note category shows so a new note can be added). A field
 saves on blur via `editItem` / `saveNote` / `deleteNote` and applies the returned items; a refused
 save keeps the text and focus. The 10-second refresh pauses while editing.
+
+## 5s. Team check-ins on phones and staff check-ins (1.15)
+
+`server/src/lib/teamCheckins.ts` builds the Team check-ins view for both the desktop route and the
+phones: roster (not declined) + Check-Ins rows + **staff check-ins** (`staffCheckIns` extra). Planning
+Center's Check-Ins API has no create endpoint, so a staff check-in is local: `staffCheckIn()` finds
+every plan the same local day (`listUpcomingPlans`) where the person is scheduled and records one row
+per plan and team; `staffUndo()` removes that day's rows. Each person carries `checkedInVia`
+("checkins" | "staff") and `checkedInBy`. Phone requests share one computation per plan for 8 s.
+
+The phone pages ride on the LAN listener in `kiosk.ts` (the iPad port): `/leads` and `/staff` serve
+`team.html` (the static export of `web/app/team`), and `/api/team/:role/{info,unlock,lock,data,checkin}`
+is all a phone can reach. Settings live in the `teamPhones` extra: on/off, friendly hostnames, a
+scrypt-hashed PIN per role (a new PIN signs that role's phones out), sessions (httpOnly `cs_team`
+cookie; a staff session may also read the leads view, not the other way), and the owner whose
+Planning Center access is used (whoever last saved them). `GET /` on a host matching a saved name, or
+starting with `staff.` / `leads.`, redirects to that page. Desktop settings: `/api/team-phones`.

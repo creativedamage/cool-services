@@ -51,7 +51,10 @@ Services scheduling faster.
 - **Team check-ins** (sidebar): a tile per team (Safety, Greeters, Production…) showing how many of
   the people scheduled on a service have checked in with Planning Center Check-Ins, like **8/10**,
   grouped under ministries you set up (**Ministries** button). Tap a tile for who's in and who
-  isn't.
+  isn't, and **Check in** anyone by hand.
+- **Team check-ins on phones**: the same page for phones on the church Wi-Fi. **/leads** for team
+  leads (every team, with names), **/staff** for staff (plus a big Check in button). Each has its
+  own PIN. Friendly addresses like `staff.yourchurch.org` and `leads.yourchurch.org` work too.
 - **Check-ins**: a Check-ins tab on every service shows who's checked in (Planning Center
   Check-Ins) for that service, grouped by room, with regulars, guests, volunteers and check-outs.
   It refreshes every 10 seconds and highlights new arrivals.
@@ -275,6 +278,29 @@ workflow with that person in Planning Center, and it appears under their My work
 - People managers and site administrators still see every workflow, under "Other workflows".
 - New cards on your workflows pop up as a notification (with Open), checked every minute.
 
+## Team check-ins on phones (leads and staff)
+
+Preferences → Network Connections → **Team check-ins on phones**: turn it on and set a PIN for
+**Team leads** and one for **Staff**. Phones on the church Wi-Fi open the address shown there (or scan
+the QR code), enter the PIN once and stay signed in; Share → Add to Home Screen makes it an app.
+
+- **Team leads** (`/leads`): every ministry and team with how many are in (8/10), who's in and who
+  isn't. Filter to one ministry, or search for a name.
+- **Staff** (`/staff`): the same, plus **Check in** next to everyone who isn't in yet. One tap checks
+  that person in on **every service that day** they're scheduled on, on each of their teams (for
+  example the 9:00 and 11:00 plans, or two campuses). Staff can add their name so check-ins show
+  "by Wayne (staff phone)"; a staff check-in can be undone from the same row.
+- The desktop Team check-ins page has the same Check in button.
+- Planning Center's Check-Ins can't be written to by other apps (its API is read-only), so staff
+  check-ins are kept by Cool Services on this Mac. They count on every Team check-ins screen, marked
+  "by staff", but don't show in Planning Center's own Check-Ins reports. Scans in Check-Ins count
+  automatically.
+- Phones only get names, photos, positions and check-in times, never contact details. They use the
+  same port as the Kids & Nursery iPads.
+- **Friendly addresses**: enter e.g. `staff.libertychurch.net` and `leads.libertychurch.net`, then
+  set them up like the iPad names below (a DNS A record for each pointing at this Mac's fixed IP, and
+  Port 80). Any address starting with `staff.` or `leads.` works even before it's entered.
+
 ## Friendly iPad addresses (kids.yourchurch.org)
 
 Preferences → Network Connections → Kids & Nursery iPads → **Friendly addresses**: enter e.g.
@@ -330,7 +356,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.14.0 && git push origin v1.14.0
+   git tag v1.15.0 && git push origin v1.15.0
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

@@ -7,6 +7,7 @@ import QRCode from "qrcode";
 import { z } from "zod";
 import { MINISTRIES, type KioskAddresses, type Ministry } from "../../../shared/types.js";
 import { discover, ProPresenter, ProPresenterError } from "../lib/propresenter.js";
+import { phonesConfig } from "../lib/teamCheckins.js";
 import { cancelRequest, page, PagingError, pp, publicConfig, saveConfig, sendAllRequests, sendRequest, setPin, signOutIpads, status, stored, testPage } from "../lib/paging.js";
 import { childrenFor, kioskState } from "../kiosk.js";
 import { checkInsDenied } from "../auth/oauth.js";
@@ -150,7 +151,8 @@ pagingRouter.get("/ipads", h(async (_req, res) => res.json(kioskAddresses())));
 pagingRouter.get("/qr", h(async (req, res) => {
   const url = String(req.query.url ?? "");
   const a = kioskAddresses();
-  const ok = a.urls.some((u) => url === `${u}/nursery` || url === `${u}/kids`) || Object.values(a.friendly).includes(url);
+  const phoneFriendly = Object.values(phonesConfig().hostnames).filter(Boolean).map((h) => `http://${h}${a.port === 80 ? "" : `:${a.port}`}`);
+  const ok = a.urls.some((u) => ["nursery", "kids", "leads", "staff"].some((p) => url === `${u}/${p}`)) || Object.values(a.friendly).includes(url) || phoneFriendly.includes(url);
   if (!ok) return res.status(400).json({ error: "not_our_address" });
   res.type("image/svg+xml").send(await QRCode.toString(url, { type: "svg", margin: 1, errorCorrectionLevel: "M" }));
 }));

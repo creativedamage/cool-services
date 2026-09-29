@@ -36,6 +36,12 @@ function TeamCheckInsPage() {
   const groups = useQuery({ queryKey: ["teamGroups"], queryFn: Api.teamGroups });
   const [open, setOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const qc = useQueryClient();
+  const checkIn = useMutation({
+    mutationFn: (v: { id: string; undo?: boolean }) => Api.staffCheckIn(chosen!.serviceTypeId, chosen!.id, v.id, v.undo),
+    onSuccess: (d, v) => { qc.setQueryData(["teamCheckIns", chosen?.id ?? ""], d); if (!v.undo) toast.success("Checked in", { description: "On every service today they’re scheduled on." }); },
+    onError: (e) => toast.error("Couldn’t check them in", { description: (e as Error).message }),
+  });
 
   const teams = data.data?.teams ?? [];
   const sections = useMemo(() => {
@@ -84,7 +90,7 @@ function TeamCheckInsPage() {
                 <span className="font-mono text-sm tabular-nums text-ink-soft">{c.inn}/{c.all}</span>
               </div>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-                {s.teams.map((t) => <Tile key={t.teamId} t={t} open={open === t.teamId} onToggle={() => setOpen(open === t.teamId ? null : t.teamId)} />)}
+                {s.teams.map((t) => <Tile key={t.teamId} t={t} open={open === t.teamId} onToggle={() => setOpen(open === t.teamId ? null : t.teamId)} onCheckIn={(id, undo) => checkIn.mutate({ id, undo })} busy={checkIn.isPending ? checkIn.variables?.id ?? null : null} />)}
               </div>
             </section>
           );
@@ -95,7 +101,7 @@ function TeamCheckInsPage() {
   );
 }
 
-function Tile({ t, open, onToggle }: { t: Team; open: boolean; onToggle: () => void }) {
+function Tile({ t, open, onToggle, onCheckIn, busy }: { t: Team; open: boolean; onToggle: () => void; onCheckIn: (personId: string, undo?: boolean) => void; busy: string | null }) {
   const inn = t.people.filter((p) => p.checkedInAt).length;
   const all = t.people.length;
   const pct = all ? inn / all : 0;
@@ -123,9 +129,19 @@ function Tile({ t, open, onToggle }: { t: Team; open: boolean; onToggle: () => v
                 <span className="block truncate">{p.name}</span>
                 <span className="block truncate text-[11px] text-ink-muted">{p.positions.join(", ")}{p.status === "U" ? " · unconfirmed" : ""}</span>
               </span>
-              {p.checkedInAt
-                ? <span className="flex items-center gap-1 text-xs text-ok"><Check size={13} /> {new Date(p.checkedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
-                : <span className="flex items-center gap-1 text-xs text-ink-faint"><Clock3 size={12} /> not yet</span>}
+              {p.checkedInAt ? (
+                <span className="flex flex-col items-end">
+                  <span className="flex items-center gap-1 text-xs text-ok"><Check size={13} /> {new Date(p.checkedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+                  {p.checkedInVia === "staff" && (
+                    <button className="text-[10px] text-ink-faint hover:text-bad" title={`Checked in by ${p.checkedInBy ?? "staff"}. Click to undo.`} disabled={busy === p.personId}
+                      onClick={() => onCheckIn(p.personId, true)}>by {p.checkedInBy ?? "staff"} · undo</button>
+                  )}
+                </span>
+              ) : (
+                <button className="btn-outline py-0.5 text-xs" disabled={busy === p.personId} onClick={() => onCheckIn(p.personId)} title="Check in on every service today they’re scheduled on">
+                  {busy === p.personId ? <Spinner size={11} /> : <Clock3 size={12} />} Check in
+                </button>
+              )}
             </li>
           ))}
         </ul>

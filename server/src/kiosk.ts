@@ -1,5 +1,5 @@
 /**
- * Kids & Nursery iPad pages.
+ * Kids & Nursery iPad pages, Team check-ins on phones (/leads, /staff) and FOH companions.
  *
  * The main app only listens on 127.0.0.1. When "iPads on the church network" is turned on in
  * Settings, a second, much smaller server listens on the network (port 47130 by default). It serves
@@ -15,10 +15,11 @@ import express, { Router, type NextFunction, type Request, type Response } from 
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { z } from "zod";
-import { MINISTRIES, type KioskChild, type KioskInfo, type Ministry } from "../../shared/types.js";
+import { MINISTRIES, type KioskChild, type KioskInfo, type Ministry, type TeamGroup, type TeamPhoneData, type TeamPhoneInfo } from "../../shared/types.js";
 import { pcoForUser } from "./auth/oauth.js";
 import type { PcoApi } from "./pco/api.js";
-import { settings } from "./lib/db.js";
+import { extras, settings } from "./lib/db.js";
+import { onPhonesChange, phones, phoneSession, phoneUnlock, staffCheckIn, staffUndo, teamCheckIns } from "./lib/teamCheckins.js";
 import { kioskSession, onPagingChange, page, PagingError, requestPage, status, stored, unlock } from "./lib/paging.js";
 import { companionAct, companionFor, companionView, pairingOpen, pairWithCode } from "./lib/companion.js";
 
@@ -42,8 +43,9 @@ function ownerPco() {
 
 let churchName: { name: string; at: number } | null = null;
 async function church(): Promise<string> {
-  if (churchName && Date.now() - churchName.at < 3600e3) return churchName.name;
-  const api = ownerPco();
+  if (churchName && churchName.name && Date.now() - churchName.at < 3600e3) return churchName.name;
+  const o = stored().owner ?? phones().owner;
+  const api = o ? pcoForUser(o.userId, o.demo) : null;
   const name = api ? await api.me().then((m) => m.orgName).catch(() => "") : "";
   churchName = { name, at: Date.now() };
   return name;
@@ -167,6 +169,71 @@ companionLanRouter.post("/act", needCompanion, h(async (req, res) => {
   res.json(companionView());
 }));
 
+/* ───────────── Team check-ins on phones (leads view, staff check-in) ───────────── */
+
+const phoneCookie = "cs_team";
+const roleZ = z.enum(["leads", "staff"]);
+function phonesPco() {
+  const o = phones().owner;
+  return o ? pcoForUser(o.userId, o.demo) : null;
+}
+const teamLanRouter = Router();
+teamLanRouter.use((_req, res, next) => (phones().enabled ? next() : res.status(404).json({ error: "not_found" })));
+teamLanRouter.get("/:role/info", h(async (req, res) => {
+  const role = roleZ.parse(req.params.role);
+  const info: TeamPhoneInfo = { role, church: await church(), logo: settings.get().logo, unlocked: phoneSession(role, req.cookies?.[phoneCookie]), enabled: true };
+  res.json(info);
+}));
+teamLanRouter.post("/:role/unlock", h(async (req, res) => {
+  const role = roleZ.parse(req.params.role);
+  const { pin } = z.object({ pin: z.string().max(12) }).parse(req.body);
+  const r = phoneUnlock(role, pin, req.ip ?? "unknown");
+  if ("error" in r) {
+    const message = r.error === "no_pin" ? "This page isn’t set up yet. Ask a staff member to set a PIN in Cool Services → Preferences → Network Connections → Team check-ins on phones."
+      : r.error === "too_many_tries" ? `Too many tries. Wait ${r.waitSeconds} seconds.` : "That PIN isn’t right.";
+    return res.status(r.error === "too_many_tries" ? 429 : 401).json({ ...r, message });
+  }
+  res.cookie(phoneCookie, r.token, cookieOpts);
+  res.json({ ok: true });
+}));
+teamLanRouter.post("/:role/lock", (_req, res) => { res.clearCookie(phoneCookie, { path: "/" }); res.json({ ok: true }); });
+const needPhone = (req: Request, res: Response, next: NextFunction) => {
+  const role = roleZ.safeParse(req.params.role);
+  if (!role.success || !phoneSession(role.data, req.cookies?.[phoneCookie])) return res.status(401).json({ error: "locked" });
+  next();
+};
+const denied = () => "Planning Center Check-Ins isn’t available to the account that set up these pages, so only staff check-ins show.";
+teamLanRouter.get("/:role/data", needPhone, h(async (req, res) => {
+  const api = phonesPco();
+  if (!api) return res.status(503).json({ error: "not_configured", message: "Ask a staff member to open Cool Services → Preferences and save the Team check-ins phone settings." });
+  const cutoff = Date.now() - 8 * 3600e3;
+  const plans = (await api.listUpcomingPlans()).filter((p) => Date.parse(p.sortDate) > cutoff).slice(0, 14);
+  const services = plans.map((p) => ({
+    id: p.id, serviceTypeId: p.serviceTypeId, sortDate: p.sortDate,
+    label: `${new Date(p.sortDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${p.serviceTypeName}`,
+  }));
+  const chosen = services.find((x) => x.id === req.query.plan) ?? services[0] ?? null;
+  const out: TeamPhoneData = {
+    services, planId: chosen?.id ?? null, groups: extras.get<TeamGroup[]>("teamGroups", []),
+    data: chosen ? await teamCheckIns(api, chosen.serviceTypeId, chosen.id, denied, "phones") : null,
+  };
+  res.set("Cache-Control", "no-store").json(out);
+}));
+teamLanRouter.post("/:role/checkin", needPhone, h(async (req, res) => {
+  if (req.params.role !== "staff") return res.status(403).json({ error: "forbidden", message: "Only the staff page can check people in." });
+  const api = phonesPco();
+  if (!api) return res.status(503).json({ error: "not_configured", message: "Not set up yet." });
+  const b = z.object({ st: z.string().max(40), plan: z.string().max(40), personId: z.string().regex(/^\w{1,30}$/), undo: z.boolean().optional(), by: z.string().trim().max(40).optional() }).parse(req.body);
+  try {
+    if (b.undo) { await staffUndo(api, b.st, b.plan, b.personId); return res.json({ ok: true }); }
+    const r = await staffCheckIn(api, b.st, b.plan, b.personId, b.by ? `${b.by} (staff phone)` : "Staff phone");
+    res.json({ ok: true, ...r });
+  } catch (e) {
+    if ((e as { status?: number }).status === 404) return res.status(404).json({ error: "not_found", message: (e as Error).message });
+    throw e;
+  }
+}));
+
 /* ───────────── The network listener ───────────── */
 
 let server: Server | null = null;
@@ -186,6 +253,7 @@ function createKioskApp() {
   const ipadsOn = (_req: Request, res: Response, next: NextFunction) => (stored().config.ipads.enabled ? next() : res.status(404).json({ error: "not_found" }));
   app.use("/api/kiosk", ipadsOn, kioskRouter);
   app.use("/api/companion", companionLanRouter);
+  app.use("/api/team", teamLanRouter);
   app.use("/api", (_req, res) => res.status(404).json({ error: "not_found" }));
   if (webRoot && fs.existsSync(webRoot)) {
     const page = path.join(webRoot, "kiosk.html");
@@ -197,9 +265,15 @@ function createKioskApp() {
       const m = MINISTRIES.find((x) => names[x] && names[x] === host)
         ?? MINISTRIES.find((x) => host.split(".")[0] === x); // kids.… / nursery.…
       if (m) return res.redirect(302, `/${m}`);
+      // staff.… / leads.… (or the names set in Preferences) go to the Team check-ins phone pages.
+      const tn = phones().hostnames;
+      const role = (["leads", "staff"] as const).find((x) => tn[x] && tn[x] === host) ?? (["leads", "staff"] as const).find((x) => host.split(".")[0] === x);
+      if (role) return res.redirect(302, `/${role}`);
       next();
     });
     app.get(["/", "/nursery", "/kids"], ipadsOn, send);
+    const teamPage = path.join(webRoot, "team.html");
+    app.get(["/leads", "/staff"], (_req, res) => (phones().enabled ? res.set("Cache-Control", "no-cache").sendFile(teamPage) : res.status(404).send("Not found")));
     // Only what the iPad page needs: its scripts/styles, the PDF-free static bundle and icons.
     app.use("/_next/static", express.static(path.join(webRoot, "_next", "static"), { immutable: true, maxAge: "365d" }));
     for (const f of ["favicon.ico", "icon.png", "apple-touch-icon.png"]) {
@@ -214,14 +288,14 @@ function createKioskApp() {
 export function applyKiosk() {
   const { enabled, port } = stored().config.ipads;
   // Also listen for FOH companions (paired ones, or while a pairing code is showing).
-  const want = enabled || pairingOpen() || (stored().companions ?? []).length ? { port } : null;
+  const want = enabled || phones().enabled || pairingOpen() || (stored().companions ?? []).length ? { port } : null;
   if (listening && want && listening.port === want.port) return;
   if (server) { server.close(); server.closeAllConnections?.(); server = null; listening = null; }
   lastError = undefined;
   if (!want) return;
   const s = createKioskApp().listen(want.port, "0.0.0.0", () => {
     listening = want;
-    console.log(`  Kids & Nursery iPad pages on port ${want.port}`);
+    console.log(`  Network pages (iPads, team phones, companions) on port ${want.port}`);
   });
   s.on("error", (e: NodeJS.ErrnoException) => {
     lastError = e.code === "EADDRINUSE" ? `Port ${want.port} is already in use on this Mac. Choose another in Settings.` : e.message;
@@ -235,4 +309,5 @@ export function initKiosk(webDir?: string) {
   webRoot = webDir;
   applyKiosk();
   onPagingChange(applyKiosk);
+  onPhonesChange(applyKiosk);
 }

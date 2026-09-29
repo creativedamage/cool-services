@@ -296,11 +296,41 @@ export interface PlanMics {
 
 /** Team check-ins: who's scheduled on each team for a service, and who has checked in. */
 export interface TeamCheckIns {
-  teams: { teamId: string; teamName: string; people: { personId: string; name: string; avatarUrl: string | null; positions: string[]; status: RosterStatus; checkedInAt: string | null }[] }[];
+  teams: { teamId: string; teamName: string; people: TeamCheckInPerson[] }[];
   /** Planning Center Check-Ins couldn't be read (the counts then show 0 checked in). */
   checkInsError: string | null;
   fetchedAt: string;
 }
+export interface TeamCheckInPerson {
+  personId: string; name: string; avatarUrl: string | null; positions: string[]; status: RosterStatus;
+  /** First check-in: from Planning Center Check-Ins, or a staff check-in in Cool Services. */
+  checkedInAt: string | null;
+  /** "checkins" = scanned in Planning Center Check-Ins; "staff" = checked in by staff in Cool Services. */
+  checkedInVia?: "checkins" | "staff";
+  checkedInBy?: string;
+}
+
+/** A check-in recorded in Cool Services (Planning Center's Check-Ins API can't create check-ins). */
+export interface StaffCheckIn { id: string; personId: string; name: string; planId: string; serviceTypeId: string; teamId: string; at: string; by: string }
+
+export type TeamPhoneRole = "leads" | "staff";
+/** Team check-ins on phones: leads (view) and staff (view + check in), each with a PIN. */
+export interface TeamPhonesConfig {
+  enabled: boolean;
+  /** Friendly addresses, e.g. { staff: "staff.libertychurch.net", leads: "leads.libertychurch.net" }. */
+  hostnames: Partial<Record<TeamPhoneRole, string>>;
+  hasPin: Record<TeamPhoneRole, boolean>;
+}
+export interface TeamPhonesView extends TeamPhonesConfig {
+  /** Where phones open it: http://<ip>:<port>/leads etc., plus the friendly ones. */
+  urls: string[];
+  friendly: Partial<Record<TeamPhoneRole, string>>;
+  port: number; running: boolean; error?: string;
+}
+/** What a phone gets: never contact details, only names, photos, positions and check-in times. */
+export interface TeamPhoneInfo { role: TeamPhoneRole; church: string; logo: string | null; unlocked: boolean; enabled: boolean }
+export interface TeamPhoneData { services: { id: string; serviceTypeId: string; label: string; sortDate: string }[]; planId: string | null; groups: TeamGroup[]; data: TeamCheckIns | null }
+
 /** A ministry grouping teams on the Team check-ins page (First Responders → Safety, Medical). */
 export interface TeamGroup { id: string; name: string; teamIds: string[] }
 

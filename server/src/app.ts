@@ -25,6 +25,7 @@ import { dashboardRouter } from "./routes/dashboard.js";
 import { consoleRouter } from "./routes/console.js";
 import { campusesRouter } from "./routes/campuses.js";
 import { teamGroupsRouter } from "./routes/teamGroups.js";
+import { teamPhonesRouter } from "./routes/teamPhones.js";
 import { appModeRouter, companionClientRouter } from "./routes/companionClient.js";
 import { setAttentionBridge, startCompanion } from "./lib/companion.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
@@ -53,6 +54,7 @@ export function createApp(webDir?: string) {
   app.use("/api/console", requireAuth, consoleRouter);
   app.use("/api/campuses", requireAuth, campusesRouter);
   app.use("/api/team-groups", requireAuth, teamGroupsRouter);
+  app.use("/api/team-phones", requireAuth, teamPhonesRouter);
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
   app.use("/api/app-mode", appModeRouter); // full app or FOH companion (this Mac only)
   app.use("/api/companion-client", companionClientRouter);
@@ -90,7 +92,8 @@ export function createApp(webDir?: string) {
       if (err.status === 403) return res.status(403).json({ error: "forbidden", message: `Planning Center didn’t allow that for your account. ${err.message}` });
       return res.status(err.status === 401 ? 401 : 502).json({ error: err.status === 401 ? "reauth_required" : "pco_error", message: err.message });
     }
-    if ((err as { status?: number })?.status === 403) return res.status(403).json({ error: "forbidden", message: (err as Error).message });
+    const st = (err as { status?: number })?.status;
+    if (typeof st === "number" && st >= 400 && st < 500) return res.status(st).json({ error: st === 403 ? "forbidden" : "request_failed", message: (err as Error).message });
     console.error(err);
     res.status(500).json({ error: "server_error", message: (err as Error)?.message });
   });

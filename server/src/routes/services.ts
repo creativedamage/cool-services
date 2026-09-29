@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { rememberTeams } from "./teamGroups.js";
+import { staffCheckIn, staffUndo, teamCheckIns } from "../lib/teamCheckins.js";
 import { z } from "zod";
 import { audit } from "../lib/db.js";
 import { lowPriority } from "../pco/client.js";
@@ -92,32 +93,19 @@ servicesRouter.get("/plans/:st/:plan", h(async (req, res) => res.json(await req.
  */
 servicesRouter.get("/plans/:st/:plan/team-checkins", h(async (req, res) => {
   const plan: PlanDetail = await req.pco.getPlan(req.params.st, req.params.plan);
-  let rows: { personId: string | null; at: string }[] = [];
-  let checkInsError: string | null = null;
-  try {
-    rows = (await req.pco.getCheckIns(req.params.st, req.params.plan)).rows;
-  } catch (e: any) {
-    if (e instanceof SignedOutError) throw e;
-    checkInsError = e?.status === 403 || e?.status === 401 ? checkInsDenied(req, e).message : (e?.message ?? "Check-Ins couldn’t be read.");
-  }
-  const firstIn = new Map<string, string>();
-  for (const r of rows) if (r.personId && (!firstIn.has(r.personId) || r.at < firstIn.get(r.personId)!)) firstIn.set(r.personId, r.at);
-  const teams = new Map<string, TeamCheckIns["teams"][number]>();
-  for (const m of plan.roster) {
-    if (m.status === "D") continue;
-    const t: TeamCheckIns["teams"][number] = teams.get(m.teamId) ?? { teamId: m.teamId, teamName: m.teamName, people: [] };
-    const p = t.people.find((x) => x.personId === m.personId);
-    if (p) p.positions.push(m.positionName);
-    else t.people.push({ personId: m.personId, name: m.name, avatarUrl: m.avatarUrl, positions: [m.positionName], status: m.status, checkedInAt: firstIn.get(m.personId) ?? null });
-    teams.set(m.teamId, t);
-  }
   rememberTeams(plan.teams.map((t) => ({ id: t.id, name: t.name })));
-  const order = plan.teams.map((t) => t.id);
-  const out: TeamCheckIns = {
-    teams: [...teams.values()].sort((a, b) => (order.indexOf(a.teamId) + 1 || 999) - (order.indexOf(b.teamId) + 1 || 999)),
-    checkInsError, fetchedAt: new Date().toISOString(),
-  };
+  const out: TeamCheckIns = await teamCheckIns(req.pco, req.params.st, req.params.plan, (e) => checkInsDenied(req, e).message);
   res.json(out);
+}));
+
+/** Staff check-in from the desktop (every service that day they're on). */
+servicesRouter.post("/plans/:st/:plan/team-checkins/:person", h(async (req, res) => {
+  const person = z.string().regex(/^\d{1,20}$/).parse(req.params.person);
+  const { undo } = z.object({ undo: z.boolean().optional() }).parse(req.body ?? {});
+  if (undo) await staffUndo(req.pco, req.params.st, req.params.plan, person);
+  else await staffCheckIn(req.pco, req.params.st, req.params.plan, person, req.user.name);
+  await audit(req.user.id, undo ? "team.checkin.undo" : "team.checkin", "Person", person, { plan: req.params.plan });
+  res.json(await teamCheckIns(req.pco, req.params.st, req.params.plan, (e) => checkInsDenied(req, e).message));
 }));
 
 servicesRouter.get("/plans/:st/:plan/checkins", h(async (req, res) => {

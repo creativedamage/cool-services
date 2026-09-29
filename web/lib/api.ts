@@ -1,7 +1,7 @@
 import type {
   AppSettings, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, StagePlot, PlanSummary, RosterStatus, ScheduleRequest,
   ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary, WorkflowShare, WorkflowShareGroup, WorkflowAccessRequest, Person,
-  DashboardWidget, HomeService, TeamCheckIns, TeamGroup, AppMode, CompanionState, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
+  DashboardWidget, HomeService, TeamCheckIns, TeamPhonesView, TeamPhoneRole, TeamGroup, AppMode, CompanionState, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 
@@ -109,6 +109,12 @@ export const Api = {
   dashboard: () => api<DashboardWidget[] | null>("/dashboard"),
   home: () => api<HomeService>("/dashboard/home"),
   teamCheckIns: (st: string, plan: string) => api<TeamCheckIns>(`/services/plans/${st}/${plan}/team-checkins`),
+  staffCheckIn: (st: string, plan: string, personId: string, undo?: boolean) =>
+    api<TeamCheckIns>(`/services/plans/${st}/${plan}/team-checkins/${personId}`, { method: "POST", json: { undo } }),
+  teamPhones: () => api<TeamPhonesView>("/team-phones"),
+  saveTeamPhones: (p: { enabled?: boolean; hostnames?: Partial<Record<TeamPhoneRole, string>> }) => api<TeamPhonesView>("/team-phones", { method: "PUT", json: p }),
+  setTeamPhonePin: (role: TeamPhoneRole, pin: string | null) => api<TeamPhonesView>(`/team-phones/pin/${role}`, { method: "PUT", json: { pin } }),
+  signOutTeamPhones: (role: TeamPhoneRole) => api<{ ok: true }>(`/team-phones/signout/${role}`, { method: "POST" }),
   teamGroups: () => api<TeamGroup[]>("/team-groups"),
   knownTeams: () => api<{ id: string; name: string }[]>("/team-groups/teams"),
   saveTeamGroups: (g: TeamGroup[]) => api<TeamGroup[]>("/team-groups", { method: "PUT", json: g }),
