@@ -88,7 +88,7 @@ async function boot() {
   session.defaultSession.setPermissionCheckHandler((_wc, _perm, requestingOrigin) => ours(requestingOrigin));
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { startServer, setUpdateBridge, setEmbedBridge, setPrefsOpener } = require("./server.cjs") as typeof import("../../server/src/app");
+  const { startServer, setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge } = require("./server.cjs") as typeof import("../../server/src/app");
   await startServer({ port, webDir: path.join(__dirname, "web") });
 
   // Check for Updates (GitHub Releases). Only the packaged app can replace itself.
@@ -104,6 +104,8 @@ async function boot() {
   embed = createEmbed(() => win); // Planning Center Chat inside the window
   setEmbedBridge(embed);
   setPrefsOpener((section) => openPreferences(section));
+  // FOH companion: a page request takes over the screen until someone answers it.
+  setAttentionBridge((on) => attention(on));
   updater.start();
   buildMenu(updater);
 
@@ -216,6 +218,27 @@ function openPreferences(section = "") {
   });
   void prefsWin.loadURL(url);
   prefsWin.on("closed", () => { prefsWin = null; });
+}
+
+/** Bring the window over everything (FOH companion page request), or let it go back to normal. */
+function attention(on: boolean) {
+  if (!win && origin) createWindow();
+  const w = win;
+  if (!w) return;
+  if (on) {
+    if (w.isMinimized()) w.restore();
+    if (!w.webContents.getURL().includes("/companion")) void w.loadURL(`${origin}/companion`);
+    w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    w.setAlwaysOnTop(true, "screen-saver");
+    w.setSimpleFullScreen(true);
+    w.show();
+    w.focus();
+    app.focus({ steal: true });
+  } else {
+    w.setSimpleFullScreen(false);
+    w.setAlwaysOnTop(false);
+    w.setVisibleOnAllWorkspaces(false);
+  }
 }
 
 function createWindow() {

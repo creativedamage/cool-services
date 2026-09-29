@@ -11,6 +11,10 @@ export default function StartPage() {
   useEffect(() => {
     (async () => {
       try {
+        // First time on this Mac: full app or FOH companion?
+        const { mode } = await Api.appMode().catch(() => ({ mode: "full" as const }));
+        if (mode === null) return router.replace("/setup-mode");
+        if (mode === "companion") return router.replace("/companion");
         const s = await Api.settings();
         const v = s.startView;
         if (v.kind === "workflow") return router.replace(routes.board(v.workflowId));

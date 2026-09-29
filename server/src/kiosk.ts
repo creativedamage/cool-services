@@ -20,6 +20,7 @@ import { pcoForUser } from "./auth/oauth.js";
 import type { PcoApi } from "./pco/api.js";
 import { settings } from "./lib/db.js";
 import { kioskSession, onPagingChange, page, PagingError, requestPage, status, stored, unlock } from "./lib/paging.js";
+import { companionAct, companionFor, companionView, pairingOpen, pairWithCode } from "./lib/companion.js";
 
 const cookieName = (m: Ministry) => `cs_ipad_${m}`;
 const cookieOpts = { httpOnly: true, sameSite: "strict" as const, path: "/", maxAge: 400 * 864e5 };
@@ -142,6 +143,30 @@ kioskRouter.post("/:ministry/page", needIpad, h(async (req, res) => {
   res.json({ ok: true, status: forMinistry(m) });
 }));
 
+/* ───────────── FOH companions (on the network) ───────────── */
+
+const companionLanRouter = Router();
+companionLanRouter.get("/hello", h(async (_req, res) => res.json({ app: "cool-services", name: (await church()) || "Cool Services" })));
+companionLanRouter.post("/pair", h(async (req, res) => {
+  const { code, name } = z.object({ code: z.string().regex(/^\d{6}$/), name: z.string().max(60) }).parse(req.body);
+  const r = pairWithCode(code, name, req.socket.remoteAddress ?? "?");
+  if ("error" in r) return res.status(400).json({ error: "pair_failed", message: r.error });
+  applyKiosk();
+  res.json(r);
+}));
+const needCompanion = (req: Request, res: Response, next: NextFunction) => {
+  const c = companionFor(String(req.headers.authorization ?? "").replace(/^Bearer /, ""));
+  if (!c) return res.status(401).json({ error: "not_paired" });
+  (req as Request & { companion?: string }).companion = c.name;
+  next();
+};
+companionLanRouter.get("/state", needCompanion, (_req, res) => res.json(companionView()));
+companionLanRouter.post("/act", needCompanion, h(async (req, res) => {
+  const { id, action } = z.object({ id: z.string().max(60), action: z.enum(["accept", "hold", "deny"]) }).parse(req.body);
+  companionAct(id, action, `FOH (${(req as Request & { companion?: string }).companion})`);
+  res.json(companionView());
+}));
+
 /* ───────────── The network listener ───────────── */
 
 let server: Server | null = null;
@@ -157,7 +182,10 @@ function createKioskApp() {
   app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
   app.use(cookieParser());
   app.use(express.json({ limit: "10kb" }));
-  app.use("/api/kiosk", kioskRouter);
+  // iPad pages only while they're turned on (the listener may be running just for FOH companions).
+  const ipadsOn = (_req: Request, res: Response, next: NextFunction) => (stored().config.ipads.enabled ? next() : res.status(404).json({ error: "not_found" }));
+  app.use("/api/kiosk", ipadsOn, kioskRouter);
+  app.use("/api/companion", companionLanRouter);
   app.use("/api", (_req, res) => res.status(404).json({ error: "not_found" }));
   if (webRoot && fs.existsSync(webRoot)) {
     const page = path.join(webRoot, "kiosk.html");
@@ -171,7 +199,7 @@ function createKioskApp() {
       if (m) return res.redirect(302, `/${m}`);
       next();
     });
-    app.get(["/", "/nursery", "/kids"], send);
+    app.get(["/", "/nursery", "/kids"], ipadsOn, send);
     // Only what the iPad page needs: its scripts/styles, the PDF-free static bundle and icons.
     app.use("/_next/static", express.static(path.join(webRoot, "_next", "static"), { immutable: true, maxAge: "365d" }));
     for (const f of ["favicon.ico", "icon.png", "apple-touch-icon.png"]) {
@@ -185,7 +213,8 @@ function createKioskApp() {
 /** Start/stop/move the network listener to match Settings. */
 export function applyKiosk() {
   const { enabled, port } = stored().config.ipads;
-  const want = enabled ? { port } : null;
+  // Also listen for FOH companions (paired ones, or while a pairing code is showing).
+  const want = enabled || pairingOpen() || (stored().companions ?? []).length ? { port } : null;
   if (listening && want && listening.port === want.port) return;
   if (server) { server.close(); server.closeAllConnections?.(); server = null; listening = null; }
   lastError = undefined;

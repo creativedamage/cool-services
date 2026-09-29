@@ -93,7 +93,7 @@ export function Preferences({ standalone }: { standalone?: boolean }) {
             <div className="mt-6 space-y-6">
               {tab === "about" && <><AboutSection /><UpdatesSettings /></>}
               {tab === "appearance" && <AppearanceSection s={s} save={save.mutate} />}
-              {tab === "startup" && <StartupSection s={s} save={save.mutate} />}
+              {tab === "startup" && <><StartupSection s={s} save={save.mutate} /><AppModeSection /></>}
               {tab === "campuses" && <CampusSettings />}
               {tab === "audio" && <><ConsoleSettings /><WavesSettings w={s.waves} onChange={(waves) => save.mutate({ waves })} /><SmaartSettings /></>}
               {tab === "network" && <PagingSettings />}
@@ -206,11 +206,25 @@ function StartupSection({ s, save }: { s: AppSettings; save: Save }) {
         {nextGroup("next-checkins", "Check-ins")}
         <option value="workflows">Workflows overview</option>
         <optgroup label="A specific workflow">
-          {workflows.data?.map((w) => <option key={w.id} value={`workflow:${w.id}`}>{w.name}</option>)}
+          {workflows.data?.filter((w) => w.canOpen).map((w) => <option key={w.id} value={`workflow:${w.id}`}>{w.name}</option>)}
         </optgroup>
         <option value="propresenter">ProPresenter</option>
         <option value="paging">Parent paging</option>
       </select>
+    </section>
+  );
+}
+
+/** Run this Mac as the full app, or as an FOH companion for page requests. */
+function AppModeSection() {
+  return (
+    <section id="app-mode" className="panel scroll-mt-6 p-5">
+      <h2 className="font-semibold">This Mac</h2>
+      <p className="mt-0.5 text-sm text-ink-muted">Runs the full Cool Services. The front-of-house computer can run it as an <b>FOH companion</b> instead: it only shows page requests, full screen, with big buttons.</p>
+      <button className="btn-outline mt-3 text-xs" onClick={async () => {
+        if (!confirm("Switch this Mac to an FOH companion? It will only show page requests (you can switch back from its ⚙).")) return;
+        await Api.setAppMode("companion"); window.location.href = "/companion";
+      }}>Use this Mac as an FOH companion</button>
     </section>
   );
 }

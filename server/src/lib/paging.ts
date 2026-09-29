@@ -294,10 +294,18 @@ async function pump() {
   if (requests.some((r) => r.state === "released")) pumpTimer = setTimeout(() => void pump(), Math.max(0, onScreenUntil - Date.now()) + 400);
 }
 
-export function sendRequest(id: string): PageRequest {
+export function sendRequest(id: string, by?: string): PageRequest {
   const r = requests.find((x) => x.id === id);
   if (!r) throw new PagingError("no_code", "That request isn’t there any more.", 404);
-  if (r.state === "waiting" || r.state === "failed") { r.state = "released"; delete r.error; void pump(); }
+  if (r.state === "waiting" || r.state === "failed") { r.state = "released"; delete r.error; if (by) r.decidedBy = by; void pump(); }
+  return r;
+}
+
+/** "Hold until clear": keep it waiting, without taking over the FOH screen again. */
+export function holdRequest(id: string, by?: string): PageRequest {
+  const r = requests.find((x) => x.id === id);
+  if (!r) throw new PagingError("no_code", "That request isn’t there any more.", 404);
+  if (r.state === "waiting") { r.heldAt = new Date().toISOString(); if (by) r.decidedBy = by; }
   return r;
 }
 
@@ -306,9 +314,9 @@ export function sendAllRequests(m?: Ministry) {
   void pump();
 }
 
-export function cancelRequest(id: string): PageRequest {
+export function cancelRequest(id: string, by?: string): PageRequest {
   const r = requests.find((x) => x.id === id);
   if (!r) throw new PagingError("no_code", "That request isn’t there any more.", 404);
-  if (r.state === "waiting" || r.state === "released" || r.state === "failed") finish(r, "cancelled");
+  if (r.state === "waiting" || r.state === "released" || r.state === "failed") { finish(r, "cancelled"); if (by) r.decidedBy = by; }
   return r;
 }

@@ -45,6 +45,25 @@ export interface WorkflowSummary {
   name: string;
   readyCount: number;
   overdueCount: number;
+  /** Ready cards assigned to you. */
+  myReadyCount: number;
+  myOverdueCount: number;
+  /** How this workflow is shared with you in Planning Center (null = not shared with you by name). */
+  myShare: WorkflowShareGroup | null;
+  /** Assigned to you or shared with you: shows under My workflows. */
+  mine: boolean;
+  /** You can open it here: it's yours, or you're a People manager / site administrator. */
+  canOpen: boolean;
+  /** You can share it (approve access requests): you manage it, or you're a People manager / administrator. */
+  canManage: boolean;
+}
+
+export type WorkflowShareGroup = "No Access" | "Viewer" | "Editor" | "Manager";
+export interface WorkflowShare { id: string; personId: string; name: string; avatarUrl: string | null; group: WorkflowShareGroup }
+/** Someone asking to be given a workflow (kept on this Mac until a manager answers). */
+export interface WorkflowAccessRequest {
+  id: string; workflowId: string; workflowName: string; personId: string; personName: string; avatarUrl: string | null;
+  note: string | null; requestedAt: string; state: "pending" | "approved" | "denied"; decidedBy?: string; decidedAt?: string; group?: WorkflowShareGroup;
 }
 
 export interface WorkflowStep {
@@ -275,6 +294,16 @@ export interface PlanMics {
 }
 
 
+/** Team check-ins: who's scheduled on each team for a service, and who has checked in. */
+export interface TeamCheckIns {
+  teams: { teamId: string; teamName: string; people: { personId: string; name: string; avatarUrl: string | null; positions: string[]; status: RosterStatus; checkedInAt: string | null }[] }[];
+  /** Planning Center Check-Ins couldn't be read (the counts then show 0 checked in). */
+  checkInsError: string | null;
+  fetchedAt: string;
+}
+/** A ministry grouping teams on the Team check-ins page (First Responders → Safety, Medical). */
+export interface TeamGroup { id: string; name: string; teamIds: string[] }
+
 /** A campus: a name and the service types that belong to it. */
 export interface Campus { id: string; name: string; serviceTypeIds: string[] }
 export interface CampusSettings { campuses: Campus[]; /** This person's default campus (null = all). */ myDefault: string | null }
@@ -490,7 +519,24 @@ export interface PageRequest {
   state: "waiting" | "released" | "sent" | "cancelled" | "failed";
   doneAt?: string;
   error?: string;
+  /** "Hold until clear" pressed (at FOH): still waiting, but don't take over the screen again. */
+  heldAt?: string;
+  /** Who sent or cancelled it ("FOH companion", a staff name). */
+  decidedBy?: string;
 }
+
+/** What an FOH companion sees: no child names, ever. */
+export interface CompanionRequest { id: string; ministry: string; code: string; requestedAt: string; state: PageRequest["state"]; heldAt?: string }
+export interface CompanionState {
+  linked: boolean;
+  main: { name: string; host: string; port: number } | null;
+  connected: boolean;
+  error?: string;
+  requests: CompanionRequest[];
+  onScreenUntil: string | null;
+}
+export interface CompanionInfo { id: string; name: string; pairedAt: string; lastSeen: string | null; online: boolean }
+export type AppMode = "full" | "companion";
 
 /** Settings → iPad addresses for each ministry. */
 export interface KioskAddresses {

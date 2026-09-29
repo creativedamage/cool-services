@@ -3,8 +3,10 @@
  * The whole-page run sheet (in the spirit of ScriptViewer), connected to Planning Center:
  *  - Views: each operator picks which Planning Center note categories show (Lighting, Audio…), in
  *    their order, with one highlighted, and which plan notes show at the top.
- *  - Edit: add headers, items, media and songs (from the song catalog, with arrangement and key),
- *    change lengths/descriptions/notes, move and delete items. Everything saves to Planning Center.
+ *  - Edit: press Edit and everything on the sheet becomes editable in place (titles, lengths,
+ *    descriptions and the note columns). Each change saves to Planning Center when you leave the
+ *    field. Add headers, items, media and songs, move and delete items. Songs' arrangement and key
+ *    still open the item window (the pencil).
  *  - Live: follows Planning Center Live, and drives it (Previous / Next / Take control).
  *  - Compare: actual times against another service time (the 9:00 while you run the 11:00) or
  *    another campus's service, with how far over/under you are right now.
@@ -39,7 +41,9 @@ const keep = (k: string, v: unknown) => { try { localStorage.setItem(`${LS}.${k}
 
 export function FullRunSheet({ serviceTypeId, planId, kioskStart }: { serviceTypeId: string; planId: string; kioskStart?: boolean }) {
   const qc = useQueryClient();
-  const data = useQuery({ queryKey: qk.runSheet(planId), queryFn: () => Api.runSheet(serviceTypeId, planId), refetchInterval: 10_000, refetchIntervalInBackground: true });
+  const [editing, setEditing] = useState(false);
+  // While editing, don't pull a fresh copy under someone's cursor; it refreshes after each save.
+  const data = useQuery({ queryKey: qk.runSheet(planId), queryFn: () => Api.runSheet(serviceTypeId, planId), refetchInterval: editing ? false : 10_000, refetchIntervalInBackground: true });
   const live = useQuery({ queryKey: qk.live(planId), queryFn: () => Api.live(serviceTypeId, planId), refetchInterval: 3_000, refetchIntervalInBackground: true, retry: false });
   const times = useQuery({ queryKey: qk.itemTimes(planId), queryFn: () => Api.itemTimes(serviceTypeId, planId), refetchInterval: 10_000, retry: false });
   const views = useQuery({ queryKey: qk.runSheetViews, queryFn: Api.runSheetViews });
@@ -52,7 +56,7 @@ export function FullRunSheet({ serviceTypeId, planId, kioskStart }: { serviceTyp
   const [compareKey, setCompareKey] = useState<string>("");
   const [watching, setWatching] = useState<string[]>(() => load("watching", []));
   const [watchOpen, setWatchOpen] = useState<boolean>(() => load("watchOpen", false));
-  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(0);
   const [modal, setModal] = useState<{ item?: PlanItem; after?: string | null } | null>(null);
   const [viewEditor, setViewEditor] = useState<RunSheetView | "new" | null>(null);
   const [timeId, setTimeId] = useState<string | null>(null);
@@ -88,7 +92,8 @@ export function FullRunSheet({ serviceTypeId, planId, kioskStart }: { serviceTyp
   const colorOf = useCallback((c: string) => PALETTE[Math.max(0, categories.indexOf(c)) % PALETTE.length], [categories]);
   const view = views.data?.find((v) => v.id === viewId) ?? null;
   const used = new Set(items.flatMap((i) => i.notes.map((n) => n.category)));
-  const noteCols = view ? view.categories : categories.filter((c) => used.has(c));
+  // Editing with "Everyone": every category, so a note can go in one this plan hasn't used yet.
+  const noteCols = view ? view.categories : categories.filter((c) => editing || used.has(c));
   const highlight = view?.highlight ?? null;
   const showDesc = view ? view.showDescriptions : true;
 
@@ -190,6 +195,25 @@ export function FullRunSheet({ serviceTypeId, planId, kioskStart }: { serviceTyp
   const run = async (label: string, fn: () => Promise<PlanItem[]>) => {
     try { applyItems(await fn()); } catch (e) { toast.error(`Couldn’t ${label}`, { description: (e as Error).message }); }
   };
+  /** Inline edits: one field at a time, straight to Planning Center. */
+  const saveField = async (label: string, fn: () => Promise<PlanItem[]>) => {
+    setSaving((n) => n + 1);
+    try { applyItems(await fn()); return true; }
+    catch (e) { toast.error(`Couldn’t save the ${label}`, { description: (e as Error).message }); return false; }
+    finally { setSaving((n) => n - 1); }
+  };
+  const saveItem = (item: PlanItem, input: { title?: string; lengthSec?: number; description?: string | null }, label: string) =>
+    saveField(label, () => Api.editItem(serviceTypeId, planId, item.id, input));
+  const catId = (name: string) => cats.data?.find((c) => c.name === name)?.id ?? null;
+  const saveNote = (item: PlanItem, category: string, text: string) => {
+    const existing = item.notes.find((n) => n.category === category);
+    const cid = existing?.categoryId ?? catId(category);
+    if (!cid) { toast.error(`“${category}” isn’t a note category on this service type in Planning Center`); return Promise.resolve(false); }
+    const t = text.trim();
+    if (existing?.id && !t) return saveField(`${category} note`, () => Api.deleteNote(serviceTypeId, planId, item.id, existing.id!));
+    if (!t && !existing) return Promise.resolve(true);
+    return saveField(`${category} note`, () => Api.saveNote(serviceTypeId, planId, item.id, { noteId: existing?.id, categoryId: cid, content: t }));
+  };
   const moveItem = (idx: number, d: -1 | 1) => {
     const ids = items.map((i) => i.id);
     const j = idx + d;
@@ -262,6 +286,7 @@ export function FullRunSheet({ serviceTypeId, planId, kioskStart }: { serviceTyp
               <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} /> Follow
             </label>
             <button className={clsx("btn-ghost py-1 text-xs", editing && "bg-accent-soft text-accent")} onClick={() => setEditing(!editing)} title="Edit the run sheet in Planning Center (E)"><Pencil size={13} /> {editing ? "Done" : "Edit"}</button>
+            {editing && <span className="text-[11px] text-ink-muted">{saving ? "Saving to Planning Center…" : "Click anything to change it · saves when you leave the field"}</span>}
             <button className={clsx("btn-ghost py-1 text-xs", watchOpen && "bg-accent-soft text-accent")} onClick={() => setWatchOpen(!watchOpen)}><Radio size={13} /> Watch</button>
 
             <div className="ml-auto flex items-center gap-2">
@@ -345,7 +370,7 @@ export function FullRunSheet({ serviceTypeId, planId, kioskStart }: { serviceTyp
                   <div className="flex items-center gap-0.5">
                     <button className="btn-ghost p-1" title="Move up" disabled={idx === 0} onClick={() => moveItem(idx, -1)}><ArrowUp size={12} /></button>
                     <button className="btn-ghost p-1" title="Move down" disabled={idx === items.length - 1} onClick={() => moveItem(idx, 1)}><ArrowDown size={12} /></button>
-                    <button className="btn-ghost p-1" title="Edit" onClick={() => setModal({ item })}><Pencil size={12} /></button>
+                    <button className="btn-ghost p-1" title={item.kind === "song" ? "Arrangement, key and more" : "Open in a window"} onClick={() => setModal({ item })}><Pencil size={12} /></button>
                     <button className="btn-ghost p-1 hover:text-bad" title="Delete" onClick={() => { if (confirm(`Delete “${item.title}” from the plan in Planning Center?`)) void run("delete it", () => Api.deleteItem(serviceTypeId, planId, item.id)); }}><Trash2 size={12} /></button>
                   </div>
                 </td>
@@ -357,7 +382,9 @@ export function FullRunSheet({ serviceTypeId, planId, kioskStart }: { serviceTyp
                 return [
                   <tr key={item.id} ref={(el) => { if (el) rowRefs.current.set(item.id, el); }}>
                     {edit}
-                    <td colSpan={colSpan - (editing ? 1 : 0)} className="border-b border-line bg-surface px-3 py-1.5 text-[0.75em] font-bold uppercase tracking-[0.14em] text-ink-muted">{item.title}</td>
+                    <td colSpan={colSpan - (editing ? 1 : 0)} className="border-b border-line bg-surface px-3 py-1.5 text-[0.75em] font-bold uppercase tracking-[0.14em] text-ink-muted">
+                      {editing ? <Inline value={item.title} className="uppercase tracking-[0.14em]" onSave={(v) => v.trim() ? saveItem(item, { title: v.trim() }, "header") : Promise.resolve(false)} /> : item.title}
+                    </td>
                   </tr>,
                   after,
                 ];
@@ -379,7 +406,15 @@ export function FullRunSheet({ serviceTypeId, planId, kioskStart }: { serviceTyp
                     {(isLive || mine) && <span className="absolute inset-y-0 left-0 w-1 rounded-r" style={{ background: isLive ? "rgb(var(--c-accent))" : colorOf(highlight!) }} />}
                     {start ? clock(new Date(start).toISOString()) : ""}
                   </td>
-                  <td className="border-b border-line/70 py-2.5 pr-3 text-right font-mono text-[0.85em] tabular-nums text-ink-muted">{item.lengthSec ? mmss(item.lengthSec) : ""}</td>
+                  <td className="border-b border-line/70 py-2.5 pr-3 text-right font-mono text-[0.85em] tabular-nums text-ink-muted">
+                    {editing ? (
+                      <Inline value={item.lengthSec ? mmss(item.lengthSec) : ""} placeholder="0:00" className="text-right" onSave={(v) => {
+                        const sec = parseLength(v);
+                        if (sec == null) { toast.error("Lengths look like 4:30 (or just minutes, like 5)"); return Promise.resolve(false); }
+                        return sec === item.lengthSec ? Promise.resolve(true) : saveItem(item, { lengthSec: sec }, "length");
+                      }} />
+                    ) : item.lengthSec ? mmss(item.lengthSec) : ""}
+                  </td>
                   {hasActuals && (
                     <td className={clsx("border-b border-line/70 py-2.5 pr-3 text-right font-mono text-[0.85em] tabular-nums",
                       actDur != null && item.lengthSec && actDur > item.lengthSec + 15 ? "text-bad" : "text-ink-soft")}>
@@ -398,17 +433,28 @@ export function FullRunSheet({ serviceTypeId, planId, kioskStart }: { serviceTyp
                       <Icon size="1em" className={clsx("mt-[0.25em] shrink-0", item.kind === "song" ? "text-violet" : "text-ink-faint")} />
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">{item.title}</span>
+                          {editing
+                            ? <Inline wrap value={item.title} className="font-semibold" onSave={(v) => v.trim() ? saveItem(item, { title: v.trim() }, "title") : Promise.resolve(false)} />
+                            : <span className="font-semibold">{item.title}</span>}
                           {item.songKey && <span className="rounded bg-violet-soft px-1.5 font-mono text-[0.75em] font-semibold text-violet">{item.songKey}</span>}
                           {isLive && <span className="rounded bg-accent px-1.5 py-0.5 text-[0.65em] font-bold uppercase tracking-wider text-white">Live</span>}
                           {isNext && <span className="rounded border border-accent/50 px-1.5 py-0.5 text-[0.65em] font-bold uppercase tracking-wider text-accent">Next</span>}
                         </div>
                         {isLive && l?.currentStartedAt && <Elapsed since={l.currentStartedAt} length={item.lengthSec} now={now} />}
-                        {showDesc && item.description && <div className="mt-0.5 whitespace-pre-wrap break-words text-[0.88em] leading-relaxed text-ink-muted">{item.description}</div>}
+                        {editing ? (
+                          <Inline multiline value={item.description ?? ""} placeholder="Description" className="mt-0.5 text-[0.88em] leading-relaxed text-ink-muted"
+                            onSave={(v) => saveItem(item, { description: v.trim() || null }, "description")} />
+                        ) : showDesc && item.description && <div className="mt-0.5 whitespace-pre-wrap break-words text-[0.88em] leading-relaxed text-ink-muted">{item.description}</div>}
                       </div>
                     </div>
                   </td>
-                  {noteCols.map((c) => <NoteCell key={c} item={item} category={c} color={colorOf(c)} strong={highlight === c} />)}
+                  {noteCols.map((c) => editing ? (
+                    <td key={c} className="border-b border-line/70 px-3 py-2">
+                      <Inline multiline value={item.notes.filter((n) => n.category === c).map((n) => n.body).join("\n\n")} placeholder={c}
+                        className="rounded-md border-l-[3px] px-2 py-1 text-[0.85em] leading-relaxed" style={{ borderLeftColor: colorOf(c), background: `${colorOf(c)}14` }}
+                        onSave={(v) => saveNote(item, c, v)} />
+                    </td>
+                  ) : <NoteCell key={c} item={item} category={c} color={colorOf(c)} strong={highlight === c} />)}
                 </tr>,
                 after,
               ];
@@ -435,6 +481,55 @@ export function FullRunSheet({ serviceTypeId, planId, kioskStart }: { serviceTyp
       )}
     </div>
   );
+}
+
+/** "4:30" → 270, "5" → 300 (minutes), "" → 0. */
+function parseLength(v: string): number | null {
+  const t = v.trim();
+  if (!t) return 0;
+  const m = t.match(/^(\d{1,3})(?::(\d{1,2}))?$/);
+  if (!m) return null;
+  const sec = m[2] != null ? Number(m[1]) * 60 + Number(m[2]) : Number(m[1]) * 60;
+  return m[2] != null && Number(m[2]) > 59 ? null : sec;
+}
+
+/**
+ * A field on the sheet you can click into and type. Saves when you leave it (or press Enter on a
+ * one-line field); Esc puts it back. Keeps what you typed if Planning Center refuses it.
+ */
+function Inline({ value, onSave, multiline, wrap, placeholder, className, style }: {
+  value: string; onSave: (v: string) => Promise<boolean>; multiline?: boolean; /** one line of text that wraps (Enter saves) */ wrap?: boolean; placeholder?: string; className?: string; style?: React.CSSProperties;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [focused, setFocused] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
+  useEffect(() => { if (!focused && !busy) setDraft(value); }, [value, focused, busy]);
+  useEffect(() => { // grow with the text
+    const el = ref.current;
+    if ((multiline || wrap) && el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; }
+  }, [draft, multiline, wrap]);
+  const commit = async () => {
+    setFocused(false);
+    if (draft === value) return;
+    setBusy(true);
+    const ok = await onSave(draft);
+    setBusy(false);
+    if (ok) return;
+    ref.current?.focus();
+  };
+  const common = {
+    ref, value: draft, placeholder, style,
+    onFocus: () => setFocused(true), onBlur: () => void commit(),
+    onChange: (e: React.ChangeEvent<HTMLInputElement & HTMLTextAreaElement>) => setDraft(wrap ? e.target.value.replace(/\n/g, " ") : e.target.value),
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === "Escape") { setDraft(value); setTimeout(() => ref.current?.blur()); }
+      else if (e.key === "Enter" && (!multiline || e.metaKey || e.ctrlKey)) { e.preventDefault(); ref.current?.blur(); }
+    },
+    className: clsx("w-full resize-none rounded border border-transparent bg-transparent px-1 -mx-1 outline-none transition placeholder:text-ink-faint/60 hover:border-line focus:border-accent/60 focus:bg-surface",
+      busy && "opacity-60", className),
+  };
+  return multiline || wrap ? <textarea rows={1} {...common} /> : <input {...common} />;
 }
 
 function AddRow({ onAdd, label }: { onAdd: () => void; label?: string }) {

@@ -265,3 +265,47 @@ every Check-Ins poll and eventually signed people out. `tokenLastOk` remembers w
 token last worked (or probes `/people/v2/me` once); a 401 from a token that works elsewhere is a
 `productDenied` PcoError: no refresh, answered as 403 `no_access` (or the Check-Ins message), and
 logged with Planning Center's reason and the token's scopes. Sign-in also logs the scopes granted.
+
+## 5o. FOH companion (1.14)
+
+`appMode` (extras) is `full` or `companion`; `/start` and the sign-in page send a companion to
+`/companion`, and an unset mode to `/setup-mode`. Main side (`server/src/lib/companion.ts`):
+`startPairing()` makes a 6-digit code (10 minutes); `POST /api/companion/pair` on the LAN listener
+(`kiosk.ts`, the iPad port) swaps it for a random token, stored only as a sha256 hash in the paging
+store. `GET /api/companion/state` (Bearer) returns requests **without child names**;
+`POST /api/companion/act` accepts / holds / denies (`paging.sendRequest`, `holdRequest`,
+`cancelRequest`, with `decidedBy` = "FOH (name)"). The LAN listener runs when iPads are on, a pairing
+code is open, or a companion is paired. Companion side: `findMains()` scans local subnets for
+`/api/companion/hello`, `linkTo()` pairs, and `poll()` runs every second. Attention (any waiting,
+un-held request) goes through `setAttentionBridge` to Electron, which loads `/companion`, puts the
+window always-on-top at screen-saver level, simple-full-screen on every Space, and focuses it; it
+undoes that when attention clears. The main app only shows its banner.
+
+## 5p. Team check-ins (1.14)
+
+`GET /api/services/plans/:st/:plan/team-checkins` takes the plan roster (not declined) and
+`getCheckIns` rows, and marks each person with their first check-in time (matched by person id).
+Check-Ins errors come back as `checkInsError` (roster still shown). Ministries are `teamGroups`
+(extras, a team in one ministry); `knownTeams` remembers every team seen so ministries can be set
+up for teams not on the current service. The page polls every 15 seconds.
+
+## 5q. Workflow access (1.14)
+
+`listWorkflows()` adds `myReadyCount` (Planning Center's `my_ready_card_count`; not used with a
+shared token, where "my" is the token owner), `myShare` (from `include=shares`, when the person may
+see shares), `mine`, `canOpen` (mine, or People manager / site administrator from
+`/people/v2/me`), and `canManage` (share group Manager, or admin). Sharing uses Planning Center
+WorkflowShares (`/people/v2/workflows/:id/shares`, create / patch group / delete), allowed only
+when `canManage`. Access requests are local (`workflowRequests` extra): the requester's pending
+requests, and pending requests for workflows the viewer manages; approving creates the share. The
+board page shows a locked screen for workflows that aren't `canOpen` (the gate is in Cool Services;
+Planning Center's own permissions still apply underneath). `WorkflowWatcher` in the app layout
+fetches boards of `mine` workflows each minute, compares card ids with those seen before (per person,
+localStorage) and toasts new ones; it also toasts new requests to review and answers to yours.
+
+## 5r. Run sheet inline editing (1.14)
+
+In Edit mode the run sheet swaps titles, lengths, descriptions and the visible note columns for
+`Inline` fields (with "Everyone", every note category shows so a new note can be added). A field
+saves on blur via `editItem` / `saveNote` / `deleteNote` and applies the returned items; a refused
+save keeps the text and focus. The 10-second refresh pauses while editing.

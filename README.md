@@ -3,7 +3,7 @@
 A dark-mode Mac app that makes Planning Center People workflows and
 Services scheduling faster.
 
-- **Workflows board**: your People workflows as a drag-and-drop Kanban board. Each card shows the
+- **Workflows board**: the People workflows assigned or shared to you as a drag-and-drop Kanban board. Each card shows the
   person's photo, email and phone, card and profile notes, staff-only notes, and email sent through
   Planning Center. The **Schedule in Services** button schedules them in one click.
 - **Services**: every upcoming plan on one screen. The plan view puts the roster, open slots and
@@ -16,9 +16,11 @@ Services scheduling faster.
   lengths, descriptions and Planning Center notes as columns.
   - **Views** for each operator (Lighting, Video, Stage manager…): pick which note categories show,
     their order, one to highlight, and which plan notes appear at the top.
-  - **Edit** (E): add headers, items, media and songs from the Planning Center song catalog (with
-    arrangement and key), change titles, lengths, descriptions and notes, move and delete items.
-    Everything saves to Planning Center.
+  - **Edit** (E): everything on the sheet becomes editable in place. Click a title, length,
+    description or note and type; it saves to Planning Center when you leave the field (Enter on
+    one-line fields, Esc to undo). Add headers, items, media and songs from the Planning Center song
+    catalog, move and delete items. A song's arrangement and key are still in its item window (the
+    pencil).
   - **Planning Center Live**: follows the current item (time used / left), and Previous / Next /
     Take control drive Live from here.
   - **Compare**: actual times against another service time (the 9:00 while you run the 11:00) or
@@ -46,6 +48,10 @@ Services scheduling faster.
   puts people back on the mic they had last time. With Shure receivers on the network, each tile
   shows live battery, runtime, antennas and signal. The connection is read-only: nothing on the
   receivers or in Wireless Workbench is ever changed.
+- **Team check-ins** (sidebar): a tile per team (Safety, Greeters, Production…) showing how many of
+  the people scheduled on a service have checked in with Planning Center Check-Ins, like **8/10**,
+  grouped under ministries you set up (**Ministries** button). Tap a tile for who's in and who
+  isn't.
 - **Check-ins**: a Check-ins tab on every service shows who's checked in (Planning Center
   Check-Ins) for that service, grouped by room, with regulars, guests, volunteers and check-outs.
   It refreshes every 10 seconds and highlights new arrivals.
@@ -236,6 +242,39 @@ Sent pages go up as soon as nothing else is on screen, one after another. The iP
 request as "Waiting for the auditorium", "On the screens" or "Not sent". Pages started in Cool
 Services itself go straight up. Requests are kept while Cool Services is open.
 
+## FOH companion (a second computer at front of house)
+
+A second Mac can run Cool Services as an **FOH companion**: a full-screen panel that only handles
+Kids and Nursery page requests.
+
+1. On the main Cool Services Mac: Preferences → Network Connections → **FOH companions** → **Pair a
+   companion**. A 6-digit code appears (good for 10 minutes).
+2. On the FOH Mac: install Cool Services and choose **FOH companion** when it asks how this computer
+   is used (or "Use it as an FOH companion" on the sign-in screen, or Preferences → Default Startup).
+   It finds the main Mac on the network; pick it (or enter its address) and type the code.
+
+When a Kids or Nursery iPad asks for a page, the companion takes over its screen with the ministry
+and tag code and three big buttons: **Accept** (goes up as soon as the screens are free), **Hold
+until clear** (keeps it waiting without taking over the screen) and **Deny**. The companion never
+shows a child's name. The main Mac keeps its banner and can accept or cancel requests too; it never
+takes over its own screen. Unpair a companion from the same Preferences section.
+
+## Workflows: yours, and asking for others
+
+The Workflows page shows **My workflows**: the ones with cards assigned to you or shared with you
+by name in Planning Center. Other workflows are locked with **Request access**. A request shows up
+for that workflow's managers (and People managers / site administrators) under **Access requests**
+on the Workflows page and as a notification; **Approve** as Viewer, Editor or Manager shares the
+workflow with that person in Planning Center, and it appears under their My workflows.
+
+- Managers can also share directly: the **Share** button on a board (or the share icon on its tile).
+  This is Planning Center's own workflow sharing, so it applies everywhere.
+- Requests are kept on the Mac where they were made. If the manager uses Cool Services on a
+  different computer, the requester can send a quick email from the request window and the manager
+  adds them with Share.
+- People managers and site administrators still see every workflow, under "Other workflows".
+- New cards on your workflows pop up as a notification (with Open), checked every minute.
+
 ## Friendly iPad addresses (kids.yourchurch.org)
 
 Preferences → Network Connections → Kids & Nursery iPads → **Friendly addresses**: enter e.g.
@@ -291,7 +330,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.13.1 && git push origin v1.13.1
+   git tag v1.14.0 && git push origin v1.14.0
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

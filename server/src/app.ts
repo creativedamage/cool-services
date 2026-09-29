@@ -24,6 +24,9 @@ import { smaartRouter, startSmaart } from "./routes/smaart.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { consoleRouter } from "./routes/console.js";
 import { campusesRouter } from "./routes/campuses.js";
+import { teamGroupsRouter } from "./routes/teamGroups.js";
+import { appModeRouter, companionClientRouter } from "./routes/companionClient.js";
+import { setAttentionBridge, startCompanion } from "./lib/companion.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
 import { PcoError, SignedOutError } from "./pco/client.js";
 import { flush, settings } from "./lib/db.js";
@@ -49,7 +52,10 @@ export function createApp(webDir?: string) {
   app.use("/api/dashboard", requireAuth, dashboardRouter);
   app.use("/api/console", requireAuth, consoleRouter);
   app.use("/api/campuses", requireAuth, campusesRouter);
+  app.use("/api/team-groups", requireAuth, teamGroupsRouter);
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
+  app.use("/api/app-mode", appModeRouter); // full app or FOH companion (this Mac only)
+  app.use("/api/companion-client", companionClientRouter);
   app.use("/api", requireAuth, peopleRouter);
   app.use("/api", (_req, res) => res.status(404).json({ error: "not_found" }));
 
@@ -81,8 +87,10 @@ export function createApp(webDir?: string) {
       console.error(err.message);
       // Not allowed to use one Planning Center product: say so (a 401 would send you to sign in).
       if (err.productDenied) return res.status(403).json({ error: "no_access", message: `Your Planning Center sign-in can’t use this part of Planning Center. ${err.message}` });
+      if (err.status === 403) return res.status(403).json({ error: "forbidden", message: `Planning Center didn’t allow that for your account. ${err.message}` });
       return res.status(err.status === 401 ? 401 : 502).json({ error: err.status === 401 ? "reauth_required" : "pco_error", message: err.message });
     }
+    if ((err as { status?: number })?.status === 403) return res.status(403).json({ error: "forbidden", message: (err as Error).message });
     console.error(err);
     res.status(500).json({ error: "server_error", message: (err as Error)?.message });
   });
@@ -100,6 +108,7 @@ export function startServer(opts: { port: number; webDir?: string }): Promise<Se
         : "  Planning Center sign-in OFF — add the Client ID in server/src/pco/registration.ts");
       console.log(usingPat() ? "  Data: shared Personal Access Token" : "  Data: each person's own sign-in");
       initKiosk(opts.webDir);
+      startCompanion(); // if this Mac is an FOH companion, start watching the main computer
       startSmaart();
       resolve(server);
     });
@@ -111,4 +120,4 @@ process.on("exit", flush);
 
 
 /** Used by the Mac app to plug its updater into /api/updates. */
-export { setUpdateBridge, setEmbedBridge, setPrefsOpener };
+export { setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge };

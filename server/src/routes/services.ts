@@ -1,8 +1,11 @@
 import { Router } from "express";
+import { rememberTeams } from "./teamGroups.js";
 import { z } from "zod";
 import { audit } from "../lib/db.js";
 import { lowPriority } from "../pco/client.js";
 import { checkInsDenied } from "../auth/oauth.js";
+import { SignedOutError } from "../pco/client.js";
+import type { PlanDetail, TeamCheckIns } from "../../../shared/types.js";
 
 export const servicesRouter = Router();
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
@@ -82,6 +85,40 @@ servicesRouter.get("/plans/:st/:plan/live", h(async (req, res) => {
 }));
 
 servicesRouter.get("/plans/:st/:plan", h(async (req, res) => res.json(await req.pco.getPlan(req.params.st, req.params.plan))));
+
+/**
+ * Team check-ins: everyone scheduled (not declined) on each team, and whether they've checked in
+ * with Planning Center Check-Ins during this service's check-in window (matched by person).
+ */
+servicesRouter.get("/plans/:st/:plan/team-checkins", h(async (req, res) => {
+  const plan: PlanDetail = await req.pco.getPlan(req.params.st, req.params.plan);
+  let rows: { personId: string | null; at: string }[] = [];
+  let checkInsError: string | null = null;
+  try {
+    rows = (await req.pco.getCheckIns(req.params.st, req.params.plan)).rows;
+  } catch (e: any) {
+    if (e instanceof SignedOutError) throw e;
+    checkInsError = e?.status === 403 || e?.status === 401 ? checkInsDenied(req, e).message : (e?.message ?? "Check-Ins couldn’t be read.");
+  }
+  const firstIn = new Map<string, string>();
+  for (const r of rows) if (r.personId && (!firstIn.has(r.personId) || r.at < firstIn.get(r.personId)!)) firstIn.set(r.personId, r.at);
+  const teams = new Map<string, TeamCheckIns["teams"][number]>();
+  for (const m of plan.roster) {
+    if (m.status === "D") continue;
+    const t: TeamCheckIns["teams"][number] = teams.get(m.teamId) ?? { teamId: m.teamId, teamName: m.teamName, people: [] };
+    const p = t.people.find((x) => x.personId === m.personId);
+    if (p) p.positions.push(m.positionName);
+    else t.people.push({ personId: m.personId, name: m.name, avatarUrl: m.avatarUrl, positions: [m.positionName], status: m.status, checkedInAt: firstIn.get(m.personId) ?? null });
+    teams.set(m.teamId, t);
+  }
+  rememberTeams(plan.teams.map((t) => ({ id: t.id, name: t.name })));
+  const order = plan.teams.map((t) => t.id);
+  const out: TeamCheckIns = {
+    teams: [...teams.values()].sort((a, b) => (order.indexOf(a.teamId) + 1 || 999) - (order.indexOf(b.teamId) + 1 || 999)),
+    checkInsError, fetchedAt: new Date().toISOString(),
+  };
+  res.json(out);
+}));
 
 servicesRouter.get("/plans/:st/:plan/checkins", h(async (req, res) => {
   try {

@@ -82,7 +82,7 @@ function Line({ r, now, onScreen, big }: { r: PageRequest; now: number; onScreen
   return (
     <div className={clsx("flex min-w-0 flex-wrap items-baseline gap-x-2", big ? "text-sm" : "text-xs")}>
       <b className={big ? "text-base" : ""}>{who}</b>
-      <span className="text-ink-soft">{r.state === "waiting" ? "is requesting a page" : r.state === "released" ? (onScreen ? `sending after the current page (${onScreen}s)` : "sending…") : "couldn’t be paged"}</span>
+      <span className="text-ink-soft">{r.state === "waiting" ? (r.heldAt ? `is on hold${r.decidedBy ? ` (${r.decidedBy})` : ""}` : "is requesting a page") : r.state === "released" ? (onScreen ? `sending after the current page (${onScreen}s)` : "sending…") : "couldn’t be paged"}</span>
       <span className="rounded bg-canvas/70 px-1.5 font-mono font-semibold tracking-wider">{r.code}</span>
       {r.childName && <span className="text-ink-muted">{r.childName}</span>}
       <span className="text-ink-faint">{ago(r.requestedAt, now)}</span>

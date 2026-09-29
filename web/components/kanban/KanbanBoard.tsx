@@ -4,9 +4,9 @@ import {
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, RefreshCw, Search } from "lucide-react";
+import { AlertCircle, RefreshCw, Search, Share2 } from "lucide-react";
 import clsx from "clsx";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { Board, WorkflowCard } from "@shared/types";
 import { Api, qk } from "@/lib/api";
@@ -15,8 +15,10 @@ import { Skeleton, Spinner } from "@/components/ui";
 import { KanbanColumn, DONE_ID } from "./KanbanColumn";
 import { PersonCard } from "./PersonCard";
 import { CardDrawer } from "./CardDrawer";
+import { ShareModal } from "@/components/workflows/WorkflowAccess";
 
-export function KanbanBoard({ workflowId }: { workflowId: string }) {
+export function KanbanBoard({ workflowId, canShare }: { workflowId: string; canShare?: boolean }) {
+  const [sharing, setSharing] = useState(false);
   const qc = useQueryClient();
   const key = qk.board(workflowId);
   const { activeCardId, setActive, pending, markPending, search, setSearch, onlyOverdue, toggleOverdue } = useUi();
@@ -150,6 +152,7 @@ export function KanbanBoard({ workflowId }: { workflowId: string }) {
         <button onClick={toggleOverdue} className={clsx("btn-outline", onlyOverdue && "border-bad/40 bg-bad-soft text-bad")}>
           <AlertCircle size={14} /> Overdue
         </button>
+        {canShare && <button onClick={() => setSharing(true)} className="btn-outline" title="Who can use this workflow"><Share2 size={14} /> Share</button>}
         <button onClick={() => board.refetch()} className="btn-ghost p-2" title="Sync with Planning Center">
           {board.isFetching ? <Spinner /> : <RefreshCw size={15} />}
         </button>
@@ -169,6 +172,7 @@ export function KanbanBoard({ workflowId }: { workflowId: string }) {
       </DndContext>
 
       <CardDrawer workflowId={workflowId} board={{ ...board.data, cards: cardsWithContacts }} />
+      {sharing && <ShareModal workflow={workflow} onClose={() => setSharing(false)} />}
     </div>
   );
 }

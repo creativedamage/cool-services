@@ -1,7 +1,7 @@
 import type {
   AppSettings, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, StagePlot, PlanSummary, RosterStatus, ScheduleRequest,
-  ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary,
-  DashboardWidget, HomeService, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
+  ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary, WorkflowShare, WorkflowShareGroup, WorkflowAccessRequest, Person,
+  DashboardWidget, HomeService, TeamCheckIns, TeamGroup, AppMode, CompanionState, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 
@@ -30,7 +30,7 @@ async function api<T>(path: string, init?: RequestInit & { json?: unknown }): Pr
   });
   // Not signed in (or Planning Center signed you out): go to sign-in and say why. The sign-in page
   // doesn't bounce back on its own after this, so there's no loop.
-  if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/" && !window.location.pathname.startsWith("/kiosk")) {
+  if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/" && !window.location.pathname.startsWith("/kiosk") && !window.location.pathname.startsWith("/companion") && !window.location.pathname.startsWith("/setup-mode")) {
     const back = window.location.pathname + window.location.search;
     window.location.href = `/?error=signed_out&return=${encodeURIComponent(back)}`;
   }
@@ -65,6 +65,14 @@ export const Api = {
   board: (wf: string) => api<Board>(`/workflows/${wf}/board`),
   moveCard: (wf: string, card: string, toStepId: string | null, personId?: string) =>
     api<WorkflowCard>(`/workflows/${wf}/cards/${card}/move`, { method: "POST", json: { toStepId, personId } }),
+  workflowShares: (wf: string) => api<WorkflowShare[]>(`/workflows/${wf}/shares`),
+  shareWorkflow: (wf: string, personId: string, group: WorkflowShareGroup) => api<WorkflowShare[]>(`/workflows/${wf}/shares`, { method: "PUT", json: { personId, group } }),
+  unshareWorkflow: (wf: string, shareId: string) => api<WorkflowShare[]>(`/workflows/${wf}/shares/${shareId}`, { method: "DELETE" }),
+  searchPeople: (q: string) => api<Person[]>(`/people-search?q=${encodeURIComponent(q)}`),
+  workflowRequests: () => api<{ mine: WorkflowAccessRequest[]; toReview: WorkflowAccessRequest[] }>("/workflow-requests"),
+  requestWorkflow: (workflowId: string, note?: string) => api<WorkflowAccessRequest>("/workflow-requests", { method: "POST", json: { workflowId, note } }),
+  decideWorkflowRequest: (id: string, decision: "approve" | "deny" | "withdraw", group?: WorkflowShareGroup) =>
+    api<WorkflowAccessRequest>(`/workflow-requests/${id}/${decision}`, { method: "POST", json: { group } }),
   contacts: (ids: string[]) => api<Record<string, { email: string | null; phone: string | null; mobile: string | null }>>(`/contacts?ids=${ids.join(",")}`),
   notes: (person: string, card: string) => api<Note[]>(`/people/${person}/cards/${card}/notes`),
   addNote: (person: string, card: string, body: string, internal: boolean) =>
@@ -100,6 +108,20 @@ export const Api = {
   smaartStatus: () => api<SmaartStatusView>("/smaart/status"),
   dashboard: () => api<DashboardWidget[] | null>("/dashboard"),
   home: () => api<HomeService>("/dashboard/home"),
+  teamCheckIns: (st: string, plan: string) => api<TeamCheckIns>(`/services/plans/${st}/${plan}/team-checkins`),
+  teamGroups: () => api<TeamGroup[]>("/team-groups"),
+  knownTeams: () => api<{ id: string; name: string }[]>("/team-groups/teams"),
+  saveTeamGroups: (g: TeamGroup[]) => api<TeamGroup[]>("/team-groups", { method: "PUT", json: g }),
+  appMode: () => api<{ mode: AppMode | null }>("/app-mode"),
+  setAppMode: (mode: AppMode | null) => api<{ mode: AppMode | null }>("/app-mode", { method: "PUT", json: { mode } }),
+  companionState: () => api<CompanionState>("/companion-client/state"),
+  companionFind: () => api<{ host: string; port: number; name: string }[]>("/companion-client/find"),
+  companionLink: (host: string, port: number, code: string) => api<CompanionState>("/companion-client/link", { method: "POST", json: { host, port, code } }),
+  companionUnlink: () => api<CompanionState>("/companion-client/unlink", { method: "POST" }),
+  companionAct: (id: string, action: "accept" | "hold" | "deny") => api<CompanionState>("/companion-client/act", { method: "POST", json: { id, action } }),
+  companions: () => api<{ companions: CompanionInfo[]; addresses: string[] }>("/paging/companions"),
+  pairCompanion: () => api<{ code: string; expiresAt: string }>("/paging/companions/pair", { method: "POST" }),
+  removeCompanion: (id: string) => api<{ companions: CompanionInfo[] }>(`/paging/companions/${id}`, { method: "DELETE" }),
   campuses: () => api<CampusSettings>("/campuses"),
   saveCampuses: (c: Campus[]) => api<CampusSettings>("/campuses", { method: "PUT", json: c }),
   setDefaultCampus: (campusId: string | null) => api<CampusSettings>("/campuses/default", { method: "PUT", json: { campusId } }),

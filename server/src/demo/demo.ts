@@ -4,21 +4,23 @@
  */
 import type { PersonProfile,
   Board, Candidate, CheckInLocation, ItemInput, ItemTimes, Matrix, NoteCategory, RunSheetData, RunSheetLive, SongArrangement, SongHit, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanItem, PlanSummary, Person, RosterStatus,
-  ScheduleRequest, ServiceType, StaffMe, Team, TeamMember, WorkflowCard, WorkflowStep, WorkflowSummary,
+  ScheduleRequest, ServiceType, StaffMe, Team, TeamMember, WorkflowCard, WorkflowShare, WorkflowShareGroup, WorkflowStep, WorkflowSummary,
 } from "../../../shared/types.js";
 import { computeConflicts, type PcoApi } from "../pco/api.js";
 
 let seq = 1000;
 const DEMO_ROOMS: [string, string, string][] = [["Kids", "Nursery", "loc-nursery"], ["Kids", "K–2nd", "loc-k2"], ["Kids", "3rd–5th", "loc-35"], ["Students", "Middle School", "loc-ms"], ["Serve", "Volunteers", "loc-vol"]];
 
-function demoCheckIns(key: string, start: number): CheckInRow[] {
+function demoCheckIns(key: string, start: number, serving: string[] = []): CheckInRow[] {
   const kids = ["Ava", "Liam", "Mia", "Noah", "Zoe", "Eli", "Luna", "Leo", "Ivy", "Max", "Nora", "Kai", "Ruby", "Owen", "Isla", "Jude"];
   const lasts = ["Johnson", "Patel", "Reyes", "Nguyen", "Soto", "Kim", "Scott", "Díaz", "Pierre", "Brooks"];
   const shown = Math.min(48, 18 + Math.floor((Date.now() - demoBoot) / 4000));
   return Array.from({ length: shown }, (_, i): CheckInRow => {
     const [folder, room, roomId] = DEMO_ROOMS[i % 5];
     const vol = folder === "Serve";
-    const person = vol ? people[(i * 3) % people.length] : null;
+    // Volunteers: people scheduled on this service first (all but the last two), so Team check-ins fills up.
+    const k = Math.floor(i / 5);
+    const person = vol ? (k < serving.length - 2 ? people.find((x) => x.id === serving[k]) : undefined) ?? people[(i * 3) % people.length] : null;
     return {
       id: `ci-${key}-${i}`, personId: person?.id ?? null,
       name: person ? person.name : `${kids[(i * 7) % kids.length]} ${lasts[(i * 3) % lasts.length]}`,
@@ -89,6 +91,11 @@ const workflows: DemoWorkflow[] = [
     steps: ["Requested", "Class Scheduled", "Story Recorded", "Baptism Sunday"]
       .map((name, i) => ({ id: `3${i}`, name, sequence: i })),
   },
+  {
+    id: "4", name: "Membership",
+    steps: ["Class Signup", "Class Attended", "Interview", "Welcomed"]
+      .map((name, i) => ({ id: `4${i}`, name, sequence: i })),
+  },
 ];
 
 interface DemoCard extends Omit<WorkflowCard, "person"> { workflowId: string }
@@ -115,6 +122,22 @@ function addCard(workflowId: string, personIdx: number, stepIdx: number, ageDays
 [[10, 0, 1], [11, 1, 5], [12, 1, 12], [13, 2, 3], [14, 3, 2], [15, 4, 1], [16, 0, 0], [17, 2, 7]]
   .forEach(([p, s, a]) => addCard("2", p, s, a));
 [[18, 0, 2], [19, 1, 4], [20, 2, 1], [21, 3, 0]].forEach(([p, s, a]) => addCard("3", p, s, a));
+[[22, 0, 1], [23, 2, 3]].forEach(([p, s, a]) => addCard("4", p, s, a));
+
+/** Demo sharing: the demo user manages New Guest Follow-Up, edits Volunteer Onboarding, and isn't on the others. */
+const DEMO_ME = "205";
+const shares = new Map<string, WorkflowShare[]>([
+  ["1", [{ id: "s1", personId: DEMO_ME, name: "Wayne (Demo)", avatarUrl: null, group: "Manager" }, { id: "s2", personId: "203", name: "", avatarUrl: null, group: "Editor" }]],
+  ["2", [{ id: "s3", personId: DEMO_ME, name: "Wayne (Demo)", avatarUrl: null, group: "Editor" }]],
+  ["3", []], ["4", []],
+]);
+/** A new guest shows up a minute after the demo starts, so the new-card notification can be seen. */
+let demoNewCard = false;
+function demoArrivals() {
+  if (demoNewCard || Date.now() - demoBoot < 60_000) return;
+  demoNewCard = true;
+  addCard("1", 24, 0, 0);
+}
 
 const profileNotes: Record<string, Note[]> = {
   "200": [{ id: "profile-1", body: "First visited with his wife and two kids (ages 6 & 9). Interested in the men's group.", authorName: "Pastor Mike", createdAt: daysAgo(20), source: "profile", category: "Pastoral Care" }],
@@ -269,10 +292,42 @@ export class DemoPco implements PcoApi {
   }
 
   async listWorkflows(): Promise<WorkflowSummary[]> {
+    demoArrivals();
     return workflows.map((w) => {
-      const mine = cards.filter((c) => c.workflowId === w.id && c.stage === "ready");
-      return { id: w.id, name: w.name, readyCount: mine.length, overdueCount: mine.filter((c) => c.overdue).length };
+      const ready = cards.filter((c) => c.workflowId === w.id && c.stage === "ready");
+      const myShare = shares.get(w.id)?.find((x) => x.personId === DEMO_ME)?.group ?? null;
+      const mine = myShare != null && myShare !== "No Access";
+      return {
+        id: w.id, name: w.name, readyCount: ready.length, overdueCount: ready.filter((c) => c.overdue).length,
+        myReadyCount: mine ? Math.ceil(ready.length / 3) : 0, myOverdueCount: 0, myShare, mine, canOpen: mine, canManage: myShare === "Manager",
+      };
     });
+  }
+
+  async listShares(workflowId: string): Promise<WorkflowShare[]> {
+    return (shares.get(workflowId) ?? []).map((x) => {
+      const p = people.find((q) => q.id === x.personId);
+      return { ...x, name: x.personId === DEMO_ME ? "Wayne (Demo)" : p?.name ?? x.name, avatarUrl: p?.avatarUrl ?? null };
+    });
+  }
+
+  async setShare(workflowId: string, personId: string, group: WorkflowShareGroup): Promise<WorkflowShare[]> {
+    const list = shares.get(workflowId) ?? [];
+    const hit = list.find((x) => x.personId === personId);
+    if (hit) hit.group = group;
+    else list.push({ id: `s${nid()}`, personId, name: "", avatarUrl: null, group });
+    shares.set(workflowId, list);
+    return this.listShares(workflowId);
+  }
+
+  async removeShare(workflowId: string, shareId: string): Promise<WorkflowShare[]> {
+    shares.set(workflowId, (shares.get(workflowId) ?? []).filter((x) => x.id !== shareId));
+    return this.listShares(workflowId);
+  }
+
+  async searchPeople(query: string): Promise<Person[]> {
+    const q = query.trim().toLowerCase();
+    return q.length < 2 ? [] : people.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 15);
   }
 
   private hydrate(c: DemoCard): WorkflowCard {
@@ -281,6 +336,7 @@ export class DemoPco implements PcoApi {
   }
 
   async getBoard(workflowId: string): Promise<Board> {
+    demoArrivals();
     const wf = workflows.find((w) => w.id === workflowId);
     if (!wf) throw new Error("Workflow not found");
     return {
@@ -547,7 +603,7 @@ export class DemoPco implements PcoApi {
   async getCheckIns(st: string, planId: string): Promise<CheckInsForPlan> {
     const p = this.plan(st, planId);
     const start = Date.parse(p.times.find((t) => t.kind === "service")?.startsAt ?? p.sortDate) - 40 * 60e3;
-    return { from: new Date(start).toISOString(), to: new Date(start + 5 * 3600e3).toISOString(), rows: demoCheckIns(planId, start), fetchedAt: new Date().toISOString() };
+    return { from: new Date(start).toISOString(), to: new Date(start + 5 * 3600e3).toISOString(), rows: demoCheckIns(planId, start, [...new Set((roster.get(planId) ?? []).filter((m) => m.status !== "D").map((m) => m.personId))]), fetchedAt: new Date().toISOString() };
   }
 
   async getTodayCheckIns(): Promise<CheckInRow[]> {

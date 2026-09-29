@@ -101,6 +101,8 @@ export interface PagingStored {
   kioskSessions: { token: string; ministry: Ministry; pinVersion: number; createdAt: string; lastSeen: string }[];
   /** Whose Planning Center access the iPad pages use (the person who set them up). */
   owner: { userId: string; demo: boolean } | null;
+  /** FOH companion computers linked to this one (token hashes only). */
+  companions?: { id: string; name: string; tokenHash: string; pairedAt: string; lastSeen: string | null }[];
 }
 
 /* ───────────── File handling ───────────── */

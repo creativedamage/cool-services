@@ -2,7 +2,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import clsx from "clsx";
-import { BellRing, CalendarDays, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, LayoutTemplate, LogOut, Settings } from "lucide-react";
+import { BellRing, CalendarDays, UsersRound, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, LayoutTemplate, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -10,6 +10,7 @@ import { Api, planQuery, qk } from "@/lib/api";
 import { prefetchPlans, usePlans } from "@/lib/plans";
 import { useUpdates } from "@/components/settings/UpdatesSettings";
 import { Avatar, Badge } from "@/components/ui";
+import { WorkflowWatcher } from "@/components/workflows/WorkflowAccess";
 import { ScheduleModal } from "@/components/scheduling/ScheduleModal";
 import { Logo } from "@/components/Logo";
 import { routes } from "@/lib/routes";
@@ -37,6 +38,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/workflows", label: "Workflows", icon: KanbanSquare },
     { href: "/services", label: "Services", icon: CalendarDays },
+    { href: "/team-checkins", label: "Team check-ins", icon: UsersRound },
     { href: "/stage-plots", label: "Stage plots", icon: LayoutTemplate },
     { href: "/propresenter", label: "ProPresenter", icon: MonitorUp },
     { href: "/chat", label: "Chat", icon: MessageCircle },
@@ -71,7 +73,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <StagePlotsNav activeId={search.get("id")} />
         ) : path.startsWith("/paging") ? (
           <PagingNav />
-        ) : path.startsWith("/chat") || path.startsWith("/propresenter") || path.startsWith("/dashboard") ? (
+        ) : path.startsWith("/chat") || path.startsWith("/propresenter") || path.startsWith("/dashboard") || path.startsWith("/team-checkins") ? (
           <div className="flex-1" />
         ) : path.startsWith("/settings") ? (
           <div className="flex-1" />
@@ -79,7 +81,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <>
             <div className="label mt-6 px-4 pb-2">Workflows</div>
             <div className="flex-1 space-y-0.5 overflow-y-auto px-2">
-              {workflows.data?.map((w) => (
+              {workflows.data?.filter((w) => w.canOpen).sort((a, b) => Number(b.mine) - Number(a.mine)).map((w) => (
                 <Link key={w.id} href={routes.board(w.id)}
                   className={clsx("flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[13px] transition",
                     path === "/workflows/board" && activeWf === w.id ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-hover/60")}>
@@ -120,6 +122,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="pointer-events-none absolute bottom-3 right-4 z-10"><Badge tone="violet">Demo data</Badge></div>
         )}
         <PageRequestsBar />
+        <WorkflowWatcher />
         <div className="relative flex min-h-0 flex-1 flex-col">{children}</div>
       </main>
 

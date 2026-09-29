@@ -10,7 +10,7 @@ export const SECTION_TAB: Record<string, PrefsTab> = {
   appearance: "appearance", logo: "appearance",
   startup: "startup", start: "startup", campuses: "campuses",
   audio: "audio", console: "audio", waves: "audio", smaart: "audio",
-  network: "network", paging: "network", ipads: "network",
+  network: "network", paging: "network", ipads: "network", companions: "network",
   video: "video", "pro-computers": "video",
 };
 

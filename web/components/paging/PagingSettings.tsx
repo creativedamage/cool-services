@@ -55,6 +55,7 @@ export function PagingSettings() {
       <ProPresenterSection c={c} save={(p) => save.mutate(p)} />
       <MinistriesSection c={c} save={(p) => save.mutate(p)} />
       <IpadSection c={c} save={(p) => save.mutate(p)} />
+      <CompanionsSection />
     </>
   );
 }
@@ -462,5 +463,53 @@ function FriendlyNames({ c, save, macIp }: { c: PagingConfig; save: (p: PagingPa
         <li>On the iPads, open <b>http://kids.yourchurch.org</b> (with http://) and enter the PIN again once. Add it to the Home Screen again too.</li>
       </ol>
     </div>
+  );
+}
+
+/* ───────────── FOH companions ───────────── */
+
+/** Pair front-of-house computers that take over their screen when a page is requested. */
+function CompanionsSection() {
+  const q = useQuery({ queryKey: ["companions"], queryFn: Api.companions, refetchInterval: 3000 });
+  const [pairing, setPairing] = useState<{ code: string; expiresAt: string } | null>(null);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const pair = useMutation({ mutationFn: Api.pairCompanion, onSuccess: setPairing, onError: (e) => toast.error("Couldn’t start pairing", { description: (e as Error).message }) });
+  const remove = useMutation({ mutationFn: Api.removeCompanion, onSuccess: () => void q.refetch() });
+  const left = pairing ? Math.max(0, Math.round((Date.parse(pairing.expiresAt) - now) / 1000)) : 0;
+  const list = q.data?.companions ?? [];
+  // A new companion showed up: the code has been used.
+  useEffect(() => { if (pairing && list.some((c) => Date.parse(c.pairedAt) > Date.parse(pairing.expiresAt) - 10 * 60_000)) setPairing(null); }, [list, pairing]);
+  return (
+    <section id="companions" className="panel scroll-mt-6 p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="flex items-center gap-2 font-semibold"><BellRing size={16} /> FOH companions</h2>
+          <p className="mt-0.5 text-sm text-ink-muted">
+            A front-of-house computer running Cool Services as a <b>companion</b> takes over its screen when Kids or Nursery ask for a page,
+            with big Accept, Hold until clear and Deny buttons. It never sees children’s names. You can still answer requests here too.
+          </p>
+        </div>
+        <button className="btn-outline shrink-0 py-1 text-xs" onClick={() => pair.mutate()}>Pair a companion</button>
+      </div>
+      {pairing && left > 0 && (
+        <div className="mt-4 rounded-xl border border-accent/40 bg-accent-soft p-4 text-center">
+          <div className="text-xs text-ink-muted">On the FOH computer, choose <b>FOH companion</b>, then enter:</div>
+          <div className="mt-1 font-mono text-5xl font-bold tracking-[0.4em] text-accent">{pairing.code}</div>
+          <div className="mt-1 text-[11px] text-ink-faint">Good for {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")} · this Mac’s address: {q.data?.addresses[0]?.replace(/^http:\/\//, "") ?? "…"}</div>
+        </div>
+      )}
+      <ul className="mt-4 space-y-1.5">
+        {list.map((c) => (
+          <li key={c.id} className="flex items-center gap-3 rounded-lg border border-line px-3 py-2 text-sm">
+            <span className={clsx("h-2 w-2 rounded-full", c.online ? "bg-ok" : "bg-line-strong")} />
+            <span className="font-medium">{c.name}</span>
+            <span className="text-xs text-ink-muted">{c.online ? "connected" : c.lastSeen ? `last seen ${new Date(c.lastSeen).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : "not connected yet"}</span>
+            <button className="btn-ghost ml-auto py-1 text-xs hover:text-bad" onClick={() => { if (confirm(`Unpair ${c.name}?`)) remove.mutate(c.id); }}>Unpair</button>
+          </li>
+        ))}
+        {!list.length && <li className="text-sm text-ink-muted">No companions yet.</li>}
+      </ul>
+    </section>
   );
 }

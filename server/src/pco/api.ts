@@ -4,7 +4,7 @@
  */
 import type { PersonProfile,
   Board, Candidate, ItemInput, ItemTimes, Matrix, NoteCategory, PlanItem, RunSheetData, RunSheetLive, SongArrangement, SongHit, CheckInLocation, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanSummary, Person, RosterStatus,
-  ScheduleRequest, ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary,
+  ScheduleRequest, ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowShare, WorkflowShareGroup, WorkflowSummary,
 } from "../../../shared/types.js";
 
 export interface PcoApi {
@@ -13,6 +13,11 @@ export interface PcoApi {
   // People / workflows
   listWorkflows(): Promise<WorkflowSummary[]>;
   getBoard(workflowId: string): Promise<Board>;
+  /** Who a workflow is shared with, and sharing it (needs manager rights on the workflow). */
+  listShares(workflowId: string): Promise<WorkflowShare[]>;
+  setShare(workflowId: string, personId: string, group: WorkflowShareGroup): Promise<WorkflowShare[]>;
+  removeShare(workflowId: string, shareId: string): Promise<WorkflowShare[]>;
+  searchPeople(query: string): Promise<Person[]>;
   /** Move to `toStepId` (null = complete the card). `skip` marks intermediate steps skipped. */
   moveCard(workflowId: string, cardId: string, toStepId: string | null, skip?: boolean, personId?: string): Promise<WorkflowCard>;
   /** Email + phone for board cards, loaded after the board itself. */

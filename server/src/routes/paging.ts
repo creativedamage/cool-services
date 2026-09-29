@@ -10,6 +10,8 @@ import { discover, ProPresenter, ProPresenterError } from "../lib/propresenter.j
 import { cancelRequest, page, PagingError, pp, publicConfig, saveConfig, sendAllRequests, sendRequest, setPin, signOutIpads, status, stored, testPage } from "../lib/paging.js";
 import { childrenFor, kioskState } from "../kiosk.js";
 import { checkInsDenied } from "../auth/oauth.js";
+import { listCompanions, removeCompanion, startPairing } from "../lib/companion.js";
+import { applyKiosk } from "../kiosk.js";
 
 export const pagingRouter = Router();
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch((e: unknown) => {
@@ -105,9 +107,14 @@ pagingRouter.get("/children", h(async (req, res) => {
 pagingRouter.get("/status", h(async (_req, res) => res.json(status())));
 
 /* Page requests from the iPads: send when you're ready, or cancel. */
-pagingRouter.post("/requests/:id/send", h(async (req, res) => { sendRequest(req.params.id); res.json(status()); }));
-pagingRouter.post("/requests/:id/cancel", h(async (req, res) => { cancelRequest(req.params.id); res.json(status()); }));
+pagingRouter.post("/requests/:id/send", h(async (req, res) => { sendRequest(req.params.id, req.user?.name); res.json(status()); }));
+pagingRouter.post("/requests/:id/cancel", h(async (req, res) => { cancelRequest(req.params.id, req.user?.name); res.json(status()); }));
 pagingRouter.post("/requests/send-all", h(async (_req, res) => { sendAllRequests(); res.json(status()); }));
+
+/* FOH companions: pair (shows a code for 10 minutes), list, remove. */
+pagingRouter.get("/companions", h(async (_req, res) => res.json({ companions: listCompanions(), addresses: kioskAddresses().urls })));
+pagingRouter.post("/companions/pair", h(async (_req, res) => { const p = startPairing(); applyKiosk(); res.json(p); }));
+pagingRouter.delete("/companions/:id", h(async (req, res) => { removeCompanion(req.params.id); applyKiosk(); res.json({ companions: listCompanions() }); }));
 
 pagingRouter.post("/page", h(async (req, res) => {
   const b = z.object({ ministry, code: z.string().max(20), childName: z.string().max(120).nullable().optional() }).parse(req.body);

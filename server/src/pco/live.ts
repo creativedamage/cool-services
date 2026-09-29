@@ -4,8 +4,7 @@
  */
 import type { PersonProfile,
   Board, Candidate, CheckInLocation, ItemInput, ItemTimes, Matrix, NoteCategory, RunSheetData, RunSheetLive, SongArrangement, SongHit, CheckInRow, CheckInsForPlan, Conflict, Note, PlanCounts, PlanDetail, PlanItem, PlanSummary, PlanTime, Person,
-  RosterStatus, ScheduleRequest, ServiceType, StaffMe, Team, TeamMember, WorkflowCard, WorkflowSummary,
-} from "../../../shared/types.js";
+  RosterStatus, ScheduleRequest, ServiceType, StaffMe, Team, TeamMember, WorkflowCard, WorkflowSummary, WorkflowShare, WorkflowShareGroup, } from "../../../shared/types.js";
 import { cache } from "../lib/db.js";
 import { computeConflicts, mapLimit, type PcoApi } from "./api.js";
 import { PcoClient, flatten, type Flat } from "./client.js";
@@ -95,14 +94,78 @@ export class LivePco implements PcoApi {
 
   /* ───────────── People / workflows ───────────── */
 
+  /** Who's asking: their person id and whether they can see and share every workflow. */
+  private async viewer(): Promise<{ id: string; admin: boolean }> {
+    const who = this.actingPersonId ?? this.viewerId ?? "me";
+    return cache.wrap(this.k(`viewer:${who}`), 600, async () => {
+      const me = await this.c.get(this.actingPersonId ? `${P}/people/${this.actingPersonId}` : `${P}/me`);
+      return { id: me.id, admin: Boolean(me.site_administrator) || /manager/i.test(String(me.people_permissions ?? "")) };
+    });
+  }
+
   async listWorkflows(): Promise<WorkflowSummary[]> {
-    const wfs = await cache.wrap(this.k("workflows"), 600, () => this.c.list(`${P}/workflows?order=name`));
-    return wfs.map((w) => ({
-      id: w.id,
-      name: w.name,
-      readyCount: w.ready_card_count ?? w.total_ready_card_count ?? 0,
-      overdueCount: w.overdue_card_count ?? 0,
-    }));
+    const v = await this.viewer();
+    const who = this.actingPersonId ?? this.viewerId ?? v.id;
+    // Shares come along with the list when Planning Center lets this person see them.
+    const wfs = await cache.wrap(this.k(`workflows:${who}`), 600, () =>
+      this.c.list(`${P}/workflows?order=name&include=shares`).catch(() => this.c.list(`${P}/workflows?order=name`)));
+    // In shared-token mode the "my_" counts are the token owner's, not the signed-in person's.
+    const ownCounts = !this.actingPersonId;
+    return wfs.map((w) => {
+      const share = ((w.rel.shares ?? []) as Flat[]).find((x) => String(x.person_id ?? x.rel?.person?.id) === v.id);
+      const myShare = (share?.group ?? null) as WorkflowShareGroup | null;
+      const myReady = ownCounts ? Number(w.my_ready_card_count ?? 0) : 0;
+      const mine = myReady > 0 || (myShare != null && myShare !== "No Access");
+      return {
+        id: w.id,
+        name: w.name,
+        readyCount: w.total_ready_card_count ?? w.ready_card_count ?? 0,
+        overdueCount: w.total_overdue_card_count ?? w.overdue_card_count ?? 0,
+        myReadyCount: myReady,
+        myOverdueCount: ownCounts ? Number(w.my_overdue_card_count ?? 0) : 0,
+        myShare, mine,
+        canOpen: mine || v.admin,
+        canManage: v.admin || myShare === "Manager",
+      };
+    });
+  }
+
+  async listShares(workflowId: string): Promise<WorkflowShare[]> {
+    const rows = await this.c.list(`${P}/workflows/${workflowId}/shares?include=person`);
+    return rows.map((r) => ({
+      id: r.id, personId: String(r.person_id ?? r.rel.person?.id ?? ""), group: (r.group ?? "Viewer") as WorkflowShareGroup,
+      name: r.rel.person?.name ?? `${r.rel.person?.first_name ?? ""} ${r.rel.person?.last_name ?? ""}`.trim(),
+      avatarUrl: r.rel.person?.avatar ?? null,
+    })).filter((x) => x.personId);
+  }
+
+  private async bustWorkflows() {
+    const v = await this.viewer();
+    await cache.bust(this.k(`workflows:${this.actingPersonId ?? this.viewerId ?? v.id}`));
+  }
+
+  async setShare(workflowId: string, personId: string, group: WorkflowShareGroup): Promise<WorkflowShare[]> {
+    const existing = (await this.listShares(workflowId)).find((x) => x.personId === personId);
+    if (existing) {
+      await this.c.patch(`${P}/workflows/${workflowId}/shares/${existing.id}`, { data: { type: "WorkflowShare", id: existing.id, attributes: { group } } });
+    } else {
+      await this.c.post(`${P}/workflows/${workflowId}/shares`, { data: { type: "WorkflowShare", attributes: { group, person_id: Number(personId) || personId } } });
+    }
+    await this.bustWorkflows();
+    return this.listShares(workflowId);
+  }
+
+  async removeShare(workflowId: string, shareId: string): Promise<WorkflowShare[]> {
+    await this.c.delete(`${P}/workflows/${workflowId}/shares/${shareId}`);
+    await this.bustWorkflows();
+    return this.listShares(workflowId);
+  }
+
+  async searchPeople(query: string): Promise<Person[]> {
+    const q = query.trim();
+    if (q.length < 2) return [];
+    const rows = await this.c.list(`${P}/people?where[search_name]=${encodeURIComponent(q)}&per_page=15`, 1);
+    return rows.slice(0, 15).map((r) => this.person(r));
   }
 
   /** Batch-load contact info (emails + phones), cached per person for 1h. */

@@ -152,7 +152,7 @@ export class ProPresenter {
 /** Ports people commonly give ProPresenter's network setting; the configured port is tried first. */
 const COMMON_PORTS = [1025, 50001, 20652, 49232, 50000, 60157, 8080];
 
-function localSubnets(): { base: string; own: string }[] {
+export function localSubnets(): { base: string; own: string }[] {
   const out: { base: string; own: string }[] = [];
   for (const addrs of Object.values(os.networkInterfaces())) {
     for (const a of addrs ?? []) {
@@ -163,7 +163,7 @@ function localSubnets(): { base: string; own: string }[] {
   return out.filter((s, i) => out.findIndex((x) => x.base === s.base) === i);
 }
 
-function portOpen(host: string, port: number, timeoutMs: number): Promise<boolean> {
+export function portOpen(host: string, port: number, timeoutMs: number): Promise<boolean> {
   return new Promise((resolve) => {
     const s = net.createConnection({ host, port });
     const done = (ok: boolean) => { s.destroy(); resolve(ok); };
