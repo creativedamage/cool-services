@@ -283,7 +283,10 @@ workflow with that person in Planning Center, and it appears under their My work
 Preferences → **Team Check-ins** (the Team check-ins page asks until it's set): for each service
 type, choose the Planning Center Check-Ins **event** volunteers check in to (e.g. "Sunday
 Volunteers"), then give each **team** its **location** in that event (Hospitality → Main Lobby,
-Production → Production Booth). **Match by name** fills in the obvious ones.
+Production → Production Booth). **Match by name** fills in the obvious ones. Press **Save** when
+you're done (Discard puts it back). Only your campus's service types show (your default campus in
+Preferences → Campuses; "Show all campuses" shows the rest), and saving never changes another
+campus's setup.
 
 - Only check-ins to that event count on Team check-ins (checking your own kids in doesn't count as
   serving).
@@ -372,7 +375,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.16.0 && git push origin v1.16.0
+   git tag v1.16.1 && git push origin v1.16.1
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

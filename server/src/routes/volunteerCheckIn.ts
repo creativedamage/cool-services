@@ -12,7 +12,9 @@ export const volunteerCheckInRouter = Router();
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
 volunteerCheckInRouter.get("/", h(async (req, res) => {
-  const types = await req.pco.listServiceTypes();
+  // ?st=1,2: only these service types (your campus), so nothing from other campuses is loaded.
+  const only = new Set(String(req.query.st ?? "").split(",").filter(Boolean));
+  const types = (await req.pco.listServiceTypes()).filter((t: { id: string }) => !only.size || only.has(t.id));
   const serviceTypes = await Promise.all(types.map(async (t: { id: string; name: string }) => ({ id: t.id, name: t.name, teams: await req.pco.listTeams(t.id).catch(() => []) })));
   let eventsError: string | null = null;
   const locs: CheckInLocation[] = await req.pco.listCheckInLocations().catch((e: any) => { eventsError = e?.status === 401 || e?.status === 403 ? "Your Planning Center account can’t read Check-Ins." : (e?.message ?? "Check-Ins couldn’t be read."); return []; });
@@ -33,8 +35,27 @@ volunteerCheckInRouter.get("/", h(async (req, res) => {
   res.json(out);
 }));
 
-const Ref = z.object({ id: z.string().max(60), name: z.string().max(120) });
+const Ref = z.object({ id: z.string().min(1).max(100), name: z.string().max(300) });
+/**
+ * Save the service types you edited (and only those): each one's event and its teams' locations.
+ * Anything not sent (another campus's setup) is left as it is.
+ */
 volunteerCheckInRouter.put("/", (req, res) => {
-  const c = z.object({ events: z.record(z.string().max(40), Ref), teamLocations: z.record(z.string().max(40), Ref) }).parse(req.body);
-  res.json(saveVolunteerConfig(c));
+  const { serviceTypes } = z.object({
+    serviceTypes: z.array(z.object({
+      id: z.string().min(1).max(100),
+      event: Ref.nullable(),
+      teams: z.array(z.object({ id: z.string().min(1).max(100), location: Ref.nullable() })).max(500),
+    })).max(200),
+  }).parse(req.body);
+  const c = volunteerConfig();
+  const events = { ...c.events };
+  const teamLocations = { ...c.teamLocations };
+  for (const st of serviceTypes) {
+    if (st.event) events[st.id] = { id: st.event.id, name: st.event.name.slice(0, 200) }; else delete events[st.id];
+    for (const t of st.teams) {
+      if (t.location) teamLocations[t.id] = { id: t.location.id, name: t.location.name.slice(0, 200) }; else delete teamLocations[t.id];
+    }
+  }
+  res.json(saveVolunteerConfig({ events, teamLocations }));
 });

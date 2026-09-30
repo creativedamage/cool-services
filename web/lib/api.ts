@@ -111,8 +111,9 @@ export const Api = {
   teamCheckIns: (st: string, plan: string) => api<TeamCheckIns>(`/services/plans/${st}/${plan}/team-checkins`),
   staffCheckIn: (st: string, plan: string, personId: string, undo?: boolean) =>
     api<TeamCheckIns>(`/services/plans/${st}/${plan}/team-checkins/${personId}`, { method: "POST", json: { undo } }),
-  volunteerSetup: () => api<VolunteerCheckInSetup>("/volunteer-checkin"),
-  saveVolunteerConfig: (c: VolunteerCheckInConfig) => api<VolunteerCheckInConfig>("/volunteer-checkin", { method: "PUT", json: c }),
+  volunteerSetup: (serviceTypeIds?: string[]) => api<VolunteerCheckInSetup>(`/volunteer-checkin${serviceTypeIds?.length ? `?st=${serviceTypeIds.join(",")}` : ""}`),
+  saveVolunteerConfig: (serviceTypes: { id: string; event: { id: string; name: string } | null; teams: { id: string; location: { id: string; name: string } | null }[] }[]) =>
+    api<VolunteerCheckInConfig>("/volunteer-checkin", { method: "PUT", json: { serviceTypes } }),
   teamPhones: () => api<TeamPhonesView>("/team-phones"),
   saveTeamPhones: (p: { enabled?: boolean; hostnames?: Partial<Record<TeamPhoneRole, string>> }) => api<TeamPhonesView>("/team-phones", { method: "PUT", json: p }),
   setTeamPhonePin: (role: TeamPhoneRole, pin: string | null) => api<TeamPhonesView>(`/team-phones/pin/${role}`, { method: "PUT", json: { pin } }),

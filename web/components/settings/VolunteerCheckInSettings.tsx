@@ -3,15 +3,17 @@
  * Preferences → Team Check-ins: for each service type, the Planning Center Check-Ins event that
  * volunteers check in to, and each team's location in it (its area of serving: Greeters → Main
  * Lobby). Staff check-ins are recorded as volunteers at that location, and only check-ins to that
- * event count on Team check-ins.
+ * event count on Team check-ins. Shows your campus's service types; changes are kept until Save, and
+ * saving only touches the service types you changed.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { CalendarCheck, MapPin, Wand2 } from "lucide-react";
-import { useState } from "react";
+import { CalendarCheck, MapPin, Save, Wand2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { VolunteerCheckInConfig, VolunteerCheckInSetup } from "@shared/types";
 import { Api } from "@/lib/api";
+import { useCampus } from "@/lib/campus";
 import { Spinner } from "@/components/ui";
 
 const KEY = ["volunteerSetup"];
@@ -29,26 +31,53 @@ function guess(team: string, locs: VolunteerCheckInSetup["events"][number]["loca
   return best;
 }
 
+type Draft = VolunteerCheckInConfig;
+const same = (a: Draft, b: Draft) => JSON.stringify(a) === JSON.stringify(b);
+
 export function VolunteerCheckInSettings() {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: KEY, queryFn: Api.volunteerSetup });
-  const save = useMutation({
-    mutationFn: Api.saveVolunteerConfig,
-    onMutate: (c) => qc.setQueryData<VolunteerCheckInSetup>(KEY, (d) => d && { ...d, config: c }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["teamCheckIns"] }),
-    onError: (e) => { toast.error("Couldn’t save", { description: (e as Error).message }); void q.refetch(); },
+  const { campus, loaded } = useCampus();
+  const [everyCampus, setEveryCampus] = useState(false);
+  // Only your campus's service types are loaded and shown (Preferences → Campuses picks it).
+  const scope = campus && !everyCampus ? campus.serviceTypeIds : undefined;
+  const q = useQuery({
+    queryKey: [...KEY, scope?.join(",") ?? "all"], queryFn: () => Api.volunteerSetup(scope),
+    enabled: loaded, refetchOnWindowFocus: false, staleTime: Infinity,
   });
-  if (q.isLoading) return <Spinner />;
-  if (q.error || !q.data) return <p className="text-sm text-bad">Couldn’t load: {(q.error as Error)?.message}</p>;
-  const { config, serviceTypes, events, eventsError } = q.data;
-  const set = (c: VolunteerCheckInConfig) => save.mutate(c);
+  // Changes stay here until Save; nothing reloads underneath you while you're choosing.
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [touched, setTouched] = useState<Set<string>>(new Set());
+  useEffect(() => { if (q.data && !touched.size) setDraft(q.data.config); }, [q.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const save = useMutation({
+    mutationFn: () => {
+      const d = draft!;
+      const sts = (q.data?.serviceTypes ?? []).filter((st) => touched.has(st.id));
+      return Api.saveVolunteerConfig(sts.map((st) => ({
+        id: st.id, event: d.events[st.id] ?? null,
+        teams: st.teams.map((t) => ({ id: t.id, location: d.teamLocations[t.id] ?? null })),
+      })));
+    },
+    onSuccess: (config) => {
+      setTouched(new Set()); setDraft(config);
+      qc.setQueriesData<VolunteerCheckInSetup>({ queryKey: KEY }, (x) => x && { ...x, config });
+      void qc.invalidateQueries({ queryKey: ["teamCheckIns"] });
+      toast.success("Team Check-ins saved");
+    },
+    onError: (e) => toast.error("Couldn’t save", { description: (e as Error).message }),
+  });
+
+  if (!loaded || q.isLoading || (q.data && !draft)) return <Spinner />;
+  if (q.error || !q.data || !draft) return <p className="text-sm text-bad">Couldn’t load: {(q.error as Error)?.message}</p>;
+  const { serviceTypes, events, eventsError } = q.data;
+  const dirty = touched.size > 0 && !same(draft, q.data.config);
+  const edit = (stId: string, d: Draft) => { setDraft(d); setTouched((t) => new Set(t).add(stId)); };
 
   return (
     <>
       <section className="panel p-5 text-sm text-ink-soft">
         <p>
           Choose the Planning Center Check-Ins <b>event</b> your volunteers check in to for each service type, then give each team its <b>location</b> in
-          that event (its area of serving). Then:
+          that event (its area of serving), and press <b>Save</b>. Then:
         </p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-[13px] text-ink-muted">
           <li>Team check-ins only counts check-ins to that event, so someone checking their kids in doesn’t count as serving.</li>
@@ -60,12 +89,28 @@ export function VolunteerCheckInSettings() {
           Team check-ins, marked “by staff”) but not in Planning Center’s Check-Ins reports.
         </p>
         {eventsError && <p className="mt-3 rounded-lg bg-warn-soft px-3 py-2 text-warn">{eventsError}</p>}
+        {campus && (
+          <p className="mt-3 text-[12px] text-ink-muted">
+            {everyCampus ? "Showing every campus." : <>Showing <b>{campus.name}</b> only. Other campuses are left as they are.</>}{" "}
+            <button className="text-accent hover:underline" disabled={dirty} title={dirty ? "Save or discard your changes first" : undefined}
+              onClick={() => { setEveryCampus(!everyCampus); setTouched(new Set()); setDraft(null); }}>
+              {everyCampus ? `Only ${campus.name}` : "Show all campuses"}
+            </button>
+          </p>
+        )}
       </section>
-      {serviceTypes.map((st) => <ServiceTypeCard key={st.id} st={st} events={events} config={config} onChange={set} />)}
+      {serviceTypes.map((st) => <ServiceTypeCard key={st.id} st={st} events={events} config={draft} onChange={(d) => edit(st.id, d)} />)}
+      {!serviceTypes.length && <p className="text-sm text-ink-muted">No service types{campus && !everyCampus ? ` for ${campus.name}` : ""}.</p>}
+
+      <div className={clsx("sticky bottom-0 -mx-8 flex items-center gap-3 border-t px-8 py-3 backdrop-blur transition",
+        dirty ? "border-accent/40 bg-surface/95" : "border-line bg-canvas/80")}>
+        <span className="text-sm text-ink-muted">{dirty ? "You have unsaved changes." : "All changes saved."}</span>
+        <button className="btn-ghost ml-auto" disabled={!dirty || save.isPending} onClick={() => { setTouched(new Set()); setDraft(q.data!.config); }}>Discard</button>
+        <button className="btn-primary" disabled={!dirty || save.isPending} onClick={() => save.mutate()}>{save.isPending ? <Spinner /> : <Save size={14} />} Save</button>
+      </div>
     </>
   );
 }
-
 function ServiceTypeCard({ st, events, config, onChange }: {
   st: VolunteerCheckInSetup["serviceTypes"][number]; events: VolunteerCheckInSetup["events"]; config: VolunteerCheckInConfig; onChange: (c: VolunteerCheckInConfig) => void;
 }) {
