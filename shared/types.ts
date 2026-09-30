@@ -300,6 +300,8 @@ export interface TeamCheckIns {
   /** Planning Center Check-Ins couldn't be read (the counts then show 0 checked in). */
   checkInsError: string | null;
   fetchedAt: string;
+  /** The Check-Ins event volunteers use for this service type (Preferences → Team Check-ins); null = not chosen yet. */
+  event?: { id: string; name: string } | null;
 }
 export interface TeamCheckInPerson {
   personId: string; name: string; avatarUrl: string | null; positions: string[]; status: RosterStatus;
@@ -308,10 +310,18 @@ export interface TeamCheckInPerson {
   /** "checkins" = scanned in Planning Center Check-Ins; "staff" = checked in by staff in Cool Services. */
   checkedInVia?: "checkins" | "staff";
   checkedInBy?: string;
+  /** Where they checked in (Check-Ins location, or the team's location for a staff check-in). */
+  location?: string | null;
+  /** The team's area of serving (from Preferences → Team Check-ins). */
+  expectedLocation?: string | null;
 }
 
 /** A check-in recorded in Cool Services (Planning Center's Check-Ins API can't create check-ins). */
-export interface StaffCheckIn { id: string; personId: string; name: string; planId: string; serviceTypeId: string; teamId: string; at: string; by: string }
+export interface StaffCheckIn {
+  id: string; personId: string; name: string; planId: string; serviceTypeId: string; teamId: string; at: string; by: string;
+  /** Always "Volunteer"; the event and location come from Preferences → Team Check-ins. */
+  kind?: "Volunteer"; eventId?: string | null; eventName?: string | null; locationId?: string | null; locationName?: string | null;
+}
 
 export type TeamPhoneRole = "leads" | "staff";
 /** Team check-ins on phones: leads (view) and staff (view + check in), each with a PIN. */
@@ -416,12 +426,16 @@ export interface CheckInRow {
   avatarUrl: string | null;
   kind: CheckInKind;
   event: string;
+  /** Check-Ins event id (for matching the volunteer event chosen in Preferences). */
+  eventId?: string | null;
   locations: string[];
   /** Check-Ins location ids (rooms), for matching a ministry's rooms. */
   locationIds: string[];
   at: string; // checked in
   checkedOutAt: string | null;
   securityCode: string | null;
+  /** Checked in by staff in Cool Services (not in Planning Center Check-Ins). */
+  byStaff?: string;
 }
 
 export interface CheckInsForPlan {
@@ -622,7 +636,24 @@ export interface KioskInfo {
 
 export interface KioskChildren { children: KioskChild[]; fetchedAt: string }
 
-export interface CheckInLocation { id: string; name: string; event: string; folder: string | null; childOrAdult: string | null }
+export interface CheckInLocation { id: string; name: string; event: string; eventId?: string; folder: string | null; childOrAdult: string | null }
+
+/**
+ * Volunteer check-in setup (Preferences → Team Check-ins): which Planning Center Check-Ins event
+ * volunteers check in to for each service type, and the location (area of serving) for each team.
+ */
+export interface VolunteerCheckInConfig {
+  /** serviceTypeId → Check-Ins event. */
+  events: Record<string, { id: string; name: string }>;
+  /** teamId → location in that event (Greeters → Main Lobby). */
+  teamLocations: Record<string, { id: string; name: string }>;
+}
+export interface VolunteerCheckInSetup {
+  config: VolunteerCheckInConfig;
+  serviceTypes: { id: string; name: string; teams: { id: string; name: string }[] }[];
+  events: { id: string; name: string; locations: { id: string; name: string; folder: string | null }[] }[];
+  eventsError: string | null;
+}
 
 /* ───────────── Matrix (several weeks of one service type) ───────────── */
 

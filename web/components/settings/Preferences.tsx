@@ -6,7 +6,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { AudioLines, Building2, Info, Laptop, MonitorPlay, Moon, Network, Palette, Power, Sun, Trash2, Upload } from "lucide-react";
+import { AudioLines, Building2, Info, Laptop, MonitorPlay, Moon, Network, Palette, Power, Sun, Trash2, Upload, UserCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppSettings, StartView, ThemePref } from "@shared/types";
@@ -23,12 +23,14 @@ import { SmaartSettings } from "@/components/settings/SmaartSettings";
 import { UpdatesSettings } from "@/components/settings/UpdatesSettings";
 import { ConsoleSettings } from "@/components/settings/ConsoleSettings";
 import { CampusSettings } from "@/components/settings/CampusSettings";
+import { VolunteerCheckInSettings } from "@/components/settings/VolunteerCheckInSettings";
 
 const TABS: { id: PrefsTab; label: string; icon: typeof Info; blurb: string }[] = [
   { id: "about", label: "About", icon: Info, blurb: "Version and updates." },
   { id: "appearance", label: "Appearance", icon: Palette, blurb: "Theme and your logo." },
   { id: "startup", label: "Default Startup", icon: Power, blurb: "What opens first." },
   { id: "campuses", label: "Campuses", icon: Building2, blurb: "Sort service types by campus, and choose yours." },
+  { id: "checkins", label: "Team Check-ins", icon: UserCheck, blurb: "The Check-Ins event volunteers use, and each team’s area of serving." },
   { id: "audio", label: "Audio", icon: AudioLines, blurb: "Allen & Heath, Waves SuperRack and Smaart." },
   { id: "network", label: "Network Connections", icon: Network, blurb: "Kids & Nursery paging and iPads, team check-ins on phones, FOH companions." },
   { id: "video", label: "Video", icon: MonitorPlay, blurb: "ProPresenter computers." },
@@ -95,6 +97,7 @@ export function Preferences({ standalone }: { standalone?: boolean }) {
               {tab === "appearance" && <AppearanceSection s={s} save={save.mutate} />}
               {tab === "startup" && <><StartupSection s={s} save={save.mutate} /><AppModeSection /></>}
               {tab === "campuses" && <CampusSettings />}
+              {tab === "checkins" && <VolunteerCheckInSettings />}
               {tab === "audio" && <><ConsoleSettings /><WavesSettings w={s.waves} onChange={(waves) => save.mutate({ waves })} /><SmaartSettings /></>}
               {tab === "network" && <PagingSettings />}
               {tab === "video" && <ProComputersSettings />}

@@ -26,7 +26,7 @@ function demoCheckIns(key: string, start: number, serving: string[] = []): Check
       name: person ? person.name : `${kids[(i * 7) % kids.length]} ${lasts[(i * 3) % lasts.length]}`,
       avatarUrl: person?.avatarUrl ?? null,
       kind: vol ? "Volunteer" : i % 9 === 4 ? "Guest" : "Regular",
-      event: vol ? "Sunday Volunteers" : `Sunday ${folder}`, locations: [room], locationIds: [roomId],
+      event: vol ? "Sunday Volunteers" : `Sunday ${folder}`, eventId: vol ? "ev-vol" : `ev-${folder.toLowerCase()}`, locations: [room], locationIds: [roomId],
       at: new Date(start + i * 70e3).toISOString(),
       checkedOutAt: i < 4 ? new Date(start + 3 * 3600e3).toISOString() : null,
       securityCode: vol ? null : `${"ABCDEFGHJK"[i % 10]}${"XYZ"[i % 3]}${(i * 7) % 10}`,
@@ -612,7 +612,15 @@ export class DemoPco implements PcoApi {
   }
 
   async listCheckInLocations(): Promise<CheckInLocation[]> {
-    return DEMO_ROOMS.map(([folder, name, id]) => ({ id, name, folder, event: folder === "Serve" ? "Sunday Volunteers" : `Sunday ${folder}`, childOrAdult: folder === "Kids" ? "child" : "adult" }));
+    const rooms = DEMO_ROOMS.map(([folder, name, id]) => ({ id, name, folder, event: folder === "Serve" ? "Sunday Volunteers" : `Sunday ${folder}`, eventId: folder === "Serve" ? "ev-vol" : `ev-${folder.toLowerCase()}`, childOrAdult: folder === "Kids" ? "child" : "adult" }));
+    // Areas of serving in the volunteer event.
+    const serve = [["Front Doors", "Guest Services"], ["Main Lobby", "Guest Services"], ["Auditorium", "Worship"], ["Production Booth", "Worship"], ["Kids Wing", "Kids"], ["Parking Lot", "Safety"]]
+      .map(([name, folder], i) => ({ id: `loc-serve-${i}`, name, folder, event: "Sunday Volunteers", eventId: "ev-vol", childOrAdult: "adult" }));
+    return [...rooms, ...serve];
+  }
+
+  async listTeams(_st: string): Promise<{ id: string; name: string }[]> {
+    return teams.map((t) => ({ id: t.id, name: t.name }));
   }
 
   async getPlanCounts(_st: string, planId: string): Promise<PlanCounts> {

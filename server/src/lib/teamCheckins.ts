@@ -11,7 +11,7 @@
 import crypto from "node:crypto";
 import type { PcoApi } from "../pco/api.js";
 import { SignedOutError } from "../pco/client.js";
-import type { PlanDetail, StaffCheckIn, TeamCheckIns, TeamPhoneRole, TeamPhonesConfig } from "../../../shared/types.js";
+import type { CheckInRow, PlanDetail, StaffCheckIn, TeamCheckIns, TeamPhoneRole, TeamPhonesConfig, VolunteerCheckInConfig } from "../../../shared/types.js";
 import { extras } from "./db.js";
 
 /* ───────────── Staff check-ins ───────────── */
@@ -19,6 +19,12 @@ import { extras } from "./db.js";
 const KEY = "staffCheckIns";
 const all = () => extras.get<StaffCheckIn[]>(KEY, []);
 const localDay = (iso: string) => new Date(iso).toDateString();
+
+/* ───────────── Volunteer event and areas of serving (Preferences → Team Check-ins) ───────────── */
+
+const VKEY = "volunteerCheckIn";
+export const volunteerConfig = (): VolunteerCheckInConfig => ({ events: {}, teamLocations: {}, ...extras.get<Partial<VolunteerCheckInConfig>>(VKEY, {}) });
+export function saveVolunteerConfig(c: VolunteerCheckInConfig) { extras.set(VKEY, c); bust(); return volunteerConfig(); }
 
 /** Plans on the same day as this one that the person is scheduled on (not declined), with their teams. */
 async function sameDayPlans(api: PcoApi, st: string, planId: string, personId: string) {
@@ -40,7 +46,14 @@ export async function staffCheckIn(api: PcoApi, st: string, planId: string, pers
   const added: StaffCheckIn[] = [];
   for (const s of spots) {
     if (list.some((x) => x.personId === personId && x.planId === s.plan.id && x.teamId === s.teamId)) continue;
-    added.push({ id: crypto.randomBytes(6).toString("hex"), personId, name: s.name, planId: s.plan.id, serviceTypeId: s.plan.serviceTypeId, teamId: s.teamId, at, by });
+    // Checked in as a volunteer, in that service type's volunteer event, at the team's area of serving.
+    const cfg = volunteerConfig();
+    const ev = cfg.events[s.plan.serviceTypeId] ?? null;
+    const loc = cfg.teamLocations[s.teamId] ?? null;
+    added.push({
+      id: crypto.randomBytes(6).toString("hex"), personId, name: s.name, planId: s.plan.id, serviceTypeId: s.plan.serviceTypeId, teamId: s.teamId, at, by,
+      kind: "Volunteer", eventId: ev?.id ?? null, eventName: ev?.name ?? null, locationId: loc?.id ?? null, locationName: loc?.name ?? null,
+    });
   }
   // Keep about two weeks.
   const cutoff = Date.now() - 14 * 864e5;
@@ -57,6 +70,22 @@ export async function staffUndo(api: PcoApi, st: string, planId: string, personI
   const ids = new Set([planId, ...upcoming.filter((p) => localDay(p.sortDate) === day).map((p) => p.id)]);
   extras.set(KEY, all().filter((x) => !(x.personId === personId && ids.has(x.planId))));
   bust();
+}
+
+/** Staff check-ins for a plan as Check-ins rows (volunteers, at their team's area), for the Check-ins tab. */
+export function staffRows(planId: string): CheckInRow[] {
+  const seen = new Set<string>();
+  const cfg = volunteerConfig();
+  return all().filter((x) => x.planId === planId && !seen.has(x.personId) && seen.add(x.personId)).map((x) => {
+    // Made before the event/areas were set up: use today's setup.
+    const ev = x.eventId ? { id: x.eventId, name: x.eventName ?? "" } : cfg.events[x.serviceTypeId] ?? null;
+    const loc = x.locationId ? { id: x.locationId, name: x.locationName ?? "" } : cfg.teamLocations[x.teamId] ?? null;
+    return {
+    id: `staff-${x.id}`, personId: x.personId, name: x.name, avatarUrl: null, kind: "Volunteer" as const,
+    event: ev?.name ?? "", eventId: ev?.id ?? null, locations: loc ? [loc.name] : [], locationIds: loc ? [loc.id] : [],
+    at: x.at, checkedOutAt: null, securityCode: null, byStaff: x.by,
+    };
+  });
 }
 
 /* ───────────── The combined view ───────────── */
@@ -76,7 +105,9 @@ export function teamCheckIns(api: PcoApi, st: string, planId: string, onDenied: 
 
 async function build(api: PcoApi, st: string, planId: string, onDenied: (e: any) => string): Promise<TeamCheckIns> {
   const plan = await api.getPlan(st, planId);
-  let rows: { personId: string | null; at: string }[] = [];
+  const cfg = volunteerConfig();
+  const event = cfg.events[plan.serviceTypeId] ?? null;
+  let rows: CheckInRow[] = [];
   let checkInsError: string | null = null;
   try {
     rows = (await api.getCheckIns(st, planId)).rows;
@@ -84,8 +115,10 @@ async function build(api: PcoApi, st: string, planId: string, onDenied: (e: any)
     if (e instanceof SignedOutError) throw e;
     checkInsError = e?.status === 403 || e?.status === 401 ? onDenied(e) : (e?.message ?? "Check-Ins couldn’t be read.");
   }
-  const firstIn = new Map<string, string>();
-  for (const r of rows) if (r.personId && (!firstIn.has(r.personId) || r.at < firstIn.get(r.personId)!)) firstIn.set(r.personId, r.at);
+  // With a volunteer event chosen, only check-ins to that event count (not, say, checking their kids in).
+  if (event) rows = rows.filter((r) => (r.eventId ? r.eventId === event.id : r.event === event.name));
+  const firstIn = new Map<string, CheckInRow>();
+  for (const r of rows) if (r.personId && (!firstIn.has(r.personId) || r.at < firstIn.get(r.personId)!.at)) firstIn.set(r.personId, r);
   const staff = all().filter((x) => x.planId === planId);
   const teams = new Map<string, TeamCheckIns["teams"][number]>();
   for (const m of plan.roster) {
@@ -95,18 +128,21 @@ async function build(api: PcoApi, st: string, planId: string, onDenied: (e: any)
     if (p) { p.positions.push(m.positionName); teams.set(m.teamId, t); continue; }
     const pco = firstIn.get(m.personId);
     const byStaff = staff.find((x) => x.personId === m.personId && x.teamId === m.teamId) ?? staff.find((x) => x.personId === m.personId);
-    const via = pco && (!byStaff || pco <= byStaff.at) ? "checkins" : byStaff ? "staff" : undefined;
+    const via = pco && (!byStaff || pco.at <= byStaff.at) ? "checkins" : byStaff ? "staff" : undefined;
+    const expected = cfg.teamLocations[m.teamId]?.name ?? null;
     t.people.push({
       personId: m.personId, name: m.name, avatarUrl: m.avatarUrl, positions: [m.positionName], status: m.status,
-      checkedInAt: via === "checkins" ? pco! : via === "staff" ? byStaff!.at : null,
+      checkedInAt: via === "checkins" ? pco!.at : via === "staff" ? byStaff!.at : null,
       checkedInVia: via, checkedInBy: via === "staff" ? byStaff!.by : undefined,
+      location: via === "checkins" ? pco!.locations[0] ?? null : via === "staff" ? byStaff!.locationName ?? expected : null,
+      expectedLocation: expected,
     });
     teams.set(m.teamId, t);
   }
   const order = plan.teams.map((t) => t.id);
   return {
     teams: [...teams.values()].sort((a, b) => (order.indexOf(a.teamId) + 1 || 999) - (order.indexOf(b.teamId) + 1 || 999)),
-    checkInsError, fetchedAt: new Date().toISOString(),
+    checkInsError, fetchedAt: new Date().toISOString(), event,
   };
 }
 

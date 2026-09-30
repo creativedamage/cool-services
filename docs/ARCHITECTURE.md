@@ -326,3 +326,14 @@ scrypt-hashed PIN per role (a new PIN signs that role's phones out), sessions (h
 cookie; a staff session may also read the leads view, not the other way), and the owner whose
 Planning Center access is used (whoever last saved them). `GET /` on a host matching a saved name, or
 starting with `staff.` / `leads.`, redirects to that page. Desktop settings: `/api/team-phones`.
+
+## 5t. Volunteer event and team locations (1.16)
+
+`volunteerCheckIn` (extras): `events[serviceTypeId] = {id, name}` (a Check-Ins event) and
+`teamLocations[teamId] = {id, name}` (a location in it). Set in Preferences → Team Check-ins via
+`/api/volunteer-checkin` (GET returns service types with `listTeams()`, and events grouped from
+`listCheckInLocations()`, which now carries `eventId`; check-in rows carry `eventId` too).
+`teamCheckIns()` keeps only rows for the chosen event, adds `location` / `expectedLocation` per
+person and `event` (null → the page prompts for setup). `staffCheckIn()` stamps kind Volunteer, the
+event and the team's location; `staffRows()` turns a plan's staff check-ins into `CheckInRow`s
+(`byStaff`) merged into `/plans/:st/:plan/checkins` unless Check-Ins already has that person.

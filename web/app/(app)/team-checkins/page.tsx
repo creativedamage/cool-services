@@ -6,7 +6,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { Check, Clock3, Layers, Plus, ShieldCheck, Trash2, UsersRound } from "lucide-react";
+import { CalendarCheck, Check, Clock3, Layers, MapPin, Plus, ShieldCheck, Trash2, UsersRound } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import { Api } from "@/lib/api";
 import { useCampus } from "@/lib/campus";
 import { usePlans } from "@/lib/plans";
 import { Avatar, Modal, Skeleton, Spinner } from "@/components/ui";
+import { PrefsLink } from "@/components/settings/PrefsLink";
 
 export default function Page() { return <Suspense><TeamCheckInsPage /></Suspense>; }
 
@@ -73,6 +74,14 @@ function TeamCheckInsPage() {
       </header>
 
       <div className="space-y-8 p-6">
+        {data.data && data.data.event === null && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-accent/40 bg-accent-soft px-4 py-3 text-sm">
+            <MapPin size={16} className="text-accent" />
+            <span className="min-w-0 flex-1">Which Check-Ins event do volunteers check in to for {chosen?.serviceTypeName ?? "this service"}? Choose it and each team’s area, so only volunteer check-ins count and staff check-ins land in the right place.</span>
+            <PrefsLink section="checkins" className="btn-primary py-1 text-xs">Set up</PrefsLink>
+          </div>
+        )}
+        {data.data?.event && <p className="-mt-4 flex items-center gap-1.5 text-xs text-ink-muted"><CalendarCheck size={12} /> Counting check-ins to <b className="text-ink-soft">{data.data.event.name}</b> · <PrefsLink section="checkins" className="text-accent hover:underline">change</PrefsLink></p>}
         {data.data?.checkInsError && (
           <div className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">Check-Ins can’t be read right now, so nobody shows as checked in: {data.data.checkInsError}</div>
         )}
@@ -111,7 +120,10 @@ function Tile({ t, open, onToggle, onCheckIn, busy }: { t: Team; open: boolean; 
       <button onClick={onToggle} className="block w-full p-4 text-left">
         <div className="flex items-center gap-2">
           {tone === "ok" ? <ShieldCheck size={16} className="text-ok" /> : <UsersRound size={16} className="text-ink-muted" />}
-          <span className="truncate text-sm font-semibold">{t.teamName}</span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold">{t.teamName}</span>
+            {t.people[0]?.expectedLocation && <span className="flex items-center gap-1 truncate text-[11px] text-ink-muted"><MapPin size={10} />{t.people[0].expectedLocation}</span>}
+          </span>
         </div>
         <div className={clsx("mt-2 font-mono text-5xl font-semibold tabular-nums", tone === "ok" ? "text-ok" : tone === "warn" ? "text-ink" : "text-ink-faint")}>
           {inn}<span className="text-2xl text-ink-muted">/{all}</span>
@@ -128,6 +140,9 @@ function Tile({ t, open, onToggle, onCheckIn, busy }: { t: Team; open: boolean; 
               <span className="min-w-0 flex-1">
                 <span className="block truncate">{p.name}</span>
                 <span className="block truncate text-[11px] text-ink-muted">{p.positions.join(", ")}{p.status === "U" ? " · unconfirmed" : ""}</span>
+                {p.checkedInAt && p.location && p.expectedLocation && p.location !== p.expectedLocation && (
+                  <span className="block truncate text-[11px] text-warn">checked in at {p.location}</span>
+                )}
               </span>
               {p.checkedInAt ? (
                 <span className="flex flex-col items-end">

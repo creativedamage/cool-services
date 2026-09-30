@@ -8,7 +8,7 @@
  * Phones only ever get names, photos, positions and check-in times: no contact details.
  */
 import clsx from "clsx";
-import { Check, ChevronDown, Delete, Lock, RefreshCw, Search, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
+import { Check, ChevronDown, Delete, Lock, MapPin, RefreshCw, Search, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TeamCheckInPerson, TeamCheckIns, TeamPhoneData, TeamPhoneInfo, TeamPhoneRole } from "@shared/types";
 
@@ -321,6 +321,7 @@ function Teams({ role, info, onLocked }: { role: TeamPhoneRole; info: TeamPhoneI
                         {done ? <ShieldCheck size={20} className="shrink-0 text-ok" /> : <UsersRound size={20} className="shrink-0 text-ink-muted" />}
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-semibold">{x.teamName}</span>
+                          {x.people[0]?.expectedLocation && <span className="flex items-center gap-1 truncate text-xs text-ink-muted"><MapPin size={11} />{x.people[0].expectedLocation}</span>}
                           <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-hover">
                             <span className={clsx("block h-full rounded-full transition-all", done ? "bg-ok" : "bg-warn")} style={{ width: `${all ? (inn / all) * 100 : 0}%` }} />
                           </span>
@@ -374,6 +375,7 @@ function PersonRow({ p, sub, staff, busy, onCheckIn }: { p: TeamCheckInPerson; s
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[15px] font-medium">{p.name}</span>
         <span className="block truncate text-xs text-ink-muted">{sub}{p.status === "U" ? " · unconfirmed" : ""}</span>
+        {p.checkedInAt && p.location && p.expectedLocation && p.location !== p.expectedLocation && <span className="block truncate text-xs text-warn">checked in at {p.location}</span>}
       </span>
       {p.checkedInAt ? (
         <span className="flex shrink-0 flex-col items-end">

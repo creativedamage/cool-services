@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { rememberTeams } from "./teamGroups.js";
-import { staffCheckIn, staffUndo, teamCheckIns } from "../lib/teamCheckins.js";
+import { staffCheckIn, staffRows, staffUndo, teamCheckIns } from "../lib/teamCheckins.js";
 import { z } from "zod";
 import { audit } from "../lib/db.js";
 import { lowPriority } from "../pco/client.js";
 import { checkInsDenied } from "../auth/oauth.js";
 import { SignedOutError } from "../pco/client.js";
-import type { PlanDetail, TeamCheckIns } from "../../../shared/types.js";
+import type { CheckInsForPlan, PlanDetail, TeamCheckIns } from "../../../shared/types.js";
 
 export const servicesRouter = Router();
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
@@ -110,7 +110,11 @@ servicesRouter.post("/plans/:st/:plan/team-checkins/:person", h(async (req, res)
 
 servicesRouter.get("/plans/:st/:plan/checkins", h(async (req, res) => {
   try {
-    res.json(await req.pco.getCheckIns(req.params.st, req.params.plan));
+    const r: CheckInsForPlan = await req.pco.getCheckIns(req.params.st, req.params.plan);
+    // Staff check-ins (Cool Services) show as volunteers at their area, unless Check-Ins already has them.
+    const inPco = new Set(r.rows.map((x) => x.personId).filter(Boolean));
+    const extra = staffRows(req.params.plan).filter((x) => !inPco.has(x.personId));
+    res.json({ ...r, rows: [...r.rows, ...extra].sort((a, b) => b.at.localeCompare(a.at)) });
   } catch (e: any) {
     if (e?.status === 403 || e?.status === 401) return res.status(403).json(checkInsDenied(req, e));
     throw e;

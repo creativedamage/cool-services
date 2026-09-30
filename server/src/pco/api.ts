@@ -60,6 +60,8 @@ export interface PcoApi {
   getTodayCheckIns(): Promise<CheckInRow[]>;
   /** Rooms in Check-Ins (from current events), for choosing each ministry's rooms. */
   listCheckInLocations(): Promise<CheckInLocation[]>;
+  /** A service type's teams (for assigning each team a Check-Ins location). */
+  listTeams(serviceTypeId: string): Promise<{ id: string; name: string }[]>;
   getCandidates(serviceTypeId: string, planId: string, teamId: string, positionName: string): Promise<Candidate[]>;
   getConflicts(serviceTypeId: string, planId: string, personId: string): Promise<Conflict[]>;
   schedule(serviceTypeId: string, planId: string, req: ScheduleRequest): Promise<TeamMember>;

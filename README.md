@@ -278,6 +278,22 @@ workflow with that person in Planning Center, and it appears under their My work
 - People managers and site administrators still see every workflow, under "Other workflows".
 - New cards on your workflows pop up as a notification (with Open), checked every minute.
 
+## Volunteer event and areas of serving
+
+Preferences → **Team Check-ins** (the Team check-ins page asks until it's set): for each service
+type, choose the Planning Center Check-Ins **event** volunteers check in to (e.g. "Sunday
+Volunteers"), then give each **team** its **location** in that event (Hospitality → Main Lobby,
+Production → Production Booth). **Match by name** fills in the obvious ones.
+
+- Only check-ins to that event count on Team check-ins (checking your own kids in doesn't count as
+  serving).
+- A staff **Check in** records the person as a **Volunteer** at their team's location, in that event,
+  on every service that day they're on. They show on the service's Check-ins tab in that room, marked
+  "by staff".
+- Tiles show each team's area; anyone who checked in at a different location is flagged.
+- Planning Center's API can't create check-ins, so these stay in Cool Services and don't appear in
+  Planning Center's own Check-Ins reports.
+
 ## Team check-ins on phones (leads and staff)
 
 Preferences → Network Connections → **Team check-ins on phones**: turn it on and set a PIN for
@@ -356,7 +372,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.15.0 && git push origin v1.15.0
+   git tag v1.16.0 && git push origin v1.16.0
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

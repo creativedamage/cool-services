@@ -26,6 +26,7 @@ import { consoleRouter } from "./routes/console.js";
 import { campusesRouter } from "./routes/campuses.js";
 import { teamGroupsRouter } from "./routes/teamGroups.js";
 import { teamPhonesRouter } from "./routes/teamPhones.js";
+import { volunteerCheckInRouter } from "./routes/volunteerCheckIn.js";
 import { appModeRouter, companionClientRouter } from "./routes/companionClient.js";
 import { setAttentionBridge, startCompanion } from "./lib/companion.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
@@ -55,6 +56,7 @@ export function createApp(webDir?: string) {
   app.use("/api/campuses", requireAuth, campusesRouter);
   app.use("/api/team-groups", requireAuth, teamGroupsRouter);
   app.use("/api/team-phones", requireAuth, teamPhonesRouter);
+  app.use("/api/volunteer-checkin", requireAuth, volunteerCheckInRouter);
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
   app.use("/api/app-mode", appModeRouter); // full app or FOH companion (this Mac only)
   app.use("/api/companion-client", companionClientRouter);

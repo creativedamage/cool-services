@@ -744,6 +744,7 @@ export class LivePco implements PcoApi {
       avatarUrl: person?.avatar ?? null,
       kind: (["Regular", "Guest", "Volunteer"].includes(f.kind) ? f.kind : "Regular") as CheckInRow["kind"],
       event: f.rel.event?.name ?? "",
+      eventId: f.rel.event?.id ?? null,
       locations: (f.rel.locations ?? []).map((l: Flat) => l.name).filter(Boolean),
       locationIds: (f.rel.locations ?? []).map((l: Flat) => l.id).filter(Boolean),
       at: f.created_at,
@@ -807,10 +808,15 @@ export class LivePco implements PcoApi {
         const locs = await this.c.list(`/check-ins/v2/events/${e.id}/locations?include=parent&order=position`, 5);
         return locs
           .filter((l) => l.kind !== "Folder")
-          .map((l): CheckInLocation => ({ id: l.id, name: l.name, event: e.name, folder: l.rel.parent?.name ?? null, childOrAdult: l.child_or_adult ?? null }));
+          .map((l): CheckInLocation => ({ id: l.id, name: l.name, event: e.name, eventId: e.id, folder: l.rel.parent?.name ?? null, childOrAdult: l.child_or_adult ?? null }));
       }));
       return per.flat();
     });
+  }
+
+  async listTeams(st: string): Promise<{ id: string; name: string }[]> {
+    const rows = await cache.swr(this.k(`teams:${st}`), 600, () => this.c.list(`${S}/service_types/${st}/teams?include=team_positions`));
+    return rows.filter((t) => !t.archived_at && !t.deleted_at).map((t) => ({ id: t.id, name: t.name ?? "" })).sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /** After any roster change, forget cached copies so the next load is exact. */
