@@ -337,3 +337,27 @@ starting with `staff.` / `leads.`, redirects to that page. Desktop settings: `/a
 person and `event` (null → the page prompts for setup). `staffCheckIn()` stamps kind Volunteer, the
 event and the team's location; `staffRows()` turns a plan's staff check-ins into `CheckInRow`s
 (`byStaff`) merged into `/plans/:st/:plan/checkins` unless Check-Ins already has that person.
+
+## 5u. Production clock (1.17)
+
+- `shared/clock.ts`: types and `readClock()`. The state stores absolute times (startedAt, elapsedMs,
+  durationMs, targetAt), so each screen computes the display from its own clock plus the server's
+  offset (`serverNow`); nothing is pushed every second.
+- `server/src/lib/clock.ts`: the engine. Actions (start/pause/toggle/reset/add/set/message/blank/
+  load/next/prev/colors/info/style), presets with `nextPresetId` (loaded and started when the main
+  timer reaches zero) and weekday/time schedules (checked each minute), a secondary that can start
+  when the main ends, and Planning Center lookups for "until service" (next service time, re-checked
+  each minute) and "Live item" (polled every 3 s) using whoever last used the clock. Persisted in the
+  `clock` extra.
+- `server/src/routes/clock.ts`: `/api/clock` (signed in) and `/api/clock-out` (no sign-in, also on
+  the LAN listener when "On the church network" is on): `/state`, `/stream` (server-sent events) and
+  `/control/<key>/<action>[/<value>]` for Stream Deck / Companion.
+- Web: `/clock` (control), `/clockout` (the output: `ClockFace`, laid out like a broadcast production
+  clock; `?ndi=1` uses the transparent setting), the Dashboard widget, Preferences → Video → Clock
+  outputs. The LAN listener serves `clockout.html` at `/clock`.
+- Desktop: `clockOut.ts` renders `/clockout?ndi=1` in an off-screen window and sends each frame
+  through `ndiLib.ts` (koffi → `NDIlib_send_send_video_v2` on a worker thread, BGRA with alpha or
+  BGRX, clock_video off and paced by Cool Services); it also opens the second-display window and
+  reports displays. `build.mjs` copies koffi's Mac binaries to `app/native/koffi` and extracts
+  `libndi.dylib` from NDI's SDK installer to `app/native/ndi` (unpacked from asar; `x64ArchFiles`
+  covers them for the universal build). `COOL_NDI_FAKE=<folder>` writes frames as PNGs for testing.

@@ -1,7 +1,7 @@
 {
   "name": "cool-services",
   "productName": "Cool Services",
-  "version": "1.16.1",
+  "version": "1.17.0",
   "description": "Volunteer workflows and service scheduling, powered by Planning Center.",
   "author": "Wayne Goodman Productions",
   "private": true,
@@ -9,13 +9,14 @@
   "scripts": {
     "build": "node build.mjs",
     "start": "node build.mjs && electron .",
-    "dist": "node build.mjs && electron-builder --mac --publish never",
+    "dist": "node build.mjs --dist && electron-builder --mac --publish never",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "electron": "44.4.5",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.28.0",
+    "koffi": "2.16.3",
     "typescript": "^5.7.2"
   },
   "build": {
@@ -49,14 +50,18 @@
         }
       ],
       "identity": "-",
-      "artifactName": "Cool-Services-${version}-mac.${ext}"
+      "artifactName": "Cool-Services-${version}-mac.${ext}",
+      "x64ArchFiles": "**/app/native/**"
     },
     "dmg": {
       "title": "Cool Services",
       "artifactName": "Cool-Services-${version}.dmg"
     },
     "npmRebuild": false,
-    "afterSign": "build/after-sign.cjs"
+    "afterSign": "build/after-sign.cjs",
+    "asarUnpack": [
+      "app/native/**"
+    ]
   },
   "coolServices": {
     "updateRepo": "YOUR-GITHUB-NAME/cool-services"

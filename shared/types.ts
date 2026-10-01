@@ -782,7 +782,7 @@ export interface SmaartStatusView {
 /** The service the dashboard follows: a service type (your campus), optionally pinned to one plan. */
 export interface HomeService { serviceTypeId: string | null; planId: string | null }
 
-export type WidgetType = "tuning" | "spl" | "wireless" | "live" | "clock" | "pro";
+export type WidgetType = "tuning" | "spl" | "wireless" | "live" | "clock" | "pro" | "prodclock";
 export interface DashboardWidget {
   id: string;
   type: WidgetType;

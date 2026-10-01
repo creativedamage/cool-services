@@ -40,6 +40,12 @@ Services scheduling faster.
 - **Message the team**: on any service, text or email one person, a team, or everyone (by status).
   It opens a message in Messages on this Mac addressed with their mobile numbers from Planning
   Center, like Planning Center's mobile app does (there's no API for sending texts).
+- **Production clock** (sidebar → Clock): a broadcast-style clock (title bar, second timer,
+  Information box, big main timer) with countdowns, count up, count to a time, time of day, **until
+  service** (from Planning Center service times) and **Live item** (time left on the current Planning
+  Center Live item). Saved **timers** start with a click, a number key, a schedule, or when the one
+  before ends. Outputs: **NDI®**, the church network (any browser), a second display, and Stream Deck
+  / Companion links.
 - **Tuning**: every song's key, big, across the top of each service in service order ("Song 1 · A",
   "Song 2 · Db"). With Waves SuperRack connected in Settings, pressing a key recalls that key's
   SuperRack snapshot over MIDI.
@@ -278,6 +284,45 @@ workflow with that person in Planning Center, and it appears under their My work
 - People managers and site administrators still see every workflow, under "Other workflows".
 - New cards on your workflows pop up as a notification (with Open), checked every minute.
 
+## Production clock
+
+Sidebar → **Clock**. The preview at the top is exactly what every output shows:
+
+- **Title bar** ("MASTER TIME", set in Preferences → Video → Clock outputs), a **second timer** on
+  the left (or the time of day), the **Information** box on the right (a big yellow title and an
+  orange subtitle, like "ALPHA (Session 1)"), and the **main timer** below. The main timer's color
+  is yours (red by default); it turns yellow and then red near the end (set per timer), and pulses
+  once it's past zero.
+- **Clocks**: Countdown, Count up, Count to a time (e.g. 9:00 AM), Time of day, **Until service**
+  (the next service time in Planning Center, for one service type or any), and **Live item** (the
+  current Planning Center Live item's name and time left).
+- **Message**: shows over the main timer (bottom, top, or covering it), with quick buttons.
+- **Timers** (saved presets): main and second timer, Information text, color, message, yellow/red
+  points, "start when loaded", what to start when it reaches zero (Walk-in → Service →
+  Announcements…), and **Start automatically** on chosen days at a time (e.g. Sundays 8:50).
+  Start one by clicking it or pressing 1–9. Keys: Space start/pause, R reset, ← → previous/next, B
+  blank. **Previous / next** loop from the last timer back to the first.
+- The Dashboard has a **Production clock** widget.
+
+**Outputs** (Preferences → Video → Clock outputs):
+
+- **NDI®**: a source named "<this Mac> (Cool Services Clock)" at 1920×1080 or 1280×720, 25–60 fps,
+  optionally with a **transparent background** to key it over video. Add it in ProPresenter, vMix,
+  OBS, a TriCaster or an NDI monitor.
+- **On the church network**: `http://<this Mac>/clock` (or with the iPad port) full screen in any
+  browser: TVs, a stage iPad, a confidence monitor.
+- **Second display** on this Mac: full screen on the display you choose.
+- **Stream Deck / Bitfocus Companion**: copy the links (Generic HTTP → GET): start, pause, toggle,
+  reset, next, previous, ±1 minute, start a timer by number or name, message, information, blank.
+
+**How NDI is built.** NDI is sent by calling NDI's own library with koffi, which ships ready-built
+for Apple Silicon and Intel, so nothing is compiled on your Mac (the add-on that broke in 1.9–1.12
+needed compiling). `npm run dist:mac` downloads NDI's official Mac SDK installer once (kept in
+`~/Library/Caches/cool-services-build`), takes `libndi.dylib` out of it and puts it in the app. If it
+can't, the build stops and tells you why. To use a copy you already have:
+`COOL_NDI_LIB="/Library/NDI SDK for Apple/lib/macOS/libndi.dylib" npm run dist:mac`. To build without
+NDI: `COOL_SKIP_NDI=1 npm run dist:mac`. NDI® is a registered trademark of Vizrt NDI AB.
+
 ## Volunteer event and areas of serving
 
 Preferences → **Team Check-ins** (the Team check-ins page asks until it's set): for each service
@@ -375,7 +420,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.16.1 && git push origin v1.16.1
+   git tag v1.17.0 && git push origin v1.17.0
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

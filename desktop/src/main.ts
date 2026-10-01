@@ -5,6 +5,7 @@
  * serves the UI and talks to Planning Center; this window shows it. Signing in happens on
  * Planning Center's own page, which returns to 127.0.0.1 — the same approach ProDeck uses.
  */
+import { startClockOutputs } from "./clockOut";
 import { app, BrowserWindow, dialog, Menu, nativeTheme, safeStorage, session, shell } from "electron";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -88,8 +89,10 @@ async function boot() {
   session.defaultSession.setPermissionCheckHandler((_wc, _perm, requestingOrigin) => ours(requestingOrigin));
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { startServer, setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge } = require("./server.cjs") as typeof import("../../server/src/app");
+  const { startServer, setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge, clockOutputs } = require("./server.cjs") as typeof import("../../server/src/app");
   await startServer({ port, webDir: path.join(__dirname, "web") });
+  // Production clock: NDI output and the second-display window.
+  startClockOutputs(origin, clockOutputs);
 
   // Check for Updates (GitHub Releases). Only the packaged app can replace itself.
   const updater = createUpdater({

@@ -23,6 +23,7 @@ import { SmaartSettings } from "@/components/settings/SmaartSettings";
 import { UpdatesSettings } from "@/components/settings/UpdatesSettings";
 import { ConsoleSettings } from "@/components/settings/ConsoleSettings";
 import { CampusSettings } from "@/components/settings/CampusSettings";
+import { ClockOutputsSettings } from "@/components/settings/ClockOutputsSettings";
 import { VolunteerCheckInSettings } from "@/components/settings/VolunteerCheckInSettings";
 
 const TABS: { id: PrefsTab; label: string; icon: typeof Info; blurb: string }[] = [
@@ -33,7 +34,7 @@ const TABS: { id: PrefsTab; label: string; icon: typeof Info; blurb: string }[] 
   { id: "checkins", label: "Team Check-ins", icon: UserCheck, blurb: "The Check-Ins event volunteers use, and each team’s area of serving." },
   { id: "audio", label: "Audio", icon: AudioLines, blurb: "Allen & Heath, Waves SuperRack and Smaart." },
   { id: "network", label: "Network Connections", icon: Network, blurb: "Kids & Nursery paging and iPads, team check-ins on phones, FOH companions." },
-  { id: "video", label: "Video", icon: MonitorPlay, blurb: "ProPresenter computers." },
+  { id: "video", label: "Video", icon: MonitorPlay, blurb: "Clock outputs (NDI, network, second display) and ProPresenter computers." },
 ];
 
 function useHashTab(): [PrefsTab, (t: PrefsTab) => void] {
@@ -100,7 +101,7 @@ export function Preferences({ standalone }: { standalone?: boolean }) {
               {tab === "checkins" && <VolunteerCheckInSettings />}
               {tab === "audio" && <><ConsoleSettings /><WavesSettings w={s.waves} onChange={(waves) => save.mutate({ waves })} /><SmaartSettings /></>}
               {tab === "network" && <PagingSettings />}
-              {tab === "video" && <ProComputersSettings />}
+              {tab === "video" && <><ClockOutputsSettings /><ProComputersSettings /></>}
             </div>
           )}
         </div>
@@ -122,6 +123,7 @@ function AboutSection() {
         <div className="mt-0.5 text-sm text-ink-soft">Version <b className="font-mono">{version ?? "…"}</b></div>
         {me.data && <div className="mt-1 text-xs text-ink-muted">{me.data.orgName} · signed in as {me.data.name}</div>}
         <div className="mt-1 text-[11px] text-ink-faint">Planning Center services, workflows and production tools for the whole team.</div>
+        <div className="mt-1 text-[11px] text-ink-faint">NDI® is a registered trademark of Vizrt NDI AB (ndi.video). The clock’s NDI output uses the NDI runtime library under the NDI SDK license.</div>
       </div>
     </section>
   );

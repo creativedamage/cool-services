@@ -4,6 +4,7 @@ import type {
   DashboardWidget, HomeService, TeamCheckIns, TeamPhonesView, TeamPhoneRole, VolunteerCheckInConfig, VolunteerCheckInSetup, TeamGroup, AppMode, CompanionState, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
+import type { ClockOutputSettings, ClockPreset, ClockState, ClockView } from "@shared/clock";
 
 export type SettingsPatch = Partial<Omit<AppSettings, "waves">> & {
   waves?: Partial<AppSettings["waves"]>;
@@ -81,6 +82,12 @@ export const Api = {
     api<{ ok: true }>(`/people/${person}/cards/${card}/email`, { method: "POST", json: { subject, body } }),
 
   serviceTypes: () => api<ServiceType[]>("/services/service-types"),
+  clock: () => api<ClockView>("/clock"),
+  clockAction: (a: Record<string, unknown> & { type: string }) => api<ClockState>("/clock/action", { method: "POST", json: a }),
+  saveClockPresets: (list: ClockPreset[]) => api<ClockPreset[]>("/clock/presets", { method: "PUT", json: list }),
+  saveClockSettings: (p: { ndi?: Partial<ClockOutputSettings["ndi"]>; screen?: Partial<ClockOutputSettings["screen"]>; showTimeOfDay?: boolean; lan?: boolean; title?: string; infoHeading?: string }) =>
+    api<ClockOutputSettings>("/clock/settings", { method: "PUT", json: p }),
+  newClockKey: () => api<ClockOutputSettings>("/clock/settings/new-key", { method: "POST" }),
   plans: (serviceTypeId?: string) =>
     api<PlanSummary[]>(`/services/plans${serviceTypeId ? `?serviceTypeId=${serviceTypeId}` : ""}`),
   plan: (st: string, plan: string) => api<PlanDetail>(`/services/plans/${st}/${plan}`),

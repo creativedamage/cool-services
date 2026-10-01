@@ -19,6 +19,8 @@ import { MINISTRIES, type KioskChild, type KioskInfo, type Ministry, type TeamGr
 import { pcoForUser } from "./auth/oauth.js";
 import type { PcoApi } from "./pco/api.js";
 import { extras, settings } from "./lib/db.js";
+import { clockOutRouter } from "./routes/clock.js";
+import { clockOutputs, clockSettings } from "./lib/clock.js";
 import { onPhonesChange, phones, phoneSession, phoneUnlock, staffCheckIn, staffUndo, teamCheckIns } from "./lib/teamCheckins.js";
 import { kioskSession, onPagingChange, page, PagingError, requestPage, status, stored, unlock } from "./lib/paging.js";
 import { companionAct, companionFor, companionView, pairingOpen, pairWithCode } from "./lib/companion.js";
@@ -254,6 +256,8 @@ function createKioskApp() {
   app.use("/api/kiosk", ipadsOn, kioskRouter);
   app.use("/api/companion", companionLanRouter);
   app.use("/api/team", teamLanRouter);
+  const clockOn = (_req: Request, res: Response, next: NextFunction) => (clockSettings().lan ? next() : res.status(404).json({ error: "not_found" }));
+  app.use("/api/clock-out", clockOn, clockOutRouter); // the clock on TVs / iPads / stage displays, and Companion control
   app.use("/api", (_req, res) => res.status(404).json({ error: "not_found" }));
   if (webRoot && fs.existsSync(webRoot)) {
     const page = path.join(webRoot, "kiosk.html");
@@ -272,6 +276,8 @@ function createKioskApp() {
       next();
     });
     app.get(["/", "/nursery", "/kids"], ipadsOn, send);
+    // The production clock (full screen in any browser on the network).
+    app.get("/clock", (_req, res, next) => (clockSettings().lan ? next() : res.status(404).send("The clock isn’t shared on the network. Turn it on in Cool Services → Preferences → Clock.")), (_req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(webRoot!, "clockout.html")));
     const teamPage = path.join(webRoot, "team.html");
     app.get(["/leads", "/staff"], (_req, res) => (phones().enabled ? res.set("Cache-Control", "no-cache").sendFile(teamPage) : res.status(404).send("Not found")));
     // Only what the iPad page needs: its scripts/styles, the PDF-free static bundle and icons.
@@ -288,7 +294,7 @@ function createKioskApp() {
 export function applyKiosk() {
   const { enabled, port } = stored().config.ipads;
   // Also listen for FOH companions (paired ones, or while a pairing code is showing).
-  const want = enabled || phones().enabled || pairingOpen() || (stored().companions ?? []).length ? { port } : null;
+  const want = enabled || phones().enabled || clockSettings().lan || pairingOpen() || (stored().companions ?? []).length ? { port } : null;
   if (listening && want && listening.port === want.port) return;
   if (server) { server.close(); server.closeAllConnections?.(); server = null; listening = null; }
   lastError = undefined;
@@ -310,4 +316,5 @@ export function initKiosk(webDir?: string) {
   applyKiosk();
   onPagingChange(applyKiosk);
   onPhonesChange(applyKiosk);
+  clockOutputs.onSettings(() => applyKiosk());
 }

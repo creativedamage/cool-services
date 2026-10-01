@@ -13,11 +13,12 @@ import type { DashboardWidget, WidgetType } from "@shared/types";
 import { Api, qk } from "@/lib/api";
 import { usePlans } from "@/lib/plans";
 import { Modal } from "@/components/ui";
+import { ProdClockWidget } from "@/components/clock/ClockWidget";
 import { ClockWidget, LiveWidget, ProWidget, SplWidget, TuningWidget, WirelessWidget, useHome, useNextService } from "@/components/dashboard/Widgets";
 
 const NAMES: Record<WidgetType, string> = {
   tuning: "Tuning keys", spl: "SPL (Smaart)", wireless: "Shure wireless",
-  live: "Planning Center Live", clock: "Clock & countdown", pro: "ProPresenter control",
+  live: "Planning Center Live", clock: "Clock & countdown", pro: "ProPresenter control", prodclock: "Production clock",
 };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const DEFAULT: DashboardWidget[] = [
@@ -102,6 +103,7 @@ function Widget({ w }: { w: DashboardWidget }) {
     case "spl": return <SplWidget o={w.options} />;
     case "wireless": return <WirelessWidget />;
     case "pro": return <ProWidget o={w.options} />;
+    case "prodclock": return <ProdClockWidget />;
   }
 }
 
@@ -143,7 +145,7 @@ function OptionsModal({ w, onClose, onSave }: { w: DashboardWidget; onClose: () 
             </select>
           </label>
         )}
-        {(w.type === "clock" || w.type === "wireless") && <p className="text-sm text-ink-muted">This widget has no options.</p>}
+        {(w.type === "clock" || w.type === "wireless" || w.type === "prodclock") && <p className="text-sm text-ink-muted">This widget has no options.</p>}
       </div>
       <footer className="flex justify-end gap-2 border-t border-line px-5 py-3">
         <button className="btn-ghost" onClick={onClose}>Cancel</button>

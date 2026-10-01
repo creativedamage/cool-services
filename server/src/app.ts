@@ -27,6 +27,8 @@ import { campusesRouter } from "./routes/campuses.js";
 import { teamGroupsRouter } from "./routes/teamGroups.js";
 import { teamPhonesRouter } from "./routes/teamPhones.js";
 import { volunteerCheckInRouter } from "./routes/volunteerCheckIn.js";
+import { clockOutRouter, clockRouter } from "./routes/clock.js";
+import { startClock } from "./lib/clock.js";
 import { appModeRouter, companionClientRouter } from "./routes/companionClient.js";
 import { setAttentionBridge, startCompanion } from "./lib/companion.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
@@ -41,6 +43,7 @@ export function createApp(webDir?: string) {
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, version: process.env.APP_VERSION ?? "dev" }));
   app.use("/api/auth", authRouter);
+  app.use("/api/clock-out", clockOutRouter); // clock outputs (NDI window, second display) and control links
   app.use("/api/settings", settingsRouter);
   app.use("/api/services", requireAuth, servicesRouter);
   app.use("/api/mics", requireAuth, micsRouter);
@@ -57,6 +60,7 @@ export function createApp(webDir?: string) {
   app.use("/api/team-groups", requireAuth, teamGroupsRouter);
   app.use("/api/team-phones", requireAuth, teamPhonesRouter);
   app.use("/api/volunteer-checkin", requireAuth, volunteerCheckInRouter);
+  app.use("/api/clock", requireAuth, clockRouter);
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
   app.use("/api/app-mode", appModeRouter); // full app or FOH companion (this Mac only)
   app.use("/api/companion-client", companionClientRouter);
@@ -115,6 +119,7 @@ export function startServer(opts: { port: number; webDir?: string }): Promise<Se
       initKiosk(opts.webDir);
       startCompanion(); // if this Mac is an FOH companion, start watching the main computer
       startSmaart();
+      startClock();
       resolve(server);
     });
     server.on("error", reject);
@@ -126,3 +131,5 @@ process.on("exit", flush);
 
 /** Used by the Mac app to plug its updater into /api/updates. */
 export { setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge };
+/** The Mac app's NDI sender and second-display window read clock output settings here. */
+export { clockOutputs } from "./lib/clock.js";

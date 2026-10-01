@@ -11,7 +11,7 @@ export const SECTION_TAB: Record<string, PrefsTab> = {
   startup: "startup", start: "startup", campuses: "campuses", checkins: "checkins", "volunteer-checkin": "checkins",
   audio: "audio", console: "audio", waves: "audio", smaart: "audio",
   network: "network", paging: "network", ipads: "network", companions: "network", "team-phones": "network",
-  video: "video", "pro-computers": "video",
+  video: "video", "pro-computers": "video", clock: "video",
 };
 
 export async function openPrefs(section = "about") {
