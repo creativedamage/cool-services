@@ -11,12 +11,9 @@ import { peopleForPlan } from "@/lib/stage";
 import { ClockFace } from "@/components/clock/ClockFace";
 import { useClockStream } from "@/components/clock/useClock";
 import { PlotCanvas } from "@/components/stage/PlotCanvas";
-import { MicGrid, type TileHistory } from "./MicBoard";
+import type { TileHistory } from "./MicBoard";
 
-/** Recent audio and RF readings per mic (kept on this screen) for the graphs. */
-function useHistory(s: DisplayState) { return useTileHistory(s.tiles, s.at); }
-
-/** The same for any list of tiles; `at` changes when there are new readings. */
+/** Recent audio and RF readings per mic (kept on this screen) for the graphs; `at` changes with new readings. */
 export function useTileHistory(tiles: BoardTile[], at: string) {
   const ref = useRef(new Map<string, TileHistory>());
   const last = useRef("");
@@ -95,20 +92,33 @@ function ClockView() {
   return <ClockFace state={out.state} now={now} showTimeOfDay={out.showTimeOfDay} title={out.title} infoHeading={out.infoHeading} />;
 }
 
+/**
+ * The mic board is Micboard itself (creativedamage/micboard, running inside Cool Services on this
+ * Mac): its own page, from the same computer this page came from, at Micboard's port.
+ */
+function MicboardFrame({ s }: { s: DisplayState }) {
+  const [host, setHost] = useState<string | null>(null);
+  useEffect(() => { setHost(`${location.protocol}//${location.hostname}`); }, []);
+  const m = s.micboard;
+  if (!m) return <Empty text="Micboard is off. Turn it on in Preferences → Micboard." />;
+  if (!m.running) return <Empty text={m.error ?? "Starting Micboard…"} />;
+  if (!host) return null;
+  const src = `${host}:${m.port}/${m.hash}`;
+  // A new hash or new background pictures load Micboard's page again (it reads them when it opens).
+  return <iframe key={`${src}|${m.rev}`} src={src} title="Micboard" className="absolute inset-0 h-full w-full border-0 bg-black" allow="fullscreen" />;
+}
+
 function Empty({ text }: { text: string }) {
   return <div className="flex h-full w-full items-center justify-center p-[4cqw] text-center text-white/60" style={{ fontSize: "3cqh" }}>{text}</div>;
 }
 
 export function DisplayView({ s, now }: { s: DisplayState; now: number }) {
-  const [ref, size] = useSize<HTMLDivElement>();
-  const history = useHistory(s);
+  const [ref] = useSize<HTMLDivElement>();
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-black text-white [container-type:size]" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif" }}>
       <Banner s={s} now={now} />
-      <div ref={ref} className="relative min-h-0 flex-1" style={{ padding: s.view === "micboard" ? "0.8cqh 0.6cqw" : 0 }}>
-        {s.view === "micboard" && (s.tiles.length
-          ? <MicGrid tiles={s.tiles} columns={s.settings.columns} now={now} width={size.w} height={size.h} style={s.settings.imageStyle ?? "background"} history={history} />
-          : <Empty text="No mics to show. Set up your receivers and mics in Services → a service → Mics → Set up mics." />)}
+      <div ref={ref} className="relative min-h-0 flex-1" style={{ padding: 0 }}>
+        {s.view === "micboard" && <MicboardFrame s={s} />}
         {s.view === "stageplot" && <StageView s={s} />}
         {s.view === "clock" && <ClockView />}
       </div>

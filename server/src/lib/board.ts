@@ -7,12 +7,14 @@
  * audio; read-only, see shure.ts). Names and photos come from the service's roster in Planning
  * Center, or from pictures uploaded in Cool Services.
  */
+import crypto from "node:crypto";
 import { DEFAULT_BOARD, type BoardSettings, type BoardTile, type DisplayState, type DisplayView, type TileStatus } from "../../../shared/board.js";
 import type { ChannelStatus, PlanDetail, ReceiverStatus } from "../../../shared/types.js";
 import { pcoForUser } from "../auth/oauth.js";
 import type { PcoApi } from "../pco/api.js";
 import { cache, extras, mics, plots } from "./db.js";
 import { readReceiver } from "./shure.js";
+import { micboardData, micboardRunning, micboardStatus, setMicboardPlanSource, statusesFromMicboard } from "./micboard.js";
 
 interface Stored { settings: BoardSettings; owner: { userId: string; demo: boolean } | null; open?: { serviceTypeId: string; planId: string } | null }
 const KEY = "board";
@@ -23,6 +25,7 @@ function load(): Stored {
   settings.hidden ??= [];
   settings.banner = { ...DEFAULT_BOARD.banner, ...s.settings?.banner };
   settings.screen = { ...DEFAULT_BOARD.screen, ...s.settings?.screen };
+  settings.micboard = { ...DEFAULT_BOARD.micboard, ...s.settings?.micboard };
   return { settings, owner: s.owner ?? null, open: s.open ?? null };
 }
 let stored = load();
@@ -34,7 +37,7 @@ export function saveBoardSettings(patch: Partial<BoardSettings>) {
   const cur = stored.settings;
   stored.settings = {
     ...cur, ...patch,
-    banner: { ...cur.banner, ...patch.banner }, screen: { ...cur.screen, ...patch.screen },
+    banner: { ...cur.banner, ...patch.banner }, screen: { ...cur.screen, ...patch.screen }, micboard: { ...cur.micboard, ...patch.micboard },
     customImages: patch.customImages ?? cur.customImages, hidden: patch.hidden ?? cur.hidden ?? [],
   };
   persist();
@@ -67,8 +70,12 @@ export const boardDisplays = () => displays;
 
 /* ───────────── Receivers ───────────── */
 
-/** Every receiver with an IP, read at most every 2 seconds however many screens are watching. */
+/**
+ * Every receiver with an IP. While Micboard runs, from Micboard (it's already talking to the
+ * receivers); otherwise read directly, at most every 2 seconds however many screens are watching.
+ */
 export function micStatuses(): Promise<ReceiverStatus[]> {
+  if (micboardRunning()) return micboardData().then((d) => statusesFromMicboard(d));
   return cache.wrap("mics:status", 2, async () => {
     const rxs = mics.setup().receivers.filter((r) => r.ip);
     return Promise.all(rxs.map((r) => readReceiver(r)));
@@ -124,7 +131,7 @@ export function displayState(): Promise<DisplayState> {
   if (memo && Date.now() - memo.at < 1500) return memo.p;
   const p = build().catch((e): DisplayState => ({
     view: stored.settings.mode === "auto" ? stored.settings.autoIdle : stored.settings.mode, mode: stored.settings.mode, reason: "",
-    settings: { banner: stored.settings.banner, columns: stored.settings.columns, imageStyle: stored.settings.imageStyle }, service: null, tiles: [], stage: null,
+    settings: { banner: stored.settings.banner, columns: stored.settings.columns, imageStyle: stored.settings.imageStyle }, micboard: null, service: null, tiles: [], stage: null,
     error: (e as Error).message, at: new Date().toISOString(),
   }));
   memo = { at: Date.now(), p };
@@ -133,12 +140,43 @@ export function displayState(): Promise<DisplayState> {
 
 const imageUrl = (fileId: string) => `/api/board-out/image/${encodeURIComponent(fileId)}`;
 
+/** The service the display follows (the one open in Cool Services, or the next), looked up every 10 s at most. */
+let planMemo: { at: number; key: string; p: Promise<PlanDetail | null> } | null = null;
+function boardPlan(): Promise<PlanDetail | null> {
+  const s = stored.settings;
+  const key = JSON.stringify([s.follow, s.serviceTypeId, stored.open, stored.owner]);
+  if (planMemo && planMemo.key === key && Date.now() - planMemo.at < 10_000) return planMemo.p;
+  const p = (async () => {
+    const api = pco();
+    if (!api) return null;
+    const opened = s.follow !== "next" && stored.open ? await api.getPlan(stored.open.serviceTypeId, stored.open.planId).catch(() => null) : null;
+    return opened ?? (await currentPlan(api, s.serviceTypeId).catch(() => null));
+  })();
+  planMemo = { at: Date.now(), key, p };
+  return p;
+}
+// Micboard's names and photos follow the same service.
+setMicboardPlanSource(async () => {
+  const plan = await boardPlan();
+  if (!plan) return null;
+  return {
+    assignments: mics.plan(plan.id).assignments,
+    photos: new Map(plan.roster.map((m) => [m.personId, m.avatarUrl ?? null])),
+  };
+});
+
+/** Micboard's #hash: group, TV view and info drawer, backgrounds (see Micboard's js/app.js). */
+function micboardHash(m: BoardSettings["micboard"]) {
+  const parts: string[] = [];
+  if (m.group) parts.push(`group=${m.group}`);
+  if (m.view !== "desk") { parts.push(`tvmode=${m.view}`); if (m.backgrounds !== "NONE") parts.push(`bgmode=${m.backgrounds}`); }
+  return parts.length ? `#${parts.join("&")}` : "";
+}
+
 async function build(): Promise<DisplayState> {
   const s = stored.settings;
   const api = pco();
-  const opened = s.follow !== "next" && stored.open && api
-    ? await api.getPlan(stored.open.serviceTypeId, stored.open.planId).catch(() => null) : null;
-  const plan = opened ?? (api ? await currentPlan(api, s.serviceTypeId).catch(() => null) : null);
+  const plan = await boardPlan();
   const { view, reason } = s.mode === "auto" ? autoView(plan, s.autoIdle) : { view: s.mode, reason: "Chosen in Cool Services" };
 
   const setup = mics.setup();
@@ -209,8 +247,15 @@ async function build(): Promise<DisplayState> {
 
   const now = Date.now();
   const next = plan?.times.filter((t) => t.kind === "service" && Date.parse(t.endsAt || t.startsAt) > now).sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
+  const mb = micboardStatus();
+  const mbData = micboardRunning() ? await micboardData().catch(() => null) : null;
   return {
     view, mode: s.mode, reason, settings: { banner: s.banner, columns: s.columns, imageStyle: s.imageStyle },
+    micboard: mb.run === "off" || mb.run === "companion" ? null : {
+      running: micboardRunning(), port: mb.port, hash: micboardHash(s.micboard ?? DEFAULT_BOARD.micboard), error: mb.error,
+      // Micboard reads its list of pictures when its page loads: a new picture reloads the display.
+      rev: mbData ? crypto.createHash("sha1").update([...mbData.jpg, ...mbData.mp4].sort().join("|")).digest("hex").slice(0, 12) : "",
+    },
     service: plan ? {
       planId: plan.id, serviceTypeId: plan.serviceTypeId, title: plan.title, serviceTypeName: plan.serviceTypeName,
       when: new Date(plan.sortDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }),

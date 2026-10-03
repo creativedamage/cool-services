@@ -14,7 +14,8 @@
     "typecheck": "npm run typecheck -w server && npm run typecheck -w web && npm run typecheck -w desktop",
     "dist:mac:arm": "cd desktop && node build.mjs --dist && npx electron-builder --mac dmg zip --arm64 --publish never",
     "set-repo": "node scripts/set-repo.mjs",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "micboard:update": "git subtree pull --prefix vendor/micboard https://github.com/creativedamage/micboard.git main --squash"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

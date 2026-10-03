@@ -1,6 +1,6 @@
 import type { MicAssignment, MicChannel, MicSetup, ShureModel, TeamMember } from "@shared/types";
 
-export const MODEL_LABEL: Record<ShureModel, string> = { ULXD: "ULX-D", QLXD: "QLX-D", SLXD: "SLX-D", AD: "Axient Digital" };
+export const MODEL_LABEL: Record<ShureModel, string> = { ULXD: "ULX-D", QLXD: "QLX-D", SLXD: "SLX-D", AD: "Axient Digital", UHFR: "UHF-R" };
 const norm = (s: string) => s.trim().toLowerCase();
 
 /** One entry per person, with every position they're serving in this plan (e.g. Worship Leader + Acoustic Guitar). */

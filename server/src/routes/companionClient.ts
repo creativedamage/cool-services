@@ -9,6 +9,7 @@ import type { AppMode } from "../../../shared/types.js";
 import { extras } from "../lib/db.js";
 import { act, companionState, findMains, linkTo, saveStrip, showCompanionWindow, startCompanion, stripSettings, unlink } from "../lib/companion.js";
 import { boardDisplays } from "../lib/board.js";
+import { restartMicboard } from "../lib/micboard.js";
 
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) =>
   fn(req, res).catch((e: Error) => res.status(400).json({ error: "companion", message: e.message }));
@@ -19,6 +20,7 @@ appModeRouter.put("/", (req, res) => {
   const { mode } = z.object({ mode: z.enum(["full", "companion"]).nullable() }).parse(req.body);
   extras.set("appMode", mode);
   startCompanion();
+  restartMicboard(); // an FOH companion doesn't run Micboard
   res.json({ mode });
 });
 

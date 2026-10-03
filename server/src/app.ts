@@ -32,6 +32,8 @@ import { boardOutRouter, boardRouter } from "./routes/board.js";
 import { startClock } from "./lib/clock.js";
 import { appModeRouter, companionClientRouter } from "./routes/companionClient.js";
 import { setAttentionBridge, setCompanionWindowBridge, startCompanion } from "./lib/companion.js";
+import { micboardRouter, setFolderOpener } from "./routes/micboard.js";
+import { initMicboard } from "./lib/micboard.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
 import { PcoError, SignedOutError } from "./pco/client.js";
 import { flush, settings } from "./lib/db.js";
@@ -64,6 +66,7 @@ export function createApp(webDir?: string) {
   app.use("/api/volunteer-checkin", requireAuth, volunteerCheckInRouter);
   app.use("/api/clock", requireAuth, clockRouter);
   app.use("/api/board", requireAuth, boardRouter);
+  app.use("/api/micboard", requireAuth, micboardRouter); // Micboard inside Cool Services
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
   app.use("/api/app-mode", appModeRouter); // full app or FOH companion (this Mac only)
   app.use("/api/companion-client", companionClientRouter);
@@ -121,6 +124,7 @@ export function startServer(opts: { port: number; webDir?: string }): Promise<Se
       console.log(usingPat() ? "  Data: shared Personal Access Token" : "  Data: each person's own sign-in");
       initKiosk(opts.webDir);
       startCompanion(); // if this Mac is an FOH companion, start watching the main computer
+      initMicboard(); // Micboard (not on an FOH companion)
       startSmaart();
       startClock();
       resolve(server);
@@ -133,7 +137,7 @@ process.on("exit", flush);
 
 
 /** Used by the Mac app to plug its updater into /api/updates. */
-export { setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge, setCompanionWindowBridge };
+export { setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge, setCompanionWindowBridge, setFolderOpener };
 /** The Mac app's NDI sender and second-display window read clock output settings here. */
 export { clockOutputs } from "./lib/clock.js";
 /** …and the stage display's second-display window. */

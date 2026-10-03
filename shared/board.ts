@@ -31,6 +31,12 @@ export interface BoardSettings {
   hidden: string[];
   /** A person with more than one mic gets one tile, with their other mics stacked on it. */
   stack: boolean;
+  /**
+   * The mic board is Micboard (creativedamage/micboard, running inside Cool Services). How the
+   * display shows it: which Micboard group (0 = all slots), TV view with its info drawer (or the
+   * desk view), and background pictures/videos (from Preferences → Micboard).
+   */
+  micboard: { group: number; view: "desk" | "elinfo00" | "elinfo01" | "elinfo10" | "elinfo11"; backgrounds: "NONE" | "IMG" | "MP4" };
   /** Tiles per row on the display (0 = fit automatically). */
   columns: number;
   /** Network page (http://<this Mac>/display) and a second display on this Mac. */
@@ -73,6 +79,8 @@ export interface DisplayState {
   mode: DisplayMode;
   reason: string;
   settings: Pick<BoardSettings, "banner" | "columns" | "imageStyle">;
+  /** Micboard, for the mic board view: its port on this Mac and the #hash that picks group/view/backgrounds. */
+  micboard: { running: boolean; port: number; hash: string; rev: string; error: string | null } | null;
   service: { planId: string; serviceTypeId: string; title: string; serviceTypeName: string; when: string; nextTime: string | null } | null;
   tiles: BoardTile[];
   /** For the stage plot view. */
@@ -90,5 +98,6 @@ export const DEFAULT_BOARD: BoardSettings = {
   mode: "auto", autoIdle: "micboard", follow: "open", serviceTypeId: null,
   banner: { enabled: true, text: "", scroll: false, size: "m", background: "#0B1220", color: "#FFFFFF", showService: true, showClock: true },
   images: "custom-then-pco", imageStyle: "background", customImages: {}, kinds: ["vocal", "pack", "other"], hideUnassigned: false, hidden: [], stack: true, columns: 0,
+  micboard: { group: 0, view: "elinfo11", backgrounds: "IMG" },
   lan: false, screen: { enabled: false, displayId: null },
 };

@@ -224,7 +224,7 @@ export interface ScheduleRequest {
 
 /* ───────────── Mics & packs (Shure) ───────────── */
 
-export type ShureModel = "ULXD" | "QLXD" | "SLXD" | "AD";
+export type ShureModel = "ULXD" | "QLXD" | "SLXD" | "AD" | "UHFR";
 
 export interface Receiver {
   id: string;

@@ -3,7 +3,7 @@
  * Preferences open in their own window in the Mac app (Cool Services → Preferences…, ⌘,). In a
  * browser they open as a page. Sections ("smaart", "paging"…) pick the tab they're on.
  */
-export type PrefsTab = "about" | "appearance" | "startup" | "campuses" | "checkins" | "audio" | "network" | "video";
+export type PrefsTab = "about" | "appearance" | "startup" | "campuses" | "checkins" | "audio" | "network" | "micboard" | "video";
 
 export const SECTION_TAB: Record<string, PrefsTab> = {
   about: "about", updates: "about",
@@ -11,6 +11,7 @@ export const SECTION_TAB: Record<string, PrefsTab> = {
   startup: "startup", start: "startup", campuses: "campuses", checkins: "checkins", "volunteer-checkin": "checkins",
   audio: "audio", console: "audio", waves: "audio", smaart: "audio",
   network: "network", paging: "network", ipads: "network", companions: "network", "team-phones": "network",
+  micboard: "micboard", backgrounds: "micboard",
   video: "video", "pro-computers": "video", clock: "video",
 };
 

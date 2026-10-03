@@ -144,6 +144,20 @@ export const Api = {
   companionLink: (host: string, port: number, code: string) => api<CompanionState>("/companion-client/link", { method: "POST", json: { host, port, code } }),
   companionUnlink: () => api<CompanionState>("/companion-client/unlink", { method: "POST" }),
   companionAct: (id: string, action: "accept" | "hold" | "deny") => api<CompanionState>("/companion-client/act", { method: "POST", json: { id, action } }),
+  micboard: () => api<MicboardView>("/micboard"),
+  saveMicboard: (p: Partial<MicboardView["settings"]>) => api<MicboardView["settings"]>("/micboard/settings", { method: "PUT", json: p }),
+  restartMicboard: () => api<{ ok: true }>("/micboard/restart", { method: "POST" }),
+  syncMicboard: () => api<MicboardView["sync"]>("/micboard/sync", { method: "POST" }),
+  openMicboardFolder: (which: "backgrounds" | "config") => api<{ ok: true }>("/micboard/open-folder", { method: "POST", json: { which } }),
+  micboardBackgrounds: () => api<MicboardBackground[]>("/micboard/backgrounds"),
+  addMicboardBackground: (name: string, dataUrl: string) => api<{ file: string; list: MicboardBackground[] }>("/micboard/backgrounds", { method: "POST", json: { name, dataUrl } }),
+  addMicboardVideo: async (name: string, file: File) => {
+    const r = await fetch(`/api/micboard/backgrounds/video?name=${encodeURIComponent(name)}`, { method: "POST", headers: { "Content-Type": "video/mp4" }, body: file, credentials: "include" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.message ?? `HTTP ${r.status}`);
+    return j as { file: string; list: MicboardBackground[] };
+  },
+  removeMicboardBackground: (file: string) => api<MicboardBackground[]>(`/micboard/backgrounds/${encodeURIComponent(file)}`, { method: "DELETE" }),
   companionStrip: () => api<{ settings: CompanionStrip; displays: { id: number; label: string; primary: boolean }[] }>("/companion-client/strip"),
   saveCompanionStrip: (p: Partial<CompanionStrip>) => api<{ settings: CompanionStrip; displays: { id: number; label: string; primary: boolean }[] }>("/companion-client/strip", { method: "PUT", json: p }),
   companionWindow: (view: "full" | "strip") => api<{ ok: true }>("/companion-client/window", { method: "POST", json: { view } }),
@@ -272,3 +286,16 @@ export const planQuery = (st: string, plan: string) => ({
   queryFn: () => Api.plan(st, plan),
   staleTime: 15_000,
 });
+
+/* Micboard inside Cool Services (Preferences → Micboard). */
+export interface MicboardView {
+  settings: { enabled: boolean; port: number; names: "first" | "full" | "off"; pcoPhotos: boolean };
+  status: { run: "off" | "starting" | "running" | "error" | "missing" | "companion"; error: string | null; version: string | null; port: number; log: string[]; folder: string };
+  sync: { at: string; error: string | null; names: number; photos: number };
+  urls: string[];
+  groups: { group: number; title: string; slots: number }[];
+  slots: number;
+  canOpenFolder: boolean;
+  onBoard: string[];
+}
+export interface MicboardBackground { file: string; name: string; kind: "image" | "video"; source: "yours" | "pco" | "folder"; bytes: number; at: string }

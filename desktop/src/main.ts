@@ -19,6 +19,18 @@ import { createEmbed } from "./embed";
 const PORTS = [47123, 47124, 47125];
 
 app.setName("Cool Services");
+
+// Never use the macOS Keychain (it asked for the password after every update of the ad hoc-signed
+// app). Chromium's own storage then uses a built-in key instead of a Keychain item. The one
+// exception is the first launch after updating from a version that kept the sign-in key in the
+// Keychain: that launch reads it once and moves it to a file (encryptionKey below).
+const KEY_FILE = "key.txt";
+const OLD_KEY_FILE = "key.bin";
+{
+  const dir = app.getPath("userData");
+  const migrating = fs.existsSync(path.join(dir, OLD_KEY_FILE)) && !fs.existsSync(path.join(dir, KEY_FILE));
+  if (!migrating) app.commandLine.appendSwitch("use-mock-keychain");
+}
 nativeTheme.themeSource = "system"; // the page picks dark/light from Settings; "System" follows the Mac
 
 let win: BrowserWindow | null = null;
@@ -44,21 +56,33 @@ function portFree(port: number): Promise<boolean> {
 }
 
 /**
- * Key that encrypts saved Planning Center sign-ins. Kept in the macOS Keychain via safeStorage,
- * so the data file alone is useless if copied off the Mac.
+ * Key that encrypts saved Planning Center sign-ins: a file only this Mac user can read
+ * (~/Library/Application Support/Cool Services/key.txt).
+ *
+ * It used to be kept in the macOS Keychain, but the app is signed ad hoc, so every update looks like
+ * a different app to the Keychain and macOS asked for the password again. The first launch of
+ * this version reads the old Keychain key one last time (key.bin) and moves it to the file, so
+ * nobody has to sign in again; after that the app never touches the Keychain (see below).
  */
 function encryptionKey(dir: string): string {
-  const file = path.join(dir, "key.bin");
-  const canEncrypt = safeStorage.isEncryptionAvailable();
+  const file = path.join(dir, KEY_FILE);
   try {
-    const raw = fs.readFileSync(file);
-    return canEncrypt ? safeStorage.decryptString(raw) : raw.toString("utf8");
-  } catch {
-    const key = crypto.randomBytes(32).toString("base64");
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(file, canEncrypt ? safeStorage.encryptString(key) : Buffer.from(key), { mode: 0o600 });
-    return key;
+    const k = fs.readFileSync(file, "utf8").trim();
+    if (k) return k;
+  } catch { /* first time */ }
+  let key = "";
+  const old = path.join(dir, OLD_KEY_FILE);
+  if (fs.existsSync(old)) {
+    try {
+      const raw = fs.readFileSync(old);
+      key = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString("utf8");
+    } catch { key = ""; } // couldn't read it: a new key (sign in to Planning Center again)
   }
+  key ||= crypto.randomBytes(32).toString("base64");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(file, key, { mode: 0o600 });
+  fs.rmSync(old, { force: true });
+  return key;
 }
 
 function fatal(message: string) {
@@ -90,7 +114,7 @@ async function boot() {
   session.defaultSession.setPermissionCheckHandler((_wc, _perm, requestingOrigin) => ours(requestingOrigin));
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { startServer, setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge, setCompanionWindowBridge, clockOutputs, boardOutputs } = require("./server.cjs") as typeof import("../../server/src/app");
+  const { startServer, setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge, setCompanionWindowBridge, setFolderOpener, clockOutputs, boardOutputs } = require("./server.cjs") as typeof import("../../server/src/app");
   await startServer({ port, webDir: path.join(__dirname, "web") });
   // Production clock: NDI output and the second-display window.
   startClockOutputs(origin, clockOutputs);
@@ -110,6 +134,7 @@ async function boot() {
   embed = createEmbed(() => win); // Planning Center Chat inside the window
   setEmbedBridge(embed);
   setPrefsOpener((section) => openPreferences(section));
+  setFolderOpener((dir) => { fs.mkdirSync(dir, { recursive: true }); void shell.openPath(dir); });
   // FOH companion: a page request takes over the screen until someone answers it.
   setAttentionBridge((on) => attention(on));
   // FOH companion: the mic strip along the bottom of the screen between page requests.

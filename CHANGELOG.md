@@ -4,6 +4,20 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.20.0
+Micboard built in (creativedamage/micboard), with names and photos from Planning Center and your own backgrounds; no more Keychain password after updates.
+- The mic board is now Micboard itself: creativedamage/micboard, unchanged, running inside the app
+  with its own Python (nothing to install). It's on the network at `http://<this Mac>:8058`, and the
+  stage display (banner, Auto, network page, second display) shows it.
+- Micboard's slots appear in Mic setup by themselves, so people can be put on them in each service's
+  Mics panel; their names go to Micboard as extended names.
+- Preferences → Micboard: on/off and port, its address and QR code, names (first or full),
+  Planning Center photos, and your own background pictures and videos.
+- Display settings → Mic board: which Micboard group, TV view and info drawer, and backgrounds.
+- While Micboard runs, Cool Services reads the receivers through it instead of connecting twice.
+- Updates no longer ask for your Keychain password. The sign-in key moves out of the Keychain on the
+  first launch of this version (one last prompt), and the app doesn't use the Keychain after that.
+
 ## 1.19.0
 FOH companion mic strip: the mics along the bottom of the screen, with page requests still taking over the full screen until answered.
 - On an FOH companion, a short always-on-top bar across the bottom of the screen shows every wireless

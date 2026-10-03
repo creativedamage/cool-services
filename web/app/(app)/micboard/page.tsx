@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { BoardMic, BoardSettings, DisplayMode } from "@shared/board";
 import { Api } from "@/lib/api";
+import { openPrefs } from "@/lib/prefs";
 import { DisplayView } from "@/components/board/DisplayView";
 import { Drawer, Spinner } from "@/components/ui";
 
@@ -94,7 +95,7 @@ export default function MicBoardPage() {
           <DisplayView s={state} now={now} />
         </div>
         <p className="mt-2 text-center text-[11px] text-ink-faint">
-          This is what the display shows. Mics, receivers and who’s on which mic come from the service’s Mics panel.
+          This is what the display shows. The mic board is Micboard (click into it to use it; press s there for its settings). Who’s on each mic comes from the service’s Mics panel.
         </p>
         <NetworkPanel on={s.lan} urls={q.data.urls} onTurnOn={() => save.mutate({ lan: true })} />
       </div>
@@ -208,69 +209,9 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
           <label className="flex items-center gap-2"><input type="checkbox" checked={s.banner.showClock} onChange={(e) => onSave({ banner: { showClock: e.target.checked } })} /> Show the time on the right</label>
         </section>
 
-        <section className="space-y-2">
-          <h3 className="label">Mic board</h3>
-          <label className="block"><span className="text-xs text-ink-muted">Pictures</span>
-            <select className="input mt-1" value={s.images} onChange={(e) => onSave({ images: e.target.value as BoardSettings["images"] })}>
-              <option value="custom-then-pco">Your pictures, else Planning Center photos</option>
-              <option value="pco">Planning Center photos</option>
-              <option value="custom">Only your pictures</option>
-              <option value="none">No pictures</option>
-            </select>
-          </label>
-          <label className="block"><span className="text-xs text-ink-muted">Show the picture</span>
-            <div className="mt-1 flex rounded-lg border border-line p-0.5">
-              {([["background", "Behind the name"], ["icon", "Round photo above the name"], ["none", "No picture"]] as const).map(([v, label]) => (
-                <button key={v} onClick={() => onSave({ imageStyle: v })}
-                  className={clsx("flex-1 rounded-md px-2 py-1.5 text-xs", s.imageStyle === v ? "bg-accent text-white" : "text-ink-soft hover:bg-hover")}>{label}</button>
-              ))}
-            </div>
-          </label>
-          <div className="flex flex-wrap gap-3">
-            {(["vocal", "pack", "other"] as const).map((k) => (
-              <label key={k} className="flex items-center gap-1.5">
-                <input type="checkbox" checked={s.kinds.includes(k)} onChange={(e) => onSave({ kinds: e.target.checked ? [...s.kinds, k] : s.kinds.filter((x) => x !== k) })} />
-                {k === "vocal" ? "Vocal mics" : k === "pack" ? "Packs" : "Other"}
-              </label>
-            ))}
-          </div>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={s.hideUnassigned} onChange={(e) => onSave({ hideUnassigned: e.target.checked })} /> Hide mics nobody is on</label>
-          <label className="flex items-center gap-2"><span className="text-xs text-ink-muted">Tiles per row</span>
-            <select className="input w-28 py-1" value={s.columns} onChange={(e) => onSave({ columns: Number(e.target.value) })}>
-              <option value={0}>Fit</option>{[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
-        </section>
+        <MicboardDisplaySection s={s} onSave={onSave} />
 
         <MicsSection s={s} mics={data.mics} onSave={onSave} />
-
-        <section className="space-y-2">
-          <h3 className="label">Your pictures</h3>
-          <p className="text-[11px] text-ink-faint">A picture for a person follows them to whatever mic they’re on. A picture for a mic shows when it’s unassigned or the person has none.</p>
-          <ul className="divide-y divide-line/60 rounded-lg border border-line">
-            {tiles.map((t) => {
-              const keys = [...(t.person ? [{ key: `person:${t.person.id}`, label: t.person.name }] : []), { key: `mic:${t.channelId}`, label: `${t.micLabel} (the mic)` }];
-              return keys.map(({ key, label }) => {
-                const has = Boolean(s.customImages[key]);
-                return (
-                  <li key={key} className="flex items-center gap-3 px-3 py-2">
-                    <span className="h-9 w-9 shrink-0 overflow-hidden rounded-md bg-hover">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      {has && <img src={`/api/board-out/image/${s.customImages[key]}`} alt="" className="h-full w-full object-cover" />}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{label}</span>
-                    <label className="btn-ghost cursor-pointer p-1.5" title="Choose a picture">
-                      {upload.isPending && upload.variables?.key === key ? <Spinner size={12} /> : <ImagePlus size={14} />}
-                      <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload.mutate({ key, file: f }); e.target.value = ""; }} />
-                    </label>
-                    {has && <button className="btn-ghost p-1.5" title="Use the Planning Center photo again" onClick={() => remove.mutate(key)}><RotateCcw size={13} /></button>}
-                  </li>
-                );
-              });
-            })}
-            {!tiles.length && <li className="px-3 py-3 text-ink-muted">No mics on the board yet.</li>}
-          </ul>
-        </section>
 
         <section className="space-y-2">
           <h3 className="label">Where it shows</h3>
@@ -309,7 +250,7 @@ function MicsSection({ s, mics, onSave }: {
 
   return (
     <section className="space-y-2">
-      <h3 className="label">Mics on the board</h3>
+      <h3 className="label">FOH companion mic strip</h3>
       <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5" checked={s.stack ?? true} onChange={(e) => onSave({ stack: e.target.checked })} />
         <span>One tile per person <span className="block text-[11px] text-ink-faint">Someone on more than one mic (a vocal and their acoustic guitar’s pack) gets one tile, with the other mics stacked under their mic name.</span></span>
       </label>
@@ -339,6 +280,47 @@ function MicsSection({ s, mics, onSave }: {
         <button className="btn-primary px-3" disabled={!label.trim() || add.isPending}><Plus size={14} /></button>
       </form>
       <p className="text-[11px] text-ink-faint">Who’s on each mic comes from the service’s Mics panel, so put Adam on “AG 1” there and it stacks onto his tile.</p>
+    </section>
+  );
+}
+
+/** How the display shows Micboard: group, TV view and info drawer, backgrounds. */
+function MicboardDisplaySection({ s, onSave }: { s: BoardSettings; onSave: (p: Parameters<typeof Api.saveBoard>[0]) => void }) {
+  const mb = useQuery({ queryKey: ["micboard"], queryFn: Api.micboard, refetchInterval: 5000 });
+  const m = s.micboard;
+  const set = (p: Partial<BoardSettings["micboard"]>) => onSave({ micboard: { ...m, ...p } });
+  return (
+    <section className="space-y-2">
+      <h3 className="label">Mic board (Micboard)</h3>
+      <p className="text-[11px] text-ink-faint">
+        The mic board is Micboard, running inside Cool Services{mb.data?.status.version ? ` (version ${mb.data.status.version})` : ""}. Set up receivers, groups and names in Micboard itself (press <b>s</b> for its settings);
+        names, Planning Center photos and your own backgrounds are in <button className="text-accent hover:underline" onClick={() => void openPrefs("micboard")}>Preferences → Micboard</button>.
+      </p>
+      <label className="block"><span className="text-xs text-ink-muted">Group</span>
+        <select className="input mt-1" value={m.group} onChange={(e) => set({ group: Number(e.target.value) })}>
+          <option value={0}>All mics</option>
+          {(mb.data?.groups ?? []).map((g) => <option key={g.group} value={g.group}>{g.group}: {g.title || "Untitled"} ({g.slots})</option>)}
+        </select>
+      </label>
+      <label className="block"><span className="text-xs text-ink-muted">View</span>
+        <select className="input mt-1" value={m.view} onChange={(e) => set({ view: e.target.value as BoardSettings["micboard"]["view"] })}>
+          <option value="elinfo11">TV: names, status bar and details</option>
+          <option value="elinfo10">TV: names and details</option>
+          <option value="elinfo01">TV: names and status bar</option>
+          <option value="elinfo00">TV: names only</option>
+          <option value="desk">Desk view</option>
+        </select>
+      </label>
+      {m.view !== "desk" && (
+        <label className="block"><span className="text-xs text-ink-muted">Backgrounds behind the names</span>
+          <div className="mt-1 flex rounded-lg border border-line p-0.5">
+            {([["IMG", "Pictures"], ["MP4", "Videos"], ["NONE", "None"]] as const).map(([v, label]) => (
+              <button key={v} onClick={() => set({ backgrounds: v })}
+                className={clsx("flex-1 rounded-md px-2 py-1.5 text-xs", m.backgrounds === v ? "bg-accent text-white" : "text-ink-soft hover:bg-hover")}>{label}</button>
+            ))}
+          </div>
+        </label>
+      )}
     </section>
   );
 }

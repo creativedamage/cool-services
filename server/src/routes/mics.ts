@@ -2,12 +2,13 @@ import { Router } from "express";
 import { z } from "zod";
 import type { PlanMics } from "../../../shared/types.js";
 import { cache, mics } from "../lib/db.js";
-import { probe, readReceiver } from "../lib/shure.js";
+import { probe } from "../lib/shure.js";
+import { micStatuses } from "../lib/board.js";
 
 export const micsRouter = Router();
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
-const Model = z.enum(["ULXD", "QLXD", "SLXD", "AD"]);
+const Model = z.enum(["ULXD", "QLXD", "SLXD", "AD", "UHFR"]);
 const Setup = z.object({
   receivers: z.array(z.object({
     id: z.string(), name: z.string().max(40), model: Model,
@@ -53,9 +54,5 @@ micsRouter.put("/plans/:plan", h(async (req, res) => {
  * Shared for 2 seconds so several open windows don't each poll the receivers.
  */
 micsRouter.get("/status", h(async (_req, res) => {
-  const statuses = await cache.wrap("mics:status", 2, async () => {
-    const rxs = mics.setup().receivers.filter((r) => r.ip);
-    return Promise.all(rxs.map((r) => readReceiver(r)));
-  });
-  res.json(statuses);
+  res.json(await micStatuses()); // from Micboard while it runs
 }));
