@@ -458,7 +458,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.18.1 && git push origin v1.18.1
+   git tag v1.18.2 && git push origin v1.18.2
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

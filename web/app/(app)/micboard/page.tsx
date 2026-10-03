@@ -226,7 +226,7 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
           <label className="flex items-center gap-2"><input type="checkbox" checked={s.hideUnassigned} onChange={(e) => onSave({ hideUnassigned: e.target.checked })} /> Hide mics nobody is on</label>
           <label className="flex items-center gap-2"><span className="text-xs text-ink-muted">Tiles per row</span>
             <select className="input w-28 py-1" value={s.columns} onChange={(e) => onSave({ columns: Number(e.target.value) })}>
-              <option value={0}>Fit</option>{[2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
+              <option value={0}>Fit</option>{[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
         </section>
