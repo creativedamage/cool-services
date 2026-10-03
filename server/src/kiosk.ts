@@ -21,7 +21,7 @@ import type { PcoApi } from "./pco/api.js";
 import { extras, settings } from "./lib/db.js";
 import { clockOutRouter } from "./routes/clock.js";
 import { clockOutputs, clockSettings } from "./lib/clock.js";
-import { boardOutputs, boardSettings } from "./lib/board.js";
+import { boardOutputs, boardSettings, displayState } from "./lib/board.js";
 import { boardOutRouter } from "./routes/board.js";
 import { onPhonesChange, phones, phoneSession, phoneUnlock, staffCheckIn, staffUndo, teamCheckIns } from "./lib/teamCheckins.js";
 import { kioskSession, onPagingChange, page, PagingError, requestPage, status, stored, unlock } from "./lib/paging.js";
@@ -166,7 +166,8 @@ const needCompanion = (req: Request, res: Response, next: NextFunction) => {
   (req as Request & { companion?: string }).companion = c.name;
   next();
 };
-companionLanRouter.get("/state", needCompanion, (_req, res) => res.json(companionView()));
+// With the mics as they are on the mic board (hidden ones left out, a person's mics stacked) for the companion's mic strip.
+companionLanRouter.get("/state", needCompanion, h(async (_req, res) => res.json({ ...companionView(), mics: (await displayState().catch(() => null))?.tiles ?? [] })));
 companionLanRouter.post("/act", needCompanion, h(async (req, res) => {
   const { id, action } = z.object({ id: z.string().max(60), action: z.enum(["accept", "hold", "deny"]) }).parse(req.body);
   companionAct(id, action, `FOH (${(req as Request & { companion?: string }).companion})`);

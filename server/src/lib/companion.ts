@@ -7,11 +7,14 @@
  * as the Kids & Nursery iPad pages.
  *
  * Companion computer: finds the main one on the network, pairs once, then asks for requests every
- * second and brings its window to the front when a new one arrives.
+ * second and brings its window to the front when a new one arrives. In between, it can show a mic
+ * strip: a short always-on-top bar across the bottom of a display with the main computer's wireless
+ * mics (name, who's on it, status, battery), leaving the rest of the screen free for other apps.
  */
 import crypto from "node:crypto";
 import os from "node:os";
-import type { CompanionInfo, CompanionRequest, CompanionState } from "../../../shared/types.js";
+import type { BoardTile } from "../../../shared/board.js";
+import type { CompanionInfo, CompanionRequest, CompanionState, CompanionStrip } from "../../../shared/types.js";
 import { extras, logEvent } from "./db.js";
 import { cancelRequest, holdRequest, sendRequest, status, stored } from "./paging.js";
 import { pagingStore } from "./db.js";
@@ -93,7 +96,26 @@ export function companionAct(id: string, action: "accept" | "hold" | "deny", by:
 
 interface Link { host: string; port: number; token: string; name: string }
 const link = () => extras.get<Link | null>("companionLink", null);
-let state: CompanionState = { linked: false, main: null, connected: false, requests: [], onScreenUntil: null };
+
+const DEFAULT_STRIP: CompanionStrip = { enabled: true, size: "m", displayId: null };
+export const stripSettings = (): CompanionStrip => ({ ...DEFAULT_STRIP, ...extras.get<Partial<CompanionStrip>>("companionStrip", {}) });
+export function saveStrip(p: Partial<CompanionStrip>) {
+  extras.set("companionStrip", { ...stripSettings(), ...p });
+  state = { ...state, strip: stripSettings() };
+  applyStrip();
+  return stripSettings();
+}
+/** The Mac app's windows: the mic strip, and the full companion window. */
+interface WindowBridge { strip: (s: CompanionStrip & { on: boolean }) => void; open: (view: "full" | "strip") => void }
+let windows: WindowBridge | null = null;
+export const setCompanionWindowBridge = (b: WindowBridge) => { windows = b; applyStrip(); };
+export const showCompanionWindow = (view: "full" | "strip") => windows?.open(view);
+function applyStrip() {
+  const s = stripSettings();
+  windows?.strip({ ...s, on: s.enabled && extras.get("appMode", null) === "companion" && Boolean(link()) });
+}
+
+let state: CompanionState = { linked: false, main: null, connected: false, requests: [], onScreenUntil: null, mics: [], strip: stripSettings() };
 let attention: ((on: boolean) => void) | null = null;
 export const setAttentionBridge = (fn: (on: boolean) => void) => { attention = fn; };
 let loop: NodeJS.Timeout | null = null;
@@ -153,10 +175,10 @@ export async function act(id: string, action: "accept" | "hold" | "deny") {
 
 async function poll() {
   const l = link();
-  if (!l) { state = { linked: false, main: null, connected: false, requests: [], onScreenUntil: null }; setAttention(false); return; }
+  if (!l) { state = { linked: false, main: null, connected: false, requests: [], onScreenUntil: null, mics: [], strip: stripSettings() }; setAttention(false); return; }
   try {
-    const v = await call<{ requests: CompanionRequest[]; onScreenUntil: string | null }>(l, "/state");
-    state = { linked: true, main: { name: l.name, host: l.host, port: l.port }, connected: true, requests: v.requests, onScreenUntil: v.onScreenUntil };
+    const v = await call<{ requests: CompanionRequest[]; onScreenUntil: string | null; mics?: BoardTile[] }>(l, "/state");
+    state = { linked: true, main: { name: l.name, host: l.host, port: l.port }, connected: true, requests: v.requests, onScreenUntil: v.onScreenUntil, mics: v.mics ?? state.mics, strip: stripSettings() };
   } catch (e) {
     const status = (e as { status?: number }).status;
     state = { ...state, linked: true, main: { name: l.name, host: l.host, port: l.port }, connected: false,
@@ -175,6 +197,7 @@ function setAttention(on: boolean) {
 export function startCompanion() {
   if (loop) clearInterval(loop);
   loop = null;
+  applyStrip();
   if (extras.get("appMode", null) !== "companion" || !link()) { void poll(); return; }
   void poll();
   loop = setInterval(() => void poll(), 1000);

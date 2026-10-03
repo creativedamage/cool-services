@@ -1,7 +1,7 @@
 import type {
   AppSettings, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, StagePlot, PlanSummary, RosterStatus, ScheduleRequest,
   ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary, WorkflowShare, WorkflowShareGroup, WorkflowAccessRequest, Person,
-  DashboardWidget, HomeService, TeamCheckIns, TeamPhonesView, TeamPhoneRole, VolunteerCheckInConfig, VolunteerCheckInSetup, TeamGroup, AppMode, CompanionState, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
+  DashboardWidget, HomeService, TeamCheckIns, TeamPhonesView, TeamPhoneRole, VolunteerCheckInConfig, VolunteerCheckInSetup, TeamGroup, AppMode, CompanionState, CompanionStrip, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 import type { ClockOutputSettings, ClockPreset, ClockState, ClockView } from "@shared/clock";
@@ -144,6 +144,9 @@ export const Api = {
   companionLink: (host: string, port: number, code: string) => api<CompanionState>("/companion-client/link", { method: "POST", json: { host, port, code } }),
   companionUnlink: () => api<CompanionState>("/companion-client/unlink", { method: "POST" }),
   companionAct: (id: string, action: "accept" | "hold" | "deny") => api<CompanionState>("/companion-client/act", { method: "POST", json: { id, action } }),
+  companionStrip: () => api<{ settings: CompanionStrip; displays: { id: number; label: string; primary: boolean }[] }>("/companion-client/strip"),
+  saveCompanionStrip: (p: Partial<CompanionStrip>) => api<{ settings: CompanionStrip; displays: { id: number; label: string; primary: boolean }[] }>("/companion-client/strip", { method: "PUT", json: p }),
+  companionWindow: (view: "full" | "strip") => api<{ ok: true }>("/companion-client/window", { method: "POST", json: { view } }),
   companions: () => api<{ companions: CompanionInfo[]; addresses: string[] }>("/paging/companions"),
   pairCompanion: () => api<{ code: string; expiresAt: string }>("/paging/companions/pair", { method: "POST" }),
   removeCompanion: (id: string) => api<{ companions: CompanionInfo[] }>(`/paging/companions/${id}`, { method: "DELETE" }),

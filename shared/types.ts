@@ -3,6 +3,7 @@
  * The server flattens PCO's JSON:API into these shapes so the UI never deals with JSON:API.
  */
 
+import type { BoardTile } from "./board.js";
 export interface Person {
   id: string; // PCO person id — identical across People and Services
   name: string;
@@ -580,7 +581,12 @@ export interface CompanionState {
   error?: string;
   requests: CompanionRequest[];
   onScreenUntil: string | null;
+  /** The main computer's wireless mics (as on its mic board) for the mic strip. */
+  mics: BoardTile[];
+  strip: CompanionStrip;
 }
+/** The FOH companion's mic strip: a short always-on-top bar across the bottom of a display. */
+export interface CompanionStrip { enabled: boolean; size: "s" | "m" | "l"; displayId: number | null }
 export interface CompanionInfo { id: string; name: string; pairedAt: string; lastSeen: string | null; online: boolean }
 export type AppMode = "full" | "companion";
 

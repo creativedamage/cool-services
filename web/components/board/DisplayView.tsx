@@ -5,7 +5,7 @@
  * Sized by its container, so the same thing works full screen and as a preview in the app.
  */
 import { useEffect, useRef, useState } from "react";
-import type { DisplayState } from "@shared/board";
+import type { BoardTile, DisplayState } from "@shared/board";
 import type { MicAssignment, MicChannel, PlanDetail, PlotItem } from "@shared/types";
 import { peopleForPlan } from "@/lib/stage";
 import { ClockFace } from "@/components/clock/ClockFace";
@@ -14,12 +14,15 @@ import { PlotCanvas } from "@/components/stage/PlotCanvas";
 import { MicGrid, type TileHistory } from "./MicBoard";
 
 /** Recent audio and RF readings per mic (kept on this screen) for the graphs. */
-function useHistory(s: DisplayState) {
+function useHistory(s: DisplayState) { return useTileHistory(s.tiles, s.at); }
+
+/** The same for any list of tiles; `at` changes when there are new readings. */
+export function useTileHistory(tiles: BoardTile[], at: string) {
   const ref = useRef(new Map<string, TileHistory>());
   const last = useRef("");
-  if (s.at !== last.current) {
-    last.current = s.at;
-    for (const t of s.tiles) {
+  if (at !== last.current) {
+    last.current = at;
+    for (const t of tiles) {
       const h = ref.current.get(t.channelId) ?? { audio: [], rf: [] };
       h.audio = [...h.audio, t.audio ?? 0].slice(-40);
       h.rf = [...h.rf, t.rf?.dbm != null ? Math.max(0, t.rf.dbm + 100) : 0].slice(-40);

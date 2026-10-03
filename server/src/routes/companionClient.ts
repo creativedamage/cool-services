@@ -7,7 +7,8 @@ import { Router } from "express";
 import { z } from "zod";
 import type { AppMode } from "../../../shared/types.js";
 import { extras } from "../lib/db.js";
-import { act, companionState, findMains, linkTo, startCompanion, unlink } from "../lib/companion.js";
+import { act, companionState, findMains, linkTo, saveStrip, showCompanionWindow, startCompanion, stripSettings, unlink } from "../lib/companion.js";
+import { boardDisplays } from "../lib/board.js";
 
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) =>
   fn(req, res).catch((e: Error) => res.status(400).json({ error: "companion", message: e.message }));
@@ -33,3 +34,15 @@ companionClientRouter.post("/act", h(async (req, res) => {
   const { id, action } = z.object({ id: z.string().max(60), action: z.enum(["accept", "hold", "deny"]) }).parse(req.body);
   res.json(await act(id, action));
 }));
+
+/** The mic strip (size, which display) and switching between it and the full companion window. */
+companionClientRouter.get("/strip", (_req, res) => res.json({ settings: stripSettings(), displays: boardDisplays() }));
+companionClientRouter.put("/strip", (req, res) => {
+  const p = z.object({ enabled: z.boolean(), size: z.enum(["s", "m", "l"]), displayId: z.number().nullable() }).partial().parse(req.body);
+  res.json({ settings: saveStrip(p), displays: boardDisplays() });
+});
+companionClientRouter.post("/window", (req, res) => {
+  const { view } = z.object({ view: z.enum(["full", "strip"]) }).parse(req.body);
+  showCompanionWindow(view);
+  res.json({ ok: true });
+});

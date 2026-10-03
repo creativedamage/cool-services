@@ -31,7 +31,7 @@ import { clockOutRouter, clockRouter } from "./routes/clock.js";
 import { boardOutRouter, boardRouter } from "./routes/board.js";
 import { startClock } from "./lib/clock.js";
 import { appModeRouter, companionClientRouter } from "./routes/companionClient.js";
-import { setAttentionBridge, startCompanion } from "./lib/companion.js";
+import { setAttentionBridge, setCompanionWindowBridge, startCompanion } from "./lib/companion.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
 import { PcoError, SignedOutError } from "./pco/client.js";
 import { flush, settings } from "./lib/db.js";
@@ -133,7 +133,7 @@ process.on("exit", flush);
 
 
 /** Used by the Mac app to plug its updater into /api/updates. */
-export { setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge };
+export { setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge, setCompanionWindowBridge };
 /** The Mac app's NDI sender and second-display window read clock output settings here. */
 export { clockOutputs } from "./lib/clock.js";
 /** …and the stage display's second-display window. */

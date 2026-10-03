@@ -4,6 +4,17 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.19.0
+FOH companion mic strip: the mics along the bottom of the screen, with page requests still taking over the full screen until answered.
+- On an FOH companion, a short always-on-top bar across the bottom of the screen shows every wireless
+  mic: name, who's on it, status color, battery, audio and RF. Everything above it stays clickable
+  (Waves SuperRack, the console app).
+- A page request still takes the full screen; once it's accepted, held or denied, the strip comes back.
+- Hover the strip and press the gear (or click Cool Services in the Dock) for the companion window:
+  turn the strip on or off, choose its height and which display it's on.
+- Also includes 1.18.4 (mic board: hide/show mics, a person's mics stacked on one tile, mics that
+  aren't on the network; the board follows the service you have open; Services reopens where you left it).
+
 ## 1.18.4
 Mic board: hide or show mics, stack a person's mics on one tile, add mics that aren't on the network; the board follows the service you have open; Services reopens where you left it.
 - Mic board → Display settings → **Mics on the board**: show or hide each mic, and add mics that

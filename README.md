@@ -318,6 +318,18 @@ until clear** (keeps it waiting without taking over the screen) and **Deny**. Th
 shows a child's name. The main Mac keeps its banner and can accept or cancel requests too; it never
 takes over its own screen. Unpair a companion from the same Preferences section.
 
+**Mic strip.** Between page requests the companion steps aside and shows a short bar along the
+bottom of the screen (above the Dock, always on top) with every wireless mic: the mic name, who's on
+it, a status color (orange low battery, red change it or RF trouble, striped when the transmitter is
+off or the receiver can't be reached), battery, audio and RF. Only that bar is a window, so
+everything above it (Waves SuperRack, the console app) stays clickable. When a page request comes in
+the companion takes the full screen; once it's answered, the strip comes back. Hover the strip and
+press the gear (or click Cool Services in the Dock) to open the companion window: turn the strip on
+or off, make it short, medium or tall, or pick which display it's on. The mics, hidden mics and
+stacked mics follow the main computer's Mic board → Display settings.
+
+<img src="docs/screenshots/companion-strip.png" alt="FOH companion mic strip">
+
 ## Workflows: yours, and asking for others
 
 The Workflows page shows **My workflows**: the ones with cards assigned to you or shared with you

@@ -2,15 +2,18 @@
 /**
  * FOH companion screen. Idle: a calm clock and "no requests". When Kids or Nursery ask for a page,
  * the Mac app brings this window to the front, full screen, with three big buttons. Children's names
- * never reach this screen (the main computer leaves them out).
+ * never reach this screen (the main computer leaves them out). With the mic strip on, this window
+ * steps aside between requests and a short bar of the mics sits along the bottom of the screen.
  */
 import clsx from "clsx";
-import { BellRing, Check, Hand, Link2, Loader2, Search, Settings, Unlink, X } from "lucide-react";
+import { BellRing, Check, Hand, Link2, Loader2, PanelBottom, Search, Settings, Unlink, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CompanionRequest, CompanionState } from "@shared/types";
 import { Api } from "@/lib/api";
 import { Logo } from "@/components/Logo";
+import { MicStripRow } from "@/components/board/MicStrip";
+import { useTileHistory } from "@/components/board/DisplayView";
 
 const ago = (iso: string, now: number) => {
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
@@ -102,6 +105,7 @@ function Idle({ st, now, onChange }: { st: CompanionState; now: number; onChange
         {st.connected ? `Connected to ${st.main?.name}` : st.error ?? "Reconnecting…"}
       </div>
       <div className="mt-2 text-ink-muted">{onScreen ? `A page is on the screens (${onScreen}s)` : held.length ? `${held.length} request${held.length > 1 ? "s" : ""} on hold` : "No page requests"}</div>
+      <StripPanel st={st} now={now} />
       {(held.length > 0 || going.length > 0) && (
         <div className="mt-10 w-full max-w-2xl space-y-3">
           {going.map((r) => (
@@ -178,5 +182,45 @@ function LinkWizard({ onLinked }: { onLinked: (s: CompanionState) => void }) {
         <button className="mt-6 text-xs text-ink-muted hover:text-accent" onClick={async () => { await Api.setAppMode("full"); router.replace("/"); }}>Use the full Cool Services on this Mac instead</button>
       </div>
     </Shell>
+  );
+}
+
+/* ── The mic strip: preview and settings ── */
+function StripPanel({ st, now }: { st: CompanionState; now: number }) {
+  const [cfg, setCfg] = useState<Awaited<ReturnType<typeof Api.companionStrip>> | null>(null);
+  useEffect(() => { void Api.companionStrip().then(setCfg).catch(() => undefined); }, []);
+  const history = useTileHistory(st.mics, String(now));
+  const save = async (p: Parameters<typeof Api.saveCompanionStrip>[0]) => setCfg(await Api.saveCompanionStrip(p));
+  const s = cfg?.settings ?? st.strip;
+  return (
+    <div className="mt-10 w-full max-w-5xl rounded-2xl border border-line bg-surface p-4">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <PanelBottom size={18} className="text-accent" />
+        <span className="font-semibold">Mic strip</span>
+        <span className="text-sm text-ink-muted">Along the bottom of the screen between page requests; everything above it stays clickable.</span>
+      </div>
+      <div className="h-[150px]">
+        {st.mics.length ? <MicStripRow tiles={st.mics} now={now} history={history} />
+          : <div className="grid h-full place-items-center rounded-xl bg-[#222] text-sm text-[#8A8A8A]">No mics on the main computer’s mic board yet</div>}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
+        <label className="flex items-center gap-2"><input type="checkbox" checked={s.enabled} onChange={(e) => void save({ enabled: e.target.checked })} /> Show the mic strip</label>
+        <label className="flex items-center gap-2"><span className="text-ink-muted">Height</span>
+          <select className="input w-28 py-1" value={s.size} onChange={(e) => void save({ size: e.target.value as "m" })}>
+            <option value="s">Short</option><option value="m">Medium</option><option value="l">Tall</option>
+          </select>
+        </label>
+        {(cfg?.displays.length ?? 0) > 1 && (
+          <label className="flex items-center gap-2"><span className="text-ink-muted">Display</span>
+            <select className="input w-56 py-1" value={s.displayId ?? ""} onChange={(e) => void save({ displayId: e.target.value ? Number(e.target.value) : null })}>
+              <option value="">Main display</option>
+              {cfg!.displays.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+            </select>
+          </label>
+        )}
+        {s.enabled && <button className="btn-primary ml-auto" onClick={() => void Api.companionWindow("strip")}><PanelBottom size={15} /> Back to the mic strip</button>}
+      </div>
+      <p className="mt-2 text-xs text-ink-faint">Which mics show, and stacking a person’s mics, follow the main computer’s Mic board → Display settings. Hover the strip and press the gear (or click Cool Services in the Dock) to come back here.</p>
+    </div>
   );
 }

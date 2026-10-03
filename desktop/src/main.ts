@@ -7,7 +7,7 @@
  */
 import { startClockOutputs } from "./clockOut";
 import { startBoardOutput } from "./boardOut";
-import { app, BrowserWindow, dialog, Menu, nativeTheme, safeStorage, session, shell } from "electron";
+import { app, BrowserWindow, dialog, Menu, nativeTheme, safeStorage, screen, session, shell } from "electron";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
@@ -90,7 +90,7 @@ async function boot() {
   session.defaultSession.setPermissionCheckHandler((_wc, _perm, requestingOrigin) => ours(requestingOrigin));
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { startServer, setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge, clockOutputs, boardOutputs } = require("./server.cjs") as typeof import("../../server/src/app");
+  const { startServer, setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge, setCompanionWindowBridge, clockOutputs, boardOutputs } = require("./server.cjs") as typeof import("../../server/src/app");
   await startServer({ port, webDir: path.join(__dirname, "web") });
   // Production clock: NDI output and the second-display window.
   startClockOutputs(origin, clockOutputs);
@@ -112,6 +112,8 @@ async function boot() {
   setPrefsOpener((section) => openPreferences(section));
   // FOH companion: a page request takes over the screen until someone answers it.
   setAttentionBridge((on) => attention(on));
+  // FOH companion: the mic strip along the bottom of the screen between page requests.
+  setCompanionWindowBridge({ strip: (s) => { stripCfg = s; layoutStrip(); }, open: (view) => openCompanion(view) });
   updater.start();
   buildMenu(updater);
 
@@ -226,8 +228,73 @@ function openPreferences(section = "") {
   prefsWin.on("closed", () => { prefsWin = null; });
 }
 
+/* ───────────── FOH companion mic strip ───────────── */
+
+let strip: BrowserWindow | null = null;
+let stripCfg: { on: boolean; size: "s" | "m" | "l"; displayId: number | null } = { on: false, size: "m", displayId: null };
+let attentionOn = false;
+let fullOpen = false; // the companion window opened from the strip (settings, held requests)
+let quitting = false;
+let hiddenForStrip = false; // the main window is hidden because the strip is showing
+app.on("before-quit", () => { quitting = true; });
+const STRIP_H = { s: 120, m: 170, l: 230 } as const;
+/** The strip is showing instead of the main window. */
+const stripActive = () => stripCfg.on && !attentionOn && !fullOpen;
+
+/**
+ * A short, always-on-top bar across the bottom of the chosen display (above the Dock). Only that
+ * bar is a window, so everything above it (Waves SuperRack, the console app) stays clickable.
+ */
+function layoutStrip() {
+  if (!stripActive()) {
+    strip?.hide();
+    // The strip was turned off (or this Mac went back to the full app): the window comes back.
+    if (hiddenForStrip && !attentionOn) { hiddenForStrip = false; win?.show(); }
+    return;
+  }
+  const display = screen.getAllDisplays().find((d) => d.id === stripCfg.displayId) ?? screen.getPrimaryDisplay();
+  const wa = display.workArea;
+  const h = STRIP_H[stripCfg.size] ?? STRIP_H.m;
+  const bounds = { x: wa.x, y: wa.y + wa.height - h, width: wa.width, height: h };
+  if (!strip || strip.isDestroyed()) {
+    strip = new BrowserWindow({
+      ...bounds, frame: false, transparent: true, backgroundColor: "#00000000", hasShadow: false, resizable: false, movable: false,
+      minimizable: false, maximizable: false, fullscreenable: false, skipTaskbar: true, show: false, title: "Mic strip", acceptFirstMouse: true,
+      webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false },
+    });
+    strip.setAlwaysOnTop(true, "floating");
+    strip.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    void strip.loadURL(`${origin}/companion/strip`);
+    strip.once("ready-to-show", () => { if (stripActive()) strip?.showInactive(); });
+    strip.on("closed", () => { strip = null; });
+  } else {
+    strip.setBounds(bounds);
+    if (!strip.isVisible()) strip.showInactive();
+  }
+  // The full companion window steps aside while the strip shows.
+  if (win?.isVisible()) win.hide();
+  if (win) hiddenForStrip = true;
+}
+for (const ev of ["display-added", "display-removed", "display-metrics-changed"] as const) {
+  app.whenReady().then(() => screen.on(ev as "display-added", () => layoutStrip())).catch(() => undefined);
+}
+
+/** From the strip's gear (or the companion window's "Back to the mic strip"). */
+function openCompanion(view: "full" | "strip") {
+  fullOpen = view === "full";
+  if (fullOpen) {
+    strip?.hide();
+    if (!win && origin) createWindow();
+    if (win && !win.webContents.getURL().includes("/companion")) void win.loadURL(`${origin}/companion`);
+    hiddenForStrip = false;
+    win?.show(); win?.focus(); app.focus({ steal: true });
+  } else layoutStrip();
+}
+
 /** Bring the window over everything (FOH companion page request), or let it go back to normal. */
 function attention(on: boolean) {
+  attentionOn = on;
+  if (on) strip?.hide();
   if (!win && origin) createWindow();
   const w = win;
   if (!w) return;
@@ -244,6 +311,8 @@ function attention(on: boolean) {
     w.setSimpleFullScreen(false);
     w.setAlwaysOnTop(false);
     w.setVisibleOnAllWorkspaces(false);
+    // Answered: back to how it looked before (the mic strip, if it's on).
+    if (stripActive()) setTimeout(layoutStrip, 350); // after leaving full screen
   }
 }
 
@@ -258,7 +327,16 @@ function createWindow() {
     show: false,
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
-  win.once("ready-to-show", () => win?.show());
+  win.once("ready-to-show", () => { if (stripActive()) hiddenForStrip = true; else win?.show(); });
+  // FOH companion with the mic strip: closing the window goes back to the strip (Quit still quits).
+  win.on("close", (e) => {
+    if (quitting || !stripCfg.on) return;
+    e.preventDefault();
+    fullOpen = false;
+    win?.hide();
+    hiddenForStrip = true;
+    layoutStrip();
+  });
 
   // New windows (links with target=_blank, "Open in Planning Center") go to the default browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -277,5 +355,8 @@ function createWindow() {
   win.on("closed", () => { win = null; prefsWin?.close(); });
 }
 
-app.on("activate", () => { if (!win && origin) createWindow(); });
+app.on("activate", () => {
+  if (stripActive()) openCompanion("full"); // the Dock icon opens the companion window from the strip
+  else if (!win && origin) createWindow();
+});
 app.on("window-all-closed", () => app.quit()); // closing the main window also closes Preferences (above)
