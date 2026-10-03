@@ -436,48 +436,54 @@ no personal data). Send that file along when reporting slowness.
 
 ## GitHub and releases
 
+Your project folder (`~/Downloads/cool-services`) is a git repository with the full history. Updates
+from Claude land there as new commits; you publish them to GitHub with one command.
+
 ### One-time setup
 
-1. On github.com, create a new **public** repository (e.g. `cool-services`). Don't add a README or
-   license. Leave it empty.
-2. In Terminal, in this folder:
+1. On github.com, create a new **public** repository named `cool-services`. Don't add a README,
+   license or .gitignore: leave it empty. (Public, so every Cool Services can check it for updates
+   without a password.)
+2. Let git sign in to GitHub once. The easiest way is the GitHub CLI:
 
    ```bash
+   brew install gh
+   gh auth login        # GitHub.com → HTTPS → Login with a web browser
+   ```
+
+3. In Terminal, in the project folder:
+
+   ```bash
+   cd ~/Downloads/cool-services
    npm run set-repo -- YOUR-GITHUB-NAME/cool-services
    git add -A && git commit -m "Point updates at GitHub"
    git remote add origin https://github.com/YOUR-GITHUB-NAME/cool-services.git
    git push -u origin main
    ```
 
-   The project is already a git repository with its history committed.
-3. Optional but recommended: `bash scripts/make-signing-cert.sh`, then add the two values it prints
+4. Optional but recommended: `bash scripts/make-signing-cert.sh`, then add the two values it prints
    as repository secrets (Settings → Secrets and variables → Actions): `MAC_CERT_P12` and
    `MAC_CERT_PASSWORD`. Releases are then signed with the church's own certificate, so macOS keeps
    "Always Allow" for Cool Services' Keychain item after updates instead of asking again. Keep the
    `.p12` file out of the repository (it's in `.gitignore`).
-4. Publish the first release (1.8.0, the version already in the project):
 
-   ```bash
-   git tag v1.18.2 && git push origin v1.18.2
-   ```
-
-   When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the
-   release and install it on each Mac once. From then on, updates come through the app.
-
-### Publishing a new version
+### Publishing a version
 
 ```bash
-npm run release -- 1.7.1
+npm run release
 ```
 
-This sets the version, commits, tags `v1.7.1` and pushes. GitHub Actions
-(`.github/workflows/release.yml`) builds the universal Mac app on a GitHub Mac and publishes a
-release with `Cool-Services-1.7.1.dmg` (first installs), `Cool-Services-1.7.1-mac.zip` (what the
-updater downloads) and `SHA256SUMS.txt`. It takes about 15 minutes; follow it under the repo's
-**Actions** tab. Edit the release notes on GitHub if you like: they're what "What's new" shows.
+This releases the version the project is at (each update from Claude sets it, e.g. 1.18.2): it tags
+`v1.18.2` and pushes the code and the tag. `npm run release -- 1.19.0` picks a version yourself.
+GitHub Actions (`.github/workflows/release.yml`) then builds the universal Mac app on a GitHub Mac
+(including NDI) and publishes a release with `Cool-Services-<version>.dmg` (first installs),
+`Cool-Services-<version>-mac.zip` (what the updater downloads) and `SHA256SUMS.txt`. It takes about
+15 minutes; follow it under the repo's **Actions** tab. Edit the release notes on GitHub if you like:
+they're what "What's new" shows.
 
-Everyone's Cool Services offers the update the next time it checks. To rebuild an existing tag,
-run the Release workflow by hand from the Actions tab.
+The first time, download the `.dmg` from the release and install it on each Mac. After that every
+Cool Services offers new versions itself (Check for Updates). To rebuild an existing tag, run the
+Release workflow by hand from the Actions tab.
 
 ## Planning Center app registration
 
