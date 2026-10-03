@@ -1,0 +1,7 @@
+node_modules
+static/*.js
+static/*.js.map
+static/fonts
+dist
+.git
+config
