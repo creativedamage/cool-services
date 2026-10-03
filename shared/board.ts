@@ -18,6 +18,8 @@ export interface BoardSettings {
   banner: { enabled: boolean; text: string; scroll: boolean; size: "s" | "m" | "l"; background: string; color: string; showService: boolean; showClock: boolean };
   /** Tile backgrounds: your own picture first (if there is one), else the Planning Center photo; or none. */
   images: "custom-then-pco" | "pco" | "custom" | "none";
+  /** How the picture shows: filling the tile behind the name, as a round photo above the name, or not at all. */
+  imageStyle: "background" | "icon" | "none";
   /** "person:<id>" or "mic:<channelId>" → uploaded image file id. */
   customImages: Record<string, string>;
   /** Which mics are on the board. */
@@ -57,7 +59,7 @@ export interface DisplayState {
   view: DisplayView;
   mode: DisplayMode;
   reason: string;
-  settings: Pick<BoardSettings, "banner" | "columns">;
+  settings: Pick<BoardSettings, "banner" | "columns" | "imageStyle">;
   service: { planId: string; serviceTypeId: string; title: string; serviceTypeName: string; when: string; nextTime: string | null } | null;
   tiles: BoardTile[];
   /** For the stage plot view. */
@@ -74,6 +76,6 @@ export interface DisplayState {
 export const DEFAULT_BOARD: BoardSettings = {
   mode: "auto", autoIdle: "micboard", serviceTypeId: null,
   banner: { enabled: true, text: "", scroll: false, size: "m", background: "#0B1220", color: "#FFFFFF", showService: true, showClock: true },
-  images: "custom-then-pco", customImages: {}, kinds: ["vocal", "pack", "other"], hideUnassigned: false, columns: 0,
+  images: "custom-then-pco", imageStyle: "background", customImages: {}, kinds: ["vocal", "pack", "other"], hideUnassigned: false, columns: 0,
   lan: false, screen: { enabled: false, displayId: null },
 };

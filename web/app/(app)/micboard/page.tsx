@@ -207,6 +207,14 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
               <option value="none">No pictures</option>
             </select>
           </label>
+          <label className="block"><span className="text-xs text-ink-muted">Show the picture</span>
+            <div className="mt-1 flex rounded-lg border border-line p-0.5">
+              {([["background", "Behind the name"], ["icon", "Round photo above the name"], ["none", "No picture"]] as const).map(([v, label]) => (
+                <button key={v} onClick={() => onSave({ imageStyle: v })}
+                  className={clsx("flex-1 rounded-md px-2 py-1.5 text-xs", s.imageStyle === v ? "bg-accent text-white" : "text-ink-soft hover:bg-hover")}>{label}</button>
+              ))}
+            </div>
+          </label>
           <div className="flex flex-wrap gap-3">
             {(["vocal", "pack", "other"] as const).map((k) => (
               <label key={k} className="flex items-center gap-1.5">

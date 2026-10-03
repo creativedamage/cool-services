@@ -116,7 +116,7 @@ export function displayState(): Promise<DisplayState> {
   if (memo && Date.now() - memo.at < 1500) return memo.p;
   const p = build().catch((e): DisplayState => ({
     view: stored.settings.mode === "auto" ? stored.settings.autoIdle : stored.settings.mode, mode: stored.settings.mode, reason: "",
-    settings: { banner: stored.settings.banner, columns: stored.settings.columns }, service: null, tiles: [], stage: null,
+    settings: { banner: stored.settings.banner, columns: stored.settings.columns, imageStyle: stored.settings.imageStyle }, service: null, tiles: [], stage: null,
     error: (e as Error).message, at: new Date().toISOString(),
   }));
   memo = { at: Date.now(), p };
@@ -182,7 +182,7 @@ async function build(): Promise<DisplayState> {
   const now = Date.now();
   const next = plan?.times.filter((t) => t.kind === "service" && Date.parse(t.endsAt || t.startsAt) > now).sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
   return {
-    view, mode: s.mode, reason, settings: { banner: s.banner, columns: s.columns },
+    view, mode: s.mode, reason, settings: { banner: s.banner, columns: s.columns, imageStyle: s.imageStyle },
     service: plan ? {
       planId: plan.id, serviceTypeId: plan.serviceTypeId, title: plan.title, serviceTypeName: plan.serviceTypeName,
       when: new Date(plan.sortDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }),

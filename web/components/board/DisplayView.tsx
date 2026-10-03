@@ -11,7 +11,23 @@ import { peopleForPlan } from "@/lib/stage";
 import { ClockFace } from "@/components/clock/ClockFace";
 import { useClockStream } from "@/components/clock/useClock";
 import { PlotCanvas } from "@/components/stage/PlotCanvas";
-import { MicGrid } from "./MicBoard";
+import { MicGrid, type TileHistory } from "./MicBoard";
+
+/** Recent audio and RF readings per mic (kept on this screen) for the graphs. */
+function useHistory(s: DisplayState) {
+  const ref = useRef(new Map<string, TileHistory>());
+  const last = useRef("");
+  if (s.at !== last.current) {
+    last.current = s.at;
+    for (const t of s.tiles) {
+      const h = ref.current.get(t.channelId) ?? { audio: [], rf: [] };
+      h.audio = [...h.audio, t.audio ?? 0].slice(-40);
+      h.rf = [...h.rf, t.rf?.dbm != null ? Math.max(0, t.rf.dbm + 100) : 0].slice(-40);
+      ref.current.set(t.channelId, h);
+    }
+  }
+  return ref.current;
+}
 
 const BANNER_H = { s: 7, m: 10, l: 14 } as const;
 
@@ -82,12 +98,13 @@ function Empty({ text }: { text: string }) {
 
 export function DisplayView({ s, now }: { s: DisplayState; now: number }) {
   const [ref, size] = useSize<HTMLDivElement>();
+  const history = useHistory(s);
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-black text-white [container-type:size]" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif" }}>
       <Banner s={s} now={now} />
-      <div ref={ref} className="relative min-h-0 flex-1" style={{ padding: s.view === "micboard" ? "1.2cqh 1cqw" : 0 }}>
+      <div ref={ref} className="relative min-h-0 flex-1" style={{ padding: s.view === "micboard" ? "0.8cqh 0.6cqw" : 0 }}>
         {s.view === "micboard" && (s.tiles.length
-          ? <MicGrid tiles={s.tiles} columns={s.settings.columns} now={now} width={size.w} height={size.h} />
+          ? <MicGrid tiles={s.tiles} columns={s.settings.columns} now={now} width={size.w} height={size.h} style={s.settings.imageStyle ?? "background"} history={history} />
           : <Empty text="No mics to show. Set up your receivers and mics in Services → a service → Mics → Set up mics." />)}
         {s.view === "stageplot" && <StageView s={s} />}
         {s.view === "clock" && <ClockView />}

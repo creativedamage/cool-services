@@ -293,11 +293,14 @@ workflow with that person in Planning Center, and it appears under their My work
 
 Sidebar → **Mic board**. The big preview is exactly what the display shows.
 
-- **Mic board**: a tile for each mic in Mic setup, with the mic's name, the receiver and channel, the
-  person on it this service (from the service's Mics panel), their picture, and live battery (bars and
-  time left), RF (antennas and strength) and audio, all read-only from the Shure receivers. The tile's
-  color tells you at a glance: green fine, yellow low battery, red change the battery or RF
-  interference (flashing), grey TX off or receiver offline.
+- **Mic board**: laid out like Micboard, a tall column per mic in Mic setup: the mic's name (italic)
+  at the top, the person on it this service (from the service's Mics panel) in the middle, then a
+  status block (green fine, yellow low battery, red change the battery or RF interference, striped when
+  the transmitter is off or the receiver can't be reached), battery segments with time left, the audio
+  level and its recent graph, RF strength dots, the frequency and the RF graph, and antenna A/B at the
+  bottom. Everything is read-only from the Shure receivers (audio on the ULX-D family).
+- **Picture style** (Display settings): **Behind the name** (fills the top of the tile), **Round photo
+  above the name**, or **No picture**.
 - **Pictures**: Planning Center photos, or your own: Display settings → Your pictures. A picture for
   a person follows them to whichever mic they're on; a picture for a mic shows when nobody's on it.
   Choose "Your pictures, else Planning Center photos", only one kind, or none.
@@ -455,7 +458,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.18.0 && git push origin v1.18.0
+   git tag v1.18.1 && git push origin v1.18.1
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

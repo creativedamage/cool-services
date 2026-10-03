@@ -1,116 +1,157 @@
 "use client";
 /**
- * The mic board: a tile per wireless mic with the person's picture, name, battery, RF and audio, in
- * the spirit of Micboard. Colors: green fine, yellow low battery, red change the battery / RF
- * interference, grey transmitter off or receiver offline.
+ * The mic board, laid out like Micboard: a tall dark column per wireless mic.
+ *
+ *   VOX 1            ← the mic (italic)
+ *   [picture]        ← behind the name, or a round Planning Center photo above it, or nothing
+ *   Priya            ← who's on it this service
+ *   ██████████████   ← status block: green fine, yellow low battery, red change it / RF trouble,
+ *                       striped when the transmitter is off or the receiver can't be reached
+ *   ▮▮▮▯▯            ← battery
+ *   -12 dB  ~~~~~~   ← audio level and its recent history
+ *   ●●●○○ 554.125    ← RF strength and frequency
+ *   ~~~~~~           ← RF history
+ *   ▬▬ ▬▬            ← antennas A / B
  */
-import clsx from "clsx";
+import { useEffect, useState } from "react";
 import type { BoardTile, TileStatus } from "@shared/board";
 
-const STATUS: Record<TileStatus, { color: string; label: string }> = {
-  ok: { color: "#22C55E", label: "" },
-  low: { color: "#EAB308", label: "LOW BATTERY" },
-  critical: { color: "#EF4444", label: "" },
-  txoff: { color: "#4B5563", label: "TX OFF" },
-  offline: { color: "#6B7280", label: "RECEIVER OFFLINE" },
-  noreceiver: { color: "#334155", label: "" },
-};
+export type TileHistory = { audio: number[]; rf: number[] };
 
+const COLOR: Record<TileStatus, string> = {
+  ok: "#4CAF50", low: "#E8B931", critical: "#D9372E", txoff: "#D9372E", offline: "#6B7280", noreceiver: "#3A3A3A",
+};
+const BG = "#262626";
+const LINE = "#3A3A3A";
 const rfBars = (dbm: number | null) => (dbm == null ? 0 : dbm >= -60 ? 5 : dbm >= -67 ? 4 : dbm >= -75 ? 3 : dbm >= -82 ? 2 : dbm >= -90 ? 1 : 0);
 const runTime = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}` : `${m}m`);
 
-/** How many columns fit n tiles best in a w×h box (tiles about 4:5). */
+/** How many columns fit n tall tiles best in a w×h box. */
 export function bestColumns(n: number, w: number, h: number) {
   let best = 1, bestSize = 0;
   for (let c = 1; c <= Math.max(1, n); c++) {
     const rows = Math.ceil(n / c);
-    const tw = w / c, th = h / rows;
-    const size = Math.min(tw, th * 0.8); // tile width limited by height at 4:5
+    const size = Math.min(w / c, (h / rows) * 0.32); // tiles about 1 : 3
     if (size > bestSize) { bestSize = size; best = c; }
   }
   return best;
 }
 
-export function MicTile({ t, now }: { t: BoardTile; now: number }) {
-  const st = STATUS[t.status];
-  const dim = t.status === "txoff" || t.status === "offline";
-  const pulse = t.status === "critical" && Math.floor(now / 600) % 2 === 0;
-  const bars = t.battery?.bars ?? null;
+/** A small line graph of recent values (0..max), drawn across the tile. */
+function Spark({ values, max, color }: { values: number[]; max: number; color: string }) {
+  if (values.length < 2) return <div className="h-full w-full" />;
+  const n = 40;
+  const v = values.slice(-n);
+  const pts = v.map((x, i) => `${((i + n - v.length) / (n - 1)) * 100},${100 - Math.max(0, Math.min(1, x / max)) * 90 - 5}`).join(" ");
   return (
-    <div className="relative h-full w-full overflow-hidden [container-type:size]"
-      style={{ borderRadius: "3cqmin", background: "#0B0F17", boxShadow: `inset 0 0 0 0.9cqmin ${st.color}${pulse ? "" : "CC"}` }}>
-      {t.image && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={t.image} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ opacity: dim ? 0.25 : 0.8 }}
-          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-      )}
-      {!t.image && <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${st.color}33, transparent 60%)` }} />}
-      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 28%, rgba(0,0,0,0) 45%, rgba(0,0,0,.85) 78%, rgba(0,0,0,.95) 100%)" }} />
-      {/* status strip */}
-      <div className="absolute inset-x-0 top-0" style={{ height: "2.4cqh", background: st.color, opacity: pulse ? 0.35 : 1 }} />
-
-      <div className="absolute inset-x-0 top-0 flex items-start justify-between" style={{ padding: "4.5cqh 5cqw 0" }}>
-        <span className="rounded font-bold uppercase text-white" style={{ fontSize: "7cqh", lineHeight: 1.1, background: "rgba(0,0,0,.55)", padding: "0.6cqh 2.2cqw" }}>{t.micLabel}</span>
-        <span className="text-right font-medium text-white/70" style={{ fontSize: "4.6cqh", lineHeight: 1.15 }}>
-          {t.receiverName ? <>{t.receiverName}<br />CH {t.channel}</> : "No receiver"}
-        </span>
-      </div>
-
-      {(st.label || t.note || t.muted) && (
-        <div className="absolute inset-x-0 flex flex-col items-center gap-[1cqh]" style={{ top: "26cqh" }}>
-          {(st.label || (t.status === "critical" && t.note)) && (
-            <span className="rounded font-extrabold tracking-wider text-white" style={{ fontSize: "6.5cqh", background: `${st.color}E6`, padding: "0.5cqh 3cqw" }}>{st.label || t.note?.toUpperCase()}</span>
-          )}
-          {t.muted && <span className="rounded font-bold text-white" style={{ fontSize: "5cqh", background: "#B91C1CE6", padding: "0.3cqh 2.5cqw" }}>MUTED</span>}
-        </div>
-      )}
-
-      <div className="absolute inset-x-0 bottom-0" style={{ padding: "0 5cqw 4cqh" }}>
-        <div className={clsx("truncate font-extrabold text-white", !t.person && "text-white/40")} style={{ fontSize: t.person ? (t.person.firstName.length > 8 ? "13cqh" : "16cqh") : "10cqh", lineHeight: 1.05, textShadow: "0 0.4cqh 1.6cqh rgba(0,0,0,.6)" }}>
-          {t.person ? t.person.firstName : "Unassigned"}
-        </div>
-        <div className="truncate text-white/75" style={{ fontSize: "5cqh", lineHeight: 1.3, minHeight: "6.5cqh" }}>
-          {t.person ? [t.person.name.split(/\s+/).slice(1).join(" "), t.person.position].filter(Boolean).join(" · ") : ""}
-        </div>
-        {/* meters */}
-        <div className="mt-[2.5cqh] flex items-end gap-[3cqw]" style={{ opacity: t.battery || t.rf ? 1 : 0.35 }}>
-          <Meter label={t.battery?.minutes != null ? runTime(t.battery.minutes) : t.battery?.percent != null ? `${t.battery.percent}%` : "BATT"}>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <span key={i} style={{ display: "block", flex: 1, height: "100%", borderRadius: "0.6cqh", background: bars != null && i <= bars ? (bars <= 1 ? "#EF4444" : bars <= 2 ? "#EAB308" : "#22C55E") : "rgba(255,255,255,.18)" }} />
-            ))}
-          </Meter>
-          <Meter label={t.rf?.antennas ? t.rf.antennas.split("").map((a) => (/[AB R]/.test(a) && a !== "X" ? a : "–")).join(" ") : "RF"}>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <span key={i} style={{ display: "block", flex: 1, height: `${30 + i * 14}%`, alignSelf: "flex-end", borderRadius: "0.5cqh", background: i <= rfBars(t.rf?.dbm ?? null) ? "#38BDF8" : "rgba(255,255,255,.18)" }} />
-            ))}
-          </Meter>
-          <Meter label="AUDIO">
-            <span style={{ display: "block", flex: 1, height: "55%", alignSelf: "center", borderRadius: "0.6cqh", background: "rgba(255,255,255,.18)", position: "relative", overflow: "hidden" }}>
-              <span style={{ position: "absolute", inset: 0, width: `${Math.min(100, ((t.audio ?? 0) / 50) * 100)}%`, background: (t.audio ?? 0) > 46 ? "#EF4444" : (t.audio ?? 0) > 38 ? "#EAB308" : "#22C55E", transition: "width .3s" }} />
-            </span>
-          </Meter>
-        </div>
-      </div>
-    </div>
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={2.4} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
   );
 }
 
-function Meter({ label, children }: { label: string; children: React.ReactNode }) {
+export function MicTile({ t, now, style, history }: { t: BoardTile; now: number; style: "background" | "icon" | "none"; history?: TileHistory }) {
+  const color = COLOR[t.status];
+  const striped = t.status === "txoff" || t.status === "offline" || t.status === "noreceiver";
+  const flash = t.status === "critical" && Math.floor(now / 700) % 2 === 0;
+  const bars = t.battery?.bars ?? null;
+  // A picture that doesn't load (offline, removed in Planning Center) counts as no picture.
+  const [broken, setBroken] = useState<string | null>(null);
+  useEffect(() => { setBroken(null); }, [t.image]);
+  const showImg = style !== "none" && t.image && broken !== t.image;
+  const nameColor = t.person ? "#ECECEC" : "#7A7A7A";
+  const block: React.CSSProperties = striped
+    ? { background: `repeating-linear-gradient(135deg, ${color}66 0 7cqw, ${BG} 7cqw 14cqw)` }
+    : { background: color, opacity: flash ? 0.55 : 1, transition: "opacity .2s" };
+  const ants = (t.rf?.antennas ?? "").padEnd(2, "X").slice(0, 2).split("");
+  const audioDb = t.audio != null ? t.audio - 50 : null;
+
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
-      <div className="flex items-end gap-[1cqw]" style={{ height: "6cqh" }}>{children}</div>
-      <span className="mt-[0.6cqh] truncate font-semibold tabular-nums text-white/70" style={{ fontSize: "3.8cqh" }}>{label}</span>
+    <div className="relative flex h-full w-full flex-col overflow-hidden [container-type:size]" style={{ background: BG, borderRadius: "1.2cqh" }}>
+      {/* picture behind the top of the tile */}
+      {showImg && style === "background" && (
+        <div className="absolute inset-x-0 top-0" style={{ height: "57cqh" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={t.image!} alt="" className="h-full w-full object-cover" style={{ opacity: striped ? 0.35 : 0.85 }}
+            onError={() => setBroken(t.image)} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(38,38,38,.85) 0%, rgba(38,38,38,0) 22%, rgba(38,38,38,0) 55%, rgba(38,38,38,.9) 100%)" }} />
+        </div>
+      )}
+
+      {/* mic */}
+      <div className="relative text-center" style={{ height: "9cqh", paddingTop: "1.2cqh" }}>
+        <span className="block truncate px-[4cqw] italic" style={{ fontSize: "min(5.6cqh, 19cqw)", fontWeight: 300, color: "#E6E6E6", letterSpacing: "0.02em" }}>{t.micLabel}</span>
+      </div>
+
+      {/* person */}
+      <div className="relative flex flex-col items-center justify-center px-[5cqw] text-center" style={{ height: "48cqh", gap: "2cqh" }}>
+        {showImg && style === "icon" && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={t.image!} alt="" className="rounded-full object-cover" style={{ width: "min(62cqw, 24cqh)", height: "min(62cqw, 24cqh)", border: `0.5cqh solid ${LINE}`, opacity: striped ? 0.45 : 1 }}
+            onError={() => setBroken(t.image)} />
+        )}
+        <span className="max-w-full break-words" style={{
+          fontSize: `min(${t.person && t.person.name.length > 12 ? 3.2 : 3.8}cqh, 15cqw)`, color: nameColor, lineHeight: 1.15,
+          fontWeight: showImg && style === "background" ? 600 : 400, textShadow: showImg && style === "background" ? "0 0.3cqh 1cqh rgba(0,0,0,.9)" : undefined,
+          marginTop: showImg && style === "background" ? "auto" : undefined, marginBottom: showImg && style === "background" ? "2cqh" : undefined,
+        }}>
+          {t.person ? t.person.name : "Unassigned"}
+        </span>
+      </div>
+
+      {/* status block */}
+      <div className="relative flex items-center justify-center" style={{ height: "14cqh", ...block }}>
+        {(t.note || t.muted) && (
+          <span className="text-center font-semibold uppercase" style={{ fontSize: "min(2.2cqh, 9cqw)", color: striped ? "#E6E6E6" : "#1A1A1A", letterSpacing: "0.06em", lineHeight: 1.2 }}>
+            {t.muted ? "Muted" : t.note}
+          </span>
+        )}
+      </div>
+
+      {/* battery */}
+      <div className="relative flex" style={{ height: "3cqh", borderTop: `0.15cqh solid ${LINE}`, borderBottom: `0.15cqh solid ${LINE}` }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <span key={i} className="block flex-1" style={{ background: bars != null && i <= bars ? (striped ? "#555" : color) : "transparent", borderLeft: i > 1 ? `0.15cqh solid ${LINE}` : undefined }} />
+        ))}
+      </div>
+
+      {/* audio */}
+      <div className="relative flex justify-end px-[3cqw] font-mono italic" style={{ height: "3.5cqh", fontSize: "min(1.9cqh, 7.5cqw)", color: "#3F7A44", paddingTop: "0.6cqh" }}>
+        {t.battery?.minutes != null && <span className="mr-auto not-italic" style={{ color: "#8A8A8A" }}>{runTime(t.battery.minutes)}</span>}
+        {audioDb != null && `${audioDb} dB`}
+      </div>
+      <div className="relative px-[1.5cqw]" style={{ height: "8cqh" }}>{t.audio != null && <Spark values={history?.audio ?? []} max={50} color="#5FBF66" />}</div>
+
+      {/* RF */}
+      <div className="relative flex items-center justify-between px-[3cqw]" style={{ height: "3.5cqh" }}>
+        <span className="flex" style={{ gap: "0.8cqw" }}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <span key={i} className="block rounded-full" style={{ width: "min(1.6cqh, 6cqw)", height: "min(1.6cqh, 6cqw)", border: "0.2cqh solid #6E4B63", background: i <= rfBars(t.rf?.dbm ?? null) ? "#6E4B63" : "transparent" }} />
+          ))}
+        </span>
+        <span className="font-mono italic" style={{ fontSize: "min(1.9cqh, 7.5cqw)", color: "#6B2E2A" }}>{t.frequencyMHz != null ? `${t.frequencyMHz.toFixed(3)} MHz` : ""}</span>
+      </div>
+      <div className="relative px-[1.5cqw]" style={{ height: "7.5cqh" }}>{t.rf && <Spark values={history?.rf ?? []} max={70} color="#D9372E" />}</div>
+
+      {/* antennas */}
+      <div className="relative mt-auto flex" style={{ height: "3cqh", borderTop: `0.15cqh solid ${LINE}` }}>
+        {ants.map((a, i) => (
+          <span key={i} className="block flex-1" style={{ background: a !== "X" && a !== "-" && t.rf ? "#155E92" : "transparent", borderLeft: i ? `0.15cqh solid ${LINE}` : undefined }} />
+        ))}
+      </div>
     </div>
   );
 }
 
 /** All the tiles, filling the box they're in (no scrolling on a TV). */
-export function MicGrid({ tiles, columns, now, width, height }: { tiles: BoardTile[]; columns: number; now: number; width: number; height: number }) {
+export function MicGrid({ tiles, columns, now, width, height, style, history }: {
+  tiles: BoardTile[]; columns: number; now: number; width: number; height: number; style: "background" | "icon" | "none"; history?: Map<string, TileHistory>;
+}) {
   const cols = columns || bestColumns(tiles.length, width, height);
   const rows = Math.max(1, Math.ceil(tiles.length / cols));
   return (
-    <div className="grid h-full w-full" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`, gap: "max(6px, 0.8vmin)" }}>
-      {tiles.map((t) => <MicTile key={t.channelId} t={t} now={now} />)}
+    <div className="grid h-full w-full" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`, gap: "max(4px, 0.5vmin)" }}>
+      {tiles.map((t) => <MicTile key={t.channelId} t={t} now={now} style={style} history={history?.get(t.channelId)} />)}
     </div>
   );
 }
