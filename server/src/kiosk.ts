@@ -21,6 +21,8 @@ import type { PcoApi } from "./pco/api.js";
 import { extras, settings } from "./lib/db.js";
 import { clockOutRouter } from "./routes/clock.js";
 import { clockOutputs, clockSettings } from "./lib/clock.js";
+import { boardOutputs, boardSettings } from "./lib/board.js";
+import { boardOutRouter } from "./routes/board.js";
 import { onPhonesChange, phones, phoneSession, phoneUnlock, staffCheckIn, staffUndo, teamCheckIns } from "./lib/teamCheckins.js";
 import { kioskSession, onPagingChange, page, PagingError, requestPage, status, stored, unlock } from "./lib/paging.js";
 import { companionAct, companionFor, companionView, pairingOpen, pairWithCode } from "./lib/companion.js";
@@ -256,7 +258,10 @@ function createKioskApp() {
   app.use("/api/kiosk", ipadsOn, kioskRouter);
   app.use("/api/companion", companionLanRouter);
   app.use("/api/team", teamLanRouter);
-  const clockOn = (_req: Request, res: Response, next: NextFunction) => (clockSettings().lan ? next() : res.status(404).json({ error: "not_found" }));
+  // The clock's feed is also what the stage display's Clock view uses.
+  const clockOn = (_req: Request, res: Response, next: NextFunction) => (clockSettings().lan || boardSettings().lan ? next() : res.status(404).json({ error: "not_found" }));
+  const boardOn = (_req: Request, res: Response, next: NextFunction) => (boardSettings().lan ? next() : res.status(404).json({ error: "not_found" }));
+  app.use("/api/board-out", boardOn, boardOutRouter); // the stage display on TVs and stage screens
   app.use("/api/clock-out", clockOn, clockOutRouter); // the clock on TVs / iPads / stage displays, and Companion control
   app.use("/api", (_req, res) => res.status(404).json({ error: "not_found" }));
   if (webRoot && fs.existsSync(webRoot)) {
@@ -276,6 +281,9 @@ function createKioskApp() {
       next();
     });
     app.get(["/", "/nursery", "/kids"], ipadsOn, send);
+    // The stage display (mic board / stage plot / clock).
+    app.get("/display", (_req, res, next) => (boardSettings().lan ? next() : res.status(404).send("The stage display isn’t shared on the network. Turn it on in Cool Services → Mic board → Display settings.")),
+      (_req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(webRoot!, "displayout.html")));
     // The production clock (full screen in any browser on the network).
     app.get("/clock", (_req, res, next) => (clockSettings().lan ? next() : res.status(404).send("The clock isn’t shared on the network. Turn it on in Cool Services → Preferences → Clock.")), (_req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(webRoot!, "clockout.html")));
     const teamPage = path.join(webRoot, "team.html");
@@ -294,7 +302,7 @@ function createKioskApp() {
 export function applyKiosk() {
   const { enabled, port } = stored().config.ipads;
   // Also listen for FOH companions (paired ones, or while a pairing code is showing).
-  const want = enabled || phones().enabled || clockSettings().lan || pairingOpen() || (stored().companions ?? []).length ? { port } : null;
+  const want = enabled || phones().enabled || clockSettings().lan || boardSettings().lan || pairingOpen() || (stored().companions ?? []).length ? { port } : null;
   if (listening && want && listening.port === want.port) return;
   if (server) { server.close(); server.closeAllConnections?.(); server = null; listening = null; }
   lastError = undefined;
@@ -317,4 +325,5 @@ export function initKiosk(webDir?: string) {
   onPagingChange(applyKiosk);
   onPhonesChange(applyKiosk);
   clockOutputs.onSettings(() => applyKiosk());
+  boardOutputs.onSettings(() => applyKiosk());
 }

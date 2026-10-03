@@ -139,6 +139,7 @@ function parseChannel(c: number, replies: string[], ad: boolean): ChannelStatus 
     frequencyMHz: freqRaw ? freqRaw / 1000 : null,
     antennas: sample ? sample[1] : null,
     rfDbm: txOn && sample ? Number(sample[2]) - 128 : null,
+    audioLevel: txOn && sample ? Math.min(50, Number(sample[3])) : null,
     interference: rep("RF_INT_DET") === "CRITICAL",
     muted: mute ? mute === "ON" : null,
   };

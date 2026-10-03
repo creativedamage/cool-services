@@ -152,7 +152,7 @@ pagingRouter.get("/qr", h(async (req, res) => {
   const url = String(req.query.url ?? "");
   const a = kioskAddresses();
   const phoneFriendly = Object.values(phonesConfig().hostnames).filter(Boolean).map((h) => `http://${h}${a.port === 80 ? "" : `:${a.port}`}`);
-  const ok = a.urls.some((u) => ["nursery", "kids", "leads", "staff"].some((p) => url === `${u}/${p}`)) || Object.values(a.friendly).includes(url) || phoneFriendly.includes(url);
+  const ok = a.urls.some((u) => ["nursery", "kids", "leads", "staff", "display", "clock"].some((p) => url === `${u}/${p}`)) || Object.values(a.friendly).includes(url) || phoneFriendly.includes(url);
   if (!ok) return res.status(400).json({ error: "not_our_address" });
   res.type("image/svg+xml").send(await QRCode.toString(url, { type: "svg", margin: 1, errorCorrectionLevel: "M" }));
 }));

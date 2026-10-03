@@ -361,3 +361,23 @@ event and the team's location; `staffRows()` turns a plan's staff check-ins into
   reports displays. `build.mjs` copies koffi's Mac binaries to `app/native/koffi` and extracts
   `libndi.dylib` from NDI's SDK installer to `app/native/ndi` (unpacked from asar; `x64ArchFiles`
   covers them for the universal build). `COOL_NDI_FAKE=<folder>` writes frames as PNGs for testing.
+
+## 5v. Mic board & stage display (1.18)
+
+- `shared/board.ts`: settings and `DisplayState` (view, banner, service, tiles, stage plot data).
+- `server/src/lib/board.ts`: picks the service (`serviceTypeId` or any; the first upcoming plan that
+  isn't over), the view (manual, or auto from the plan's rehearsal/service times), and builds tiles
+  from the mic setup + this plan's assignments + `micStatuses()` (receivers read at most every 2 s,
+  shared with `/api/mics/status`; the ULX-D sample now also gives `audioLevel`). Status: no receiver /
+  offline / TX off / critical (interference, ≤1 bar or ≤30 min) / low (≤2 bars or ≤60 min) / ok. Pictures:
+  `customImages["person:<id>"|"mic:<channelId>"]` (uploaded files) and/or the roster's Planning Center
+  photo. The state is shared for 1.5 s however many displays poll it. Uses the access of whoever last
+  opened the Mic board.
+- `server/src/routes/board.ts`: `/api/board` (signed in: settings, pictures) and `/api/board-out`
+  (no sign-in: `/state`, `/image/<file>` limited to board pictures and stage-plot backgrounds). The LAN
+  listener serves `/display` (`displayout.html`) and `/api/board-out` when the network display is on,
+  and lets `/api/clock-out` through for the Clock view.
+- Web: `/micboard` (control + preview + settings drawer), `/displayout` (polls every 2 s),
+  `components/board/` (`MicBoard` tiles sized with container units, `DisplayView` with the banner,
+  the stage plot through `PlotCanvas` with a sign-in-free background URL, and the clock through
+  `ClockFace`). Desktop: `boardOut.ts` opens the second-display window.

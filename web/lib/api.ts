@@ -5,6 +5,7 @@ import type {
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 import type { ClockOutputSettings, ClockPreset, ClockState, ClockView } from "@shared/clock";
+import type { BoardSettings, DisplayState } from "@shared/board";
 
 export type SettingsPatch = Partial<Omit<AppSettings, "waves">> & {
   waves?: Partial<AppSettings["waves"]>;
@@ -82,6 +83,11 @@ export const Api = {
     api<{ ok: true }>(`/people/${person}/cards/${card}/email`, { method: "POST", json: { subject, body } }),
 
   serviceTypes: () => api<ServiceType[]>("/services/service-types"),
+  stageDisplay: () => api<{ settings: BoardSettings; state: DisplayState; displays: { id: number; label: string; primary: boolean }[]; urls: string[] }>("/board"),
+  saveBoard: (p: Partial<Omit<BoardSettings, "banner" | "screen">> & { banner?: Partial<BoardSettings["banner"]>; screen?: Partial<BoardSettings["screen"]> }) =>
+    api<BoardSettings>("/board/settings", { method: "PUT", json: p }),
+  boardImage: (key: string, dataUrl: string) => api<BoardSettings>("/board/images", { method: "POST", json: { key, dataUrl } }),
+  removeBoardImage: (key: string) => api<BoardSettings>(`/board/images/${encodeURIComponent(key)}`, { method: "DELETE" }),
   clock: () => api<ClockView>("/clock"),
   clockAction: (a: Record<string, unknown> & { type: string }) => api<ClockState>("/clock/action", { method: "POST", json: a }),
   saveClockPresets: (list: ClockPreset[]) => api<ClockPreset[]>("/clock/presets", { method: "PUT", json: list }),

@@ -6,7 +6,7 @@ import { Mic } from "lucide-react";
 import type { PlotItem, PlotPerson, StagePlot } from "@shared/types";
 import { DEFAULT_CARD, itemInfo, textOn } from "@/lib/stage";
 
-export function PlotCanvas({ plot, editable, selectedId, onSelect, onChange, people, micLabels, className, fitHeight }: {
+export function PlotCanvas({ plot, editable, selectedId, onSelect, onChange, people, micLabels, className, fitHeight, backgroundUrl }: {
   plot: Pick<StagePlot, "background" | "items">;
   editable?: boolean;
   selectedId?: string | null;
@@ -19,6 +19,8 @@ export function PlotCanvas({ plot, editable, selectedId, onSelect, onChange, peo
   className?: string;
   /** Space (px) taken by headers above the canvas; the canvas shrinks to fit the rest of the window. */
   fitHeight?: number;
+  /** Where the background picture comes from (the stage display uses its own, sign-in-free address). */
+  backgroundUrl?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: string; dx: number; dy: number; moved: boolean } | null>(null);
@@ -38,7 +40,7 @@ export function PlotCanvas({ plot, editable, selectedId, onSelect, onChange, peo
       className={clsx("relative w-full select-none overflow-hidden rounded-xl border border-line [container-type:inline-size]", plot.background ? "bg-white" : "bg-canvas", className)}>
       {plot.background ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={`/api/stage/files/${plot.background.fileId}`} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-contain" />
+        <img src={backgroundUrl ?? `/api/stage/files/${plot.background.fileId}`} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-contain" />
       ) : (
         <div className="pointer-events-none absolute inset-0 [background-image:linear-gradient(rgb(var(--c-line)/.6)_1px,transparent_1px),linear-gradient(90deg,rgb(var(--c-line)/.6)_1px,transparent_1px)] [background-size:5%_8%]">
           <div className="absolute inset-x-0 top-2 text-center text-[10px] font-semibold uppercase tracking-[0.3em] text-ink-faint">Upstage</div>

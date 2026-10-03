@@ -46,6 +46,11 @@ Services scheduling faster.
   Center Live item). Saved **timers** start with a click, a number key, a schedule, or when the one
   before ends. Outputs: **NDI®**, the church network (any browser), a second display, and Stream Deck
   / Companion links.
+- **Mic board & stage display** (sidebar → Mic board): a Micboard-style board of your wireless mics
+  (who's on each one with their picture, battery, RF and audio, colored by status), with a banner
+  message across the top. The display can show the mic board, the stage plot or the clock, chosen
+  in the app or automatically (stage plot during rehearsal, mic board for the service). Open it on
+  any other computer or TV at `http://<this Mac>/display`.
 - **Tuning**: every song's key, big, across the top of each service in service order ("Song 1 · A",
   "Song 2 · Db"). With Waves SuperRack connected in Settings, pressing a key recalls that key's
   SuperRack snapshot over MIDI.
@@ -284,6 +289,36 @@ workflow with that person in Planning Center, and it appears under their My work
 - People managers and site administrators still see every workflow, under "Other workflows".
 - New cards on your workflows pop up as a notification (with Open), checked every minute.
 
+## Mic board & stage display
+
+Sidebar → **Mic board**. The big preview is exactly what the display shows.
+
+- **Mic board**: a tile for each mic in Mic setup, with the mic's name, the receiver and channel, the
+  person on it this service (from the service's Mics panel), their picture, and live battery (bars and
+  time left), RF (antennas and strength) and audio, all read-only from the Shure receivers. The tile's
+  color tells you at a glance: green fine, yellow low battery, red change the battery or RF
+  interference (flashing), grey TX off or receiver offline.
+- **Pictures**: Planning Center photos, or your own: Display settings → Your pictures. A picture for
+  a person follows them to whichever mic they're on; a picture for a mic shows when nobody's on it.
+  Choose "Your pictures, else Planning Center photos", only one kind, or none.
+- **Banner**: type a message or your mission statement in the Banner box and press Show. It can scroll,
+  be small/medium/large, use your colors, and show the service and the time on either side.
+- **What the display shows**: **Auto** (the stage plot from 30 minutes before a rehearsal until it
+  ends, the mic board from an hour before each service until 15 minutes after, from the service's
+  times in Planning Center), or always the **Mic board**, the **Stage plot** or the **Clock**.
+- **Which service**: the next service of a type you choose, or of any type.
+- Display settings also choose which mics show (vocals, packs, other), hiding unassigned mics, and
+  tiles per row (Fit fills the screen with no scrolling).
+
+**On another computer (the display endpoint).** Cool Services runs on your main Mac; the display
+computer only needs a browser. On the Mic board page, **Show it on another computer → Turn on the
+network display**, then open the address it shows (like `http://192.168.1.20/display`) on the
+other computer and make the browser full screen. It follows every change you make. Both computers
+must be on the same network; give the main Mac a fixed IP (a DHCP reservation) so the address doesn't
+change, and set the network port to 80 (Preferences → Network Connections → Kids & Nursery iPads)
+to drop the `:port`. A second display plugged into the main Mac works too (Display settings → Where it
+shows).
+
 ## Production clock
 
 Sidebar → **Clock**. The preview at the top is exactly what every output shows:
@@ -420,7 +455,7 @@ no personal data). Send that file along when reporting slowness.
 4. Publish the first release (1.8.0, the version already in the project):
 
    ```bash
-   git tag v1.17.0 && git push origin v1.17.0
+   git tag v1.18.0 && git push origin v1.18.0
    ```
 
    When it finishes (Actions tab, about 15 minutes), download `Cool-Services-1.8.0.dmg` from the

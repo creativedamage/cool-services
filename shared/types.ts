@@ -270,6 +270,8 @@ export interface ChannelStatus {
   rfDbm: number | null; // strongest antenna, dBm
   interference: boolean;
   muted: boolean | null;
+  /** Audio level at the moment it was read, 0 (silent) to 50 (full scale); ULX-D family only. */
+  audioLevel?: number | null;
 }
 
 export interface ReceiverStatus {

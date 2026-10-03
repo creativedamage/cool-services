@@ -2,7 +2,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import clsx from "clsx";
-import { BellRing, CalendarDays, UsersRound, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, LayoutTemplate, LogOut, Settings, Timer } from "lucide-react";
+import { BellRing, CalendarDays, UsersRound, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, LayoutTemplate, LogOut, Settings, Timer, MicVocal } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -42,6 +42,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     { href: "/stage-plots", label: "Stage plots", icon: LayoutTemplate },
     { href: "/propresenter", label: "ProPresenter", icon: MonitorUp },
     { href: "/clock", label: "Clock", icon: Timer },
+    { href: "/micboard", label: "Mic board", icon: MicVocal },
     { href: "/chat", label: "Chat", icon: MessageCircle },
     { href: "/paging", label: "Parent paging", icon: BellRing },
   ];
@@ -74,7 +75,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <StagePlotsNav activeId={search.get("id")} />
         ) : path.startsWith("/paging") ? (
           <PagingNav />
-        ) : path.startsWith("/chat") || path.startsWith("/propresenter") || path.startsWith("/dashboard") || path.startsWith("/team-checkins") || path.startsWith("/clock") ? (
+        ) : path.startsWith("/chat") || path.startsWith("/propresenter") || path.startsWith("/dashboard") || path.startsWith("/team-checkins") || path.startsWith("/clock") || path.startsWith("/micboard") ? (
           <div className="flex-1" />
         ) : path.startsWith("/settings") ? (
           <div className="flex-1" />

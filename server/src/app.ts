@@ -28,6 +28,7 @@ import { teamGroupsRouter } from "./routes/teamGroups.js";
 import { teamPhonesRouter } from "./routes/teamPhones.js";
 import { volunteerCheckInRouter } from "./routes/volunteerCheckIn.js";
 import { clockOutRouter, clockRouter } from "./routes/clock.js";
+import { boardOutRouter, boardRouter } from "./routes/board.js";
 import { startClock } from "./lib/clock.js";
 import { appModeRouter, companionClientRouter } from "./routes/companionClient.js";
 import { setAttentionBridge, startCompanion } from "./lib/companion.js";
@@ -43,6 +44,7 @@ export function createApp(webDir?: string) {
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, version: process.env.APP_VERSION ?? "dev" }));
   app.use("/api/auth", authRouter);
+  app.use("/api/board-out", boardOutRouter); // the stage display (mic board / stage plot / clock)
   app.use("/api/clock-out", clockOutRouter); // clock outputs (NDI window, second display) and control links
   app.use("/api/settings", settingsRouter);
   app.use("/api/services", requireAuth, servicesRouter);
@@ -61,6 +63,7 @@ export function createApp(webDir?: string) {
   app.use("/api/team-phones", requireAuth, teamPhonesRouter);
   app.use("/api/volunteer-checkin", requireAuth, volunteerCheckInRouter);
   app.use("/api/clock", requireAuth, clockRouter);
+  app.use("/api/board", requireAuth, boardRouter);
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
   app.use("/api/app-mode", appModeRouter); // full app or FOH companion (this Mac only)
   app.use("/api/companion-client", companionClientRouter);
@@ -133,3 +136,5 @@ process.on("exit", flush);
 export { setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge };
 /** The Mac app's NDI sender and second-display window read clock output settings here. */
 export { clockOutputs } from "./lib/clock.js";
+/** …and the stage display's second-display window. */
+export { boardOutputs } from "./lib/board.js";
