@@ -25,14 +25,24 @@ let hasRemote = true;
 try { git("remote", "get-url", "origin"); } catch { hasRemote = false; }
 if (!hasRemote) fail("This folder isn't connected to GitHub yet: git remote add origin https://github.com/<github-name>/<repo>.git");
 
+// The version's notes from CHANGELOG.md: the first line is the summary that names the release.
+const changelog = fs.existsSync("CHANGELOG.md") ? fs.readFileSync("CHANGELOG.md", "utf8") : "";
+const section = changelog.split(/^## /m).find((x) => x.startsWith(`${ver}\n`) || x.startsWith(`${ver}\r\n`));
+if (!section) fail(`Add a "## ${ver}" section to CHANGELOG.md first: a one-line summary, then what changed.`);
+const summary = section.split(/\r?\n/).slice(1).find((l) => l.trim() && !l.startsWith("-"))?.trim().replace(/\.$/, "") ?? "";
+if (!summary) fail(`Give "## ${ver}" in CHANGELOG.md a one-line summary under the heading.`);
+const title = `Cool Services ${ver} — ${summary}`;
+
 if (ver !== pkg.version) {
   pkg.version = ver;
   fs.writeFileSync("desktop/package.json", JSON.stringify(pkg, null, 2) + "\n");
   git("add", "desktop/package.json");
-  git("commit", "-m", `Release v${ver}`);
 }
-git("tag", "-a", `v${ver}`, "-m", `Cool Services ${ver}`);
+// The release commit (also when nothing changed) is what GitHub Actions shows as the run's name.
+git("commit", "--allow-empty", "-m", title);
+git("tag", "-a", `v${ver}`, "-m", title);
 git("push", "-u", "origin", git("branch", "--show-current"));
 git("push", "origin", `v${ver}`);
+console.log(`✓ ${title}`);
 console.log(`✓ Pushed v${ver}. GitHub is building it now: https://github.com/${pkg.coolServices.updateRepo}/actions`);
 console.log("  In about 15 minutes it appears under Releases, and Cool Services → Check for Updates offers it.");

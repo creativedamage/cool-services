@@ -3,6 +3,8 @@
 #
 # Start one with:  npm run release -- 1.7.1
 name: Release
+# Shows as "Cool Services 1.18.3 — <summary>" (the release commit) in the Actions list.
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('Rebuild {0}', github.event.inputs.tag) || github.event.head_commit.message }}
 
 on:
   push:
@@ -75,12 +77,26 @@ jobs:
           shasum -a 256 Cool-Services-*.dmg Cool-Services-*-mac.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
+      - name: Release notes from CHANGELOG.md
+        run: |
+          node -e '
+            const fs = require("fs"); const v = process.env.VERSION;
+            const log = fs.existsSync("CHANGELOG.md") ? fs.readFileSync("CHANGELOG.md", "utf8") : "";
+            const sec = log.split(/^## /m).find((x) => x.startsWith(v + "\n")) || "";
+            const lines = sec.split("\n").slice(1);
+            const summary = (lines.find((l) => l.trim() && !l.startsWith("-")) || "").trim().replace(/\.$/, "");
+            const body = lines.filter((l) => l.trim() !== summary + "." && l.trim() !== summary).join("\n").trim();
+            fs.writeFileSync("release-notes.md", (summary ? summary + ".\n\n" : "") + body + "\n");
+            fs.appendFileSync(process.env.GITHUB_ENV, "SUMMARY=" + (summary || "Cool Services " + v) + "\n");
+          '
+          cat release-notes.md
+
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
-          name: Cool Services ${{ env.VERSION }}
-          generate_release_notes: true
+          name: Cool Services ${{ env.VERSION }} — ${{ env.SUMMARY }}
+          body_path: release-notes.md
           files: |
             desktop/release/Cool-Services-${{ env.VERSION }}.dmg
             desktop/release/Cool-Services-${{ env.VERSION }}-mac.zip

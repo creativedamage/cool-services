@@ -1,7 +1,52 @@
 # Cool Services
 
-A dark-mode Mac app that makes Planning Center People workflows and
-Services scheduling faster.
+A dark-mode Mac app for church production and volunteer teams, built on Planning Center: People
+workflows, Services scheduling, run sheets, check-ins, a production clock, a wireless mic board and
+more, in one place.
+
+**[⬇ Download the latest version](https://github.com/creativedamage/cool-services/releases/latest)** · [All releases](https://github.com/creativedamage/cool-services/releases) ·
+[What's new](CHANGELOG.md)
+
+On the release page, download **Cool-Services-<version>.dmg**, open it and drag Cool Services to
+Applications. After that, Cool Services updates itself (Cool Services → Check for Updates).
+
+![A service in Cool Services: tuning keys, mics and packs, and the roster](docs/screenshots/service.png)
+
+## A quick tour
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/dashboard.png" alt="Dashboard"><br><b>Dashboard</b>: the clock and countdown, Planning Center Live, tuning keys, SPL from Smaart, ProPresenter and your wireless mics on one screen.</td>
+<td width="50%"><img src="docs/screenshots/workflows.png" alt="Workflows board"><br><b>Workflows</b>: your People workflows as a drag-and-drop board with contact details, notes, email and one-click scheduling.</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/matrix.png" alt="Matrix"><br><b>Matrix</b>: several weeks of a service type side by side. Drag people between weeks, see open slots and who's pending.</td>
+<td><img src="docs/screenshots/run-sheet.png" alt="Run sheet"><br><b>Run sheet</b>: clock times, lengths and every team's notes in columns, following Planning Center Live. Edit anything in place.</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/checkins.png" alt="Check-ins"><br><b>Check-ins</b>: who's checked in for a service, by room, refreshing every few seconds.</td>
+<td><img src="docs/screenshots/team-checkins.png" alt="Team check-ins"><br><b>Team check-ins</b>: a tile per team (8/10 in), grouped by ministry, with staff check-in.</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/stage-plot.png" alt="Stage plot"><br><b>Stage plots</b>: build a plot once; each service fills in who's where from the roster and mics.</td>
+<td><img src="docs/screenshots/clock.png" alt="Production clock"><br><b>Production clock</b>: countdowns, until-service and Live item timers, saved timers on a schedule, messages.</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/clock-output.png" alt="Clock output"><br><b>Clock output</b>: the same clock as an NDI source, on the network or on a second display.</td>
+<td><img src="docs/screenshots/micboard-display.png" alt="Mic board display"><br><b>Mic board</b>: every wireless mic with who's on it, battery, RF and audio, on any screen in the building.</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/micboard.png" alt="Mic board control"><br><b>Stage display control</b>: switch between the mic board, stage plot and clock (or let rehearsal and service times decide), and set the banner message.</td>
+<td><img src="docs/screenshots/phone-staff.png" alt="Team check-ins on a phone" width="45%"><br><b>On phones</b>: team leads see who's in; staff check people in, from <code>staff.yourchurch.org</code>.</td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/screenshots/preferences.png" alt="Preferences" width="60%"><br><b>Preferences</b>: appearance, startup, campuses, Team Check-ins, audio (Allen &amp; Heath, Waves, Smaart), network connections (iPads, phones, companions) and video (clock outputs, ProPresenter).</td>
+</tr>
+</table>
+
+Screenshots use the built-in sample data (Sign in → "Or explore with sample data").
+
+## Everything it does
 
 - **Workflows board**: the People workflows assigned or shared to you as a drag-and-drop Kanban board. Each card shows the
   person's photo, email and phone, card and profile notes, staff-only notes, and email sent through
@@ -469,12 +514,16 @@ from Claude land there as new commits; you publish them to GitHub with one comma
 
 ### Publishing a version
 
+Each version has a section in [CHANGELOG.md](CHANGELOG.md): a one-line summary under the version
+heading, then what changed. Updates from Claude add it for you. Then:
+
 ```bash
 npm run release
 ```
 
-This releases the version the project is at (each update from Claude sets it, e.g. 1.18.2): it tags
-`v1.18.2` and pushes the code and the tag. `npm run release -- 1.19.0` picks a version yourself.
+This releases the version the project is at (e.g. 1.18.3): it makes a release commit named
+**"Cool Services 1.18.3 — <summary>"**, tags `v1.18.3` and pushes both. The GitHub Actions run and the
+release get that name, and the release notes come from the changelog. `npm run release -- 1.19.0` picks a version yourself.
 GitHub Actions (`.github/workflows/release.yml`) then builds the universal Mac app on a GitHub Mac
 (including NDI) and publishes a release with `Cool-Services-<version>.dmg` (first installs),
 `Cool-Services-<version>-mac.zip` (what the updater downloads) and `SHA256SUMS.txt`. It takes about
