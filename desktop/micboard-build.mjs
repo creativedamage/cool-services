@@ -1,8 +1,9 @@
-// Micboard inside the Mac app (see build.mjs).
+// Micboard inside the Mac app (see build.mjs). Everything below goes in desktop/micboard-runtime,
+// which the app carries as Contents/Resources/micboard.
 //
 // The Micboard code lives unchanged in vendor/micboard (creativedamage/micboard, added with
 // `git subtree`; update it with `npm run micboard:update`). Nothing in it is edited. To run it inside
-// Cool Services this adds, under app/native/:
+// Cool Services this adds, in the runtime folder:
 //
 //   micboard/        Micboard's server (py/), its built web page (static/ after `npm run build`),
 //                    demo.html, democonfig.json, dcid.json, package.json (what its own

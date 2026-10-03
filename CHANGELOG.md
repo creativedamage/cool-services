@@ -4,6 +4,15 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.20.1
+Fixes the Mac build for 1.20.0 (Micboard built in): Micboard's Python now ships next to the app archive instead of inside it.
+- The 1.20.0 release didn't build: the universal (Apple silicon + Intel) build couldn't merge an app
+  archive with all of Python's files unpacked from it. Micboard and its Python now live in
+  Cool Services.app/Contents/Resources/micboard.
+- Everything from 1.20.0: Micboard built in (creativedamage/micboard, unchanged), names and photos
+  from Planning Center, your own backgrounds in Preferences → Micboard, and no more Keychain
+  password after updates.
+
 ## 1.20.0
 Micboard built in (creativedamage/micboard), with names and photos from Planning Center and your own backgrounds; no more Keychain password after updates.
 - The mic board is now Micboard itself: creativedamage/micboard, unchanged, running inside the app

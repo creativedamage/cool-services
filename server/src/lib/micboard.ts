@@ -46,10 +46,13 @@ export function saveMicboardSettings(p: Partial<MicboardSettings>) {
 
 /* ───────────── Where things are ───────────── */
 
-/** app/native in the Mac app (outside the asar archive), or COOL_MICBOARD_NATIVE. */
+/**
+ * Micboard's runtime (its code, Python, Tornado): Contents/Resources/micboard in the Mac app (set by
+ * desktop/src/main.ts as COOL_MICBOARD_NATIVE), else desktop/micboard-runtime next to app/server.cjs.
+ */
 function nativeDir() {
   if (process.env.COOL_MICBOARD_NATIVE) return process.env.COOL_MICBOARD_NATIVE;
-  return path.join(__dirname, "native").replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+  return path.join(__dirname, "..", "micboard-runtime");
 }
 const paths = () => {
   const n = nativeDir();

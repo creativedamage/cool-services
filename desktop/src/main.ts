@@ -103,6 +103,8 @@ async function boot() {
   process.env.TOKEN_ENCRYPTION_KEY = encryptionKey(dataDir);
   process.env.NODE_ENV = "production";
   process.env.APP_VERSION = app.getVersion();
+  // Micboard's runtime: Contents/Resources/micboard in the app, desktop/micboard-runtime when developing.
+  process.env.COOL_MICBOARD_NATIVE = app.isPackaged ? path.join(process.resourcesPath, "micboard") : path.join(__dirname, "..", "micboard-runtime");
 
   // Start from a clean page cache so an updated app always shows its new screens.
   await session.defaultSession.clearCache();

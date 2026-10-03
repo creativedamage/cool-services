@@ -623,6 +623,7 @@ server/src/lib/db.ts       Local data file (users, tokens, sessions, staff notes
 server/src/lib/shure.ts    Shure receiver status, read-only (TCP 2202), when Micboard isn't running
 server/src/lib/micboard.ts Runs Micboard (vendor/micboard) and adapts to it: data, slots, names, backgrounds
 vendor/micboard/           creativedamage/micboard, unchanged (git subtree; npm run micboard:update)
+desktop/micboard-runtime/  Built Micboard + Python (→ Cool Services.app/Contents/Resources/micboard)
 desktop/micboard-build.mjs Builds Micboard's page and adds it, its Python and Tornado to the app
 server/src/lib/propresenter.ts  ProPresenter API client + finding it on the network
 server/src/routes/pro.ts   ProPresenter control (slides, timers, stage) for any computer

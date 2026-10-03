@@ -4,8 +4,8 @@
 //   src/main.ts          →  app/main.cjs
 //   koffi (ready-built)  →  app/native/koffi  (calls the NDI library; nothing is compiled)
 //   NDI library          →  app/native/ndi/libndi.dylib  (from NDI's official Mac SDK installer)
-//   Micboard             →  app/native/micboard, python, micboard-site  (vendor/micboard, unchanged;
-//                           see micboard-build.mjs)
+//   Micboard             →  micboard-runtime/ (micboard, python, micboard-site; vendor/micboard,
+//                           unchanged; see micboard-build.mjs) → Contents/Resources/micboard
 //
 // `node build.mjs --dist` (npm run dist:mac) stops with an explanation if the NDI library can't be
 // added, so a DMG never ships without NDI by accident. COOL_SKIP_NDI=1 builds without it.
@@ -137,14 +137,19 @@ if (process.env.COOL_SKIP_NDI === "1") {
   }
 }
 
-/* ── Micboard (creativedamage/micboard in vendor/micboard, run by its own Python inside the app) ── */
+/* ── Micboard (creativedamage/micboard in vendor/micboard, run by its own Python inside the app) ──
+   It goes in desktop/micboard-runtime, which the app carries as Contents/Resources/micboard (outside
+   the asar archive: Python's thousands of files are too many for the universal build's asar merge). */
+const micboardOut = path.join(here, "micboard-runtime");
+fs.rmSync(micboardOut, { recursive: true, force: true });
+fs.mkdirSync(micboardOut, { recursive: true });
 if (process.env.COOL_SKIP_MICBOARD === "1") {
   console.log("• Skipping Micboard (COOL_SKIP_MICBOARD=1)");
 } else {
   console.log("• Adding Micboard…");
   try {
     const { addMicboard } = await import("./micboard-build.mjs");
-    await addMicboard({ root, native, cacheDir });
+    await addMicboard({ root, native: micboardOut, cacheDir });
   } catch (e) {
     console.error(`
 ✗ Micboard couldn’t be added: ${e.message}
