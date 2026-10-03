@@ -6,10 +6,10 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { Copy, ImagePlus, LayoutTemplate, MicVocal, MonitorUp, RotateCcw, Settings2, Sparkles, Timer, Tv, Wifi, X } from "lucide-react";
+import { Copy, Eye, EyeOff, ImagePlus, Plus, Trash2, WifiOff, LayoutTemplate, MicVocal, MonitorUp, RotateCcw, Settings2, Sparkles, Timer, Tv, Wifi, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { BoardSettings, DisplayMode } from "@shared/board";
+import type { BoardMic, BoardSettings, DisplayMode } from "@shared/board";
 import { Api } from "@/lib/api";
 import { DisplayView } from "@/components/board/DisplayView";
 import { Drawer, Spinner } from "@/components/ui";
@@ -166,10 +166,21 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5 text-sm">
         <section className="space-y-2">
           <h3 className="label">Service</h3>
-          <select className="input" value={s.serviceTypeId ?? ""} onChange={(e) => onSave({ serviceTypeId: e.target.value || null })}>
-            <option value="">The next service of any type</option>
-            {types.data?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          <div className="flex rounded-lg border border-line p-0.5">
+            {([["open", "The service I have open"], ["next", "Always the next service"]] as const).map(([v, label]) => (
+              <button key={v} onClick={() => onSave({ follow: v })}
+                className={clsx("flex-1 rounded-md px-2 py-1.5 text-xs", (s.follow ?? "open") === v ? "bg-accent text-white" : "text-ink-soft hover:bg-hover")}>{label}</button>
+            ))}
+          </div>
+          {(s.follow ?? "open") === "open" && (
+            <p className="text-[11px] text-ink-faint">Open a service under Services and the board switches to it.{data.state.service ? <> Now: <span className="text-ink-soft">{data.state.service.serviceTypeName} · {data.state.service.when}</span></> : null}</p>
+          )}
+          <label className="block"><span className="text-xs text-ink-muted">{(s.follow ?? "open") === "open" ? "Until you open one, the next service of" : "The next service of"}</span>
+            <select className="input mt-1" value={s.serviceTypeId ?? ""} onChange={(e) => onSave({ serviceTypeId: e.target.value || null })}>
+              <option value="">Any type</option>
+              {types.data?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </label>
           <label className="block"><span className="text-xs text-ink-muted">In Auto, outside rehearsal and service times show</span>
             <select className="input mt-1" value={s.autoIdle} onChange={(e) => onSave({ autoIdle: e.target.value as BoardSettings["autoIdle"] })}>
               <option value="micboard">Mic board</option><option value="stageplot">Stage plot</option><option value="clock">Clock</option>
@@ -231,6 +242,8 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
           </label>
         </section>
 
+        <MicsSection s={s} mics={data.mics} onSave={onSave} />
+
         <section className="space-y-2">
           <h3 className="label">Your pictures</h3>
           <p className="text-[11px] text-ink-faint">A picture for a person follows them to whatever mic they’re on. A picture for a mic shows when it’s unassigned or the person has none.</p>
@@ -274,5 +287,58 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
         </section>
       </div>
     </Drawer>
+  );
+}
+
+/** Show or hide each mic, stack a person's mics on one tile, and add mics that aren't on the network. */
+function MicsSection({ s, mics, onSave }: {
+  s: BoardSettings; mics: BoardMic[]; onSave: (p: Parameters<typeof Api.saveBoard>[0]) => void;
+}) {
+  const qc = useQueryClient();
+  const [label, setLabel] = useState("");
+  const [kind, setKind] = useState<BoardMic["kind"]>("pack");
+  const refresh = () => qc.invalidateQueries({ queryKey: KEY });
+  const add = useMutation({
+    mutationFn: () => Api.addBoardMic(label.trim(), kind),
+    onSuccess: () => { setLabel(""); void refresh(); toast.success("Mic added", { description: "Put someone on it in the service’s Mics panel." }); },
+    onError: (e) => toast.error("Couldn’t add the mic", { description: (e as Error).message }),
+  });
+  const del = useMutation({ mutationFn: Api.removeBoardMic, onSuccess: () => void refresh() });
+  const hidden = new Set(s.hidden ?? []);
+  const toggle = (id: string) => onSave({ hidden: hidden.has(id) ? [...hidden].filter((x) => x !== id) : [...hidden, id] });
+
+  return (
+    <section className="space-y-2">
+      <h3 className="label">Mics on the board</h3>
+      <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5" checked={s.stack ?? true} onChange={(e) => onSave({ stack: e.target.checked })} />
+        <span>One tile per person <span className="block text-[11px] text-ink-faint">Someone on more than one mic (a vocal and their acoustic guitar’s pack) gets one tile, with the other mics stacked under their mic name.</span></span>
+      </label>
+      <div className="divide-y divide-line rounded-lg border border-line">
+        {mics.length === 0 && <p className="px-3 py-2 text-xs text-ink-muted">No mics yet. Add receivers in Settings → Mic setup, or add a mic below.</p>}
+        {mics.map((m) => (
+          <div key={m.id} className={clsx("flex items-center gap-2 px-3 py-1.5", hidden.has(m.id) && "opacity-50")}>
+            <button className="btn-ghost p-1" title={hidden.has(m.id) ? "Show on the board" : "Hide from the board"} onClick={() => toggle(m.id)}>
+              {hidden.has(m.id) ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+            <span className="min-w-0 flex-1 truncate">{m.label}</span>
+            <span className="text-[11px] text-ink-faint">{m.kind === "vocal" ? "Vocal" : m.kind === "pack" ? "Pack" : "Other"}</span>
+            {m.networked
+              ? <span className="flex items-center gap-1 text-[11px] text-ok" title="Read from its receiver"><Wifi size={11} /> Network</span>
+              : <>
+                  <span className="flex items-center gap-1 text-[11px] text-ink-muted" title="Not on the network: shows who has it, no battery or RF"><WifiOff size={11} /> Not networked</span>
+                  <button className="btn-ghost p-1 text-ink-muted hover:text-bad" title="Remove this mic" onClick={() => del.mutate(m.id)}><Trash2 size={13} /></button>
+                </>}
+          </div>
+        ))}
+      </div>
+      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (label.trim()) add.mutate(); }}>
+        <input className="input flex-1" placeholder="Add a mic that isn’t on the network (e.g. AG 1)" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} />
+        <select className="input w-24" value={kind} onChange={(e) => setKind(e.target.value as BoardMic["kind"])}>
+          <option value="vocal">Vocal</option><option value="pack">Pack</option><option value="other">Other</option>
+        </select>
+        <button className="btn-primary px-3" disabled={!label.trim() || add.isPending}><Plus size={14} /></button>
+      </form>
+      <p className="text-[11px] text-ink-faint">Who’s on each mic comes from the service’s Mics panel, so put Adam on “AG 1” there and it stacks onto his tile.</p>
+    </section>
   );
 }

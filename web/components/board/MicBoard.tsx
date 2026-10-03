@@ -12,6 +12,9 @@
  *   ●●●○○ 554.125    ← RF strength and frequency
  *   ~~~~~~           ← RF history
  *   ▬▬ ▬▬            ← antennas A / B
+ *
+ * A person's other mics (their acoustic guitar's pack) stack under the mic name as small chips.
+ * A mic that isn't on the network shows who has it, without battery, audio or RF.
  */
 import { useEffect, useState } from "react";
 import type { BoardTile, TileStatus } from "@shared/board";
@@ -52,7 +55,8 @@ function Spark({ values, max, color }: { values: number[]; max: number; color: s
 
 export function MicTile({ t, now, style, history }: { t: BoardTile; now: number; style: "background" | "icon" | "none"; history?: TileHistory }) {
   const color = COLOR[t.status];
-  const striped = t.status === "txoff" || t.status === "offline" || t.status === "noreceiver";
+  const offNet = !t.networked;
+  const striped = !offNet && (t.status === "txoff" || t.status === "offline" || t.status === "noreceiver");
   const flash = t.status === "critical" && Math.floor(now / 700) % 2 === 0;
   const bars = t.battery?.bars ?? null;
   // A picture that doesn't load (offline, removed in Planning Center) counts as no picture.
@@ -60,7 +64,7 @@ export function MicTile({ t, now, style, history }: { t: BoardTile; now: number;
   useEffect(() => { setBroken(null); }, [t.image]);
   const showImg = style !== "none" && t.image && broken !== t.image;
   const nameColor = t.person ? "#ECECEC" : "#7A7A7A";
-  const block: React.CSSProperties = striped
+  const block: React.CSSProperties = offNet ? { background: "#4A4A4A" } : striped
     ? { background: `repeating-linear-gradient(135deg, ${color}66 0 7cqw, ${BG} 7cqw 14cqw)` }
     : { background: color, opacity: flash ? 0.55 : 1, transition: "opacity .2s" };
   const ants = (t.rf?.antennas ?? "").padEnd(2, "X").slice(0, 2).split("");
@@ -83,8 +87,15 @@ export function MicTile({ t, now, style, history }: { t: BoardTile; now: number;
         <span className="block truncate px-[4cqw] italic" style={{ fontSize: "min(5.6cqh, 19cqw)", fontWeight: 300, color: "#E6E6E6", letterSpacing: "0.02em" }}>{t.micLabel}</span>
       </div>
 
+      {/* the same person's other mics */}
+      {t.extras.length > 0 && (
+        <div className="relative flex flex-wrap justify-center px-[3cqw]" style={{ gap: "0.6cqh 2cqw", marginTop: "-0.4cqh" }}>
+          {t.extras.map((x) => <ExtraChip key={x.channelId} x={x} now={now} />)}
+        </div>
+      )}
+
       {/* person */}
-      <div className="relative flex flex-col items-center justify-center px-[5cqw] text-center" style={{ height: "48cqh", gap: "2cqh" }}>
+      <div className="relative flex min-h-0 flex-col items-center justify-center px-[5cqw] text-center" style={{ height: t.extras.length ? `${48 - Math.min(2, Math.ceil(t.extras.length / 2)) * 4.4}cqh` : "48cqh", gap: "2cqh" }}>
         {showImg && style === "icon" && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={t.image!} alt="" className="rounded-full object-cover" style={{ width: "min(62cqw, 24cqh)", height: "min(62cqw, 24cqh)", border: `0.5cqh solid ${LINE}`, opacity: striped ? 0.45 : 1 }}
@@ -108,6 +119,12 @@ export function MicTile({ t, now, style, history }: { t: BoardTile; now: number;
         )}
       </div>
 
+      {offNet ? (
+        <div className="relative flex flex-1 flex-col items-center justify-center text-center" style={{ gap: "1cqh", color: "#8A8A8A", borderTop: `0.15cqh solid ${LINE}` }}>
+          <span style={{ fontSize: "min(2.2cqh, 9cqw)", letterSpacing: "0.04em" }}>Not on the network</span>
+          <span style={{ fontSize: "min(1.7cqh, 7cqw)", color: "#666" }}>No battery or RF</span>
+        </div>
+      ) : (<>
       {/* battery */}
       <div className="relative flex" style={{ height: "3cqh", borderTop: `0.15cqh solid ${LINE}`, borderBottom: `0.15cqh solid ${LINE}` }}>
         {[1, 2, 3, 4, 5].map((i) => (
@@ -139,7 +156,26 @@ export function MicTile({ t, now, style, history }: { t: BoardTile; now: number;
           <span key={i} className="block flex-1" style={{ background: a !== "X" && a !== "-" && t.rf ? "#155E92" : "transparent", borderLeft: i ? `0.15cqh solid ${LINE}` : undefined }} />
         ))}
       </div>
+      </>)}
     </div>
+  );
+}
+
+/** One of the person's other mics, stacked on their tile: its name, and its battery when it's on the network. */
+function ExtraChip({ x, now }: { x: BoardTile["extras"][number]; now: number }) {
+  const color = x.networked ? COLOR[x.status] : "#6B6B6B";
+  const flash = x.status === "critical" && Math.floor(now / 700) % 2 === 0;
+  return (
+    <span className="flex items-center rounded-full" title={x.note ?? (x.networked ? "" : "Not on the network")}
+      style={{ gap: "1.2cqw", padding: "0.3cqh 2.4cqw", border: `0.18cqh solid ${color}`, background: "rgba(0,0,0,.45)", opacity: flash ? 0.5 : 1, maxWidth: "100%" }}>
+      <span className="block shrink-0 rounded-full" style={{ width: "min(1.6cqh, 6cqw)", height: "min(1.6cqh, 6cqw)", background: color }} />
+      <span className="truncate italic" style={{ fontSize: "min(2.8cqh, 11cqw)", color: "#E0E0E0", fontWeight: 300 }}>{x.micLabel}</span>
+      {x.networked && x.bars != null && (
+        <span className="flex shrink-0" style={{ gap: "0.4cqw" }}>
+          {[1, 2, 3, 4, 5].map((i) => <span key={i} className="block" style={{ width: "min(1.1cqh, 3.5cqw)", height: "min(1.8cqh, 6cqw)", background: i <= x.bars! ? color : "#444" }} />)}
+        </span>
+      )}
+    </span>
   );
 }
 

@@ -4,6 +4,16 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.18.4
+Mic board: hide or show mics, stack a person's mics on one tile, add mics that aren't on the network; the board follows the service you have open; Services reopens where you left it.
+- Mic board → Display settings → **Mics on the board**: show or hide each mic, and add mics that
+  aren't on the network (they show who has them, without battery or RF).
+- **One tile per person**: someone on two mics (a vocal and the acoustic guitar's pack) gets one tile,
+  with the other mic stacked under the mic name.
+- The board now follows the service you have open in Services (or, if you choose, always the next
+  service).
+- Services in the sidebar takes you back to the service and tab you were last on.
+
 ## 1.18.3
 README with screenshots and download links; releases named by version and what changed.
 - The README shows every part of the app, with links to download the latest version and to all releases.

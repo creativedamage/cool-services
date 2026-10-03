@@ -1,6 +1,6 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { BellRing, CalendarDays, UsersRound, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, LayoutTemplate, LogOut, Settings, Timer, MicVocal } from "lucide-react";
 import Link from "next/link";
@@ -34,10 +34,27 @@ function Shell({ children }: { children: React.ReactNode }) {
   const updates = useUpdates();
   const version = useQuery({ queryKey: ["version"], queryFn: Api.version, staleTime: Infinity }).data;
 
+  // Services opens back where you left it (the service and tab you were on), and the mic board
+  // follows the service you have open.
+  const LAST = "cool:lastServices";
+  const [servicesHref, setServicesHref] = useState("/services");
+  useEffect(() => { try { const v = localStorage.getItem(LAST); if (v?.startsWith("/services")) setServicesHref(v); } catch { /* private window */ } }, []);
+  const qs = search.toString();
+  const st = search.get("st"), openPlan = search.get("plan");
+  useEffect(() => {
+    if (!path.startsWith("/services")) return;
+    const href = qs ? `${path}?${qs}` : path;
+    setServicesHref(href);
+    try { localStorage.setItem(LAST, href); } catch { /* private window */ }
+  }, [path, qs]);
+  useEffect(() => {
+    if (path.startsWith("/services") && st && openPlan) void Api.boardOpenPlan(st, openPlan).catch(() => undefined);
+  }, [path, st, openPlan]);
+
   const nav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/workflows", label: "Workflows", icon: KanbanSquare },
-    { href: "/services", label: "Services", icon: CalendarDays },
+    { href: "/services", to: servicesHref, label: "Services", icon: CalendarDays },
     { href: "/team-checkins", label: "Team check-ins", icon: UsersRound },
     { href: "/stage-plots", label: "Stage plots", icon: LayoutTemplate },
     { href: "/propresenter", label: "ProPresenter", icon: MonitorUp },
@@ -60,8 +77,8 @@ function Shell({ children }: { children: React.ReactNode }) {
         <CampusSwitcher />
 
         <nav className="space-y-0.5 px-2">
-          {nav.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href}
+          {nav.map(({ href, to, label, icon: Icon }: { href: string; to?: string; label: string; icon: typeof CalendarDays }) => (
+            <Link key={href} href={to ?? href}
               className={clsx("flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition",
                 path.startsWith(href) ? "bg-hover text-ink" : "text-ink-muted hover:bg-hover/60 hover:text-ink-soft")}>
               <Icon size={16} /> {label}

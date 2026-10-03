@@ -13,7 +13,9 @@ export interface BoardSettings {
   mode: DisplayMode;
   /** In auto, outside rehearsal and service times. */
   autoIdle: DisplayView;
-  /** Which service the board follows (null = the next service of any type). */
+  /** "open": the service you have open in Cool Services (else the next one); "next": always the next service. */
+  follow: "open" | "next";
+  /** For "next" (and before any service is opened): which service type (null = any). */
   serviceTypeId: string | null;
   banner: { enabled: boolean; text: string; scroll: boolean; size: "s" | "m" | "l"; background: string; color: string; showService: boolean; showClock: boolean };
   /** Tile backgrounds: your own picture first (if there is one), else the Planning Center photo; or none. */
@@ -25,6 +27,10 @@ export interface BoardSettings {
   /** Which mics are on the board. */
   kinds: ("vocal" | "pack" | "other")[];
   hideUnassigned: boolean;
+  /** Mics you've hidden from the board (mic setup channel ids). */
+  hidden: string[];
+  /** A person with more than one mic gets one tile, with their other mics stacked on it. */
+  stack: boolean;
   /** Tiles per row on the display (0 = fit automatically). */
   columns: number;
   /** Network page (http://<this Mac>/display) and a second display on this Mac. */
@@ -52,7 +58,14 @@ export interface BoardTile {
   muted: boolean;
   frequencyMHz: number | null;
   txModel: string | null;
+  /** Read from a receiver (false: a mic that isn't on the network, shown for who has it). */
+  networked: boolean;
+  /** The same person's other mics, stacked on this tile (e.g. their acoustic guitar's pack). */
+  extras: { channelId: string; micLabel: string; networked: boolean; status: TileStatus; note: string | null; bars: number | null; minutes: number | null }[];
 }
+
+/** A mic in the board's list (Display settings → Mics on the board). */
+export interface BoardMic { id: string; label: string; kind: "vocal" | "pack" | "other"; networked: boolean; hidden: boolean }
 
 export interface DisplayState {
   /** What's showing now, and why. */
@@ -74,8 +87,8 @@ export interface DisplayState {
 }
 
 export const DEFAULT_BOARD: BoardSettings = {
-  mode: "auto", autoIdle: "micboard", serviceTypeId: null,
+  mode: "auto", autoIdle: "micboard", follow: "open", serviceTypeId: null,
   banner: { enabled: true, text: "", scroll: false, size: "m", background: "#0B1220", color: "#FFFFFF", showService: true, showClock: true },
-  images: "custom-then-pco", imageStyle: "background", customImages: {}, kinds: ["vocal", "pack", "other"], hideUnassigned: false, columns: 0,
+  images: "custom-then-pco", imageStyle: "background", customImages: {}, kinds: ["vocal", "pack", "other"], hideUnassigned: false, hidden: [], stack: true, columns: 0,
   lan: false, screen: { enabled: false, displayId: null },
 };

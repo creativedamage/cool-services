@@ -354,7 +354,15 @@ Sidebar → **Mic board**. The big preview is exactly what the display shows.
 - **What the display shows**: **Auto** (the stage plot from 30 minutes before a rehearsal until it
   ends, the mic board from an hour before each service until 15 minutes after, from the service's
   times in Planning Center), or always the **Mic board**, the **Stage plot** or the **Clock**.
-- **Which service**: the next service of a type you choose, or of any type.
+- **Which service**: **The service I have open** (default): open a service under Services and the
+  board switches to it; until you open one, it shows the next service. Or **Always the next service**
+  (of a type you choose, or any type).
+- **Mics on the board** (Display settings): show or hide each mic with the eye. **One tile per
+  person** stacks someone's other mics onto their tile: put Adam on his vocal and on "AG 1" (the
+  church's acoustic guitar pack) in the service's Mics panel and his tile shows **AG 1** as a chip
+  under the mic name, with its battery when it's on the network. **Add a mic that isn't on the
+  network** (a label and vocal/pack/other) to show who has it without battery or RF; remove those
+  with the trash can.
 - Display settings also choose which mics show (vocals, packs, other), hiding unassigned mics, and
   tiles per row (Fit fills the screen with no scrolling).
 

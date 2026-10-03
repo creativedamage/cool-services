@@ -5,7 +5,7 @@ import type {
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 import type { ClockOutputSettings, ClockPreset, ClockState, ClockView } from "@shared/clock";
-import type { BoardSettings, DisplayState } from "@shared/board";
+import type { BoardMic, BoardSettings, DisplayState } from "@shared/board";
 
 export type SettingsPatch = Partial<Omit<AppSettings, "waves">> & {
   waves?: Partial<AppSettings["waves"]>;
@@ -83,7 +83,10 @@ export const Api = {
     api<{ ok: true }>(`/people/${person}/cards/${card}/email`, { method: "POST", json: { subject, body } }),
 
   serviceTypes: () => api<ServiceType[]>("/services/service-types"),
-  stageDisplay: () => api<{ settings: BoardSettings; state: DisplayState; displays: { id: number; label: string; primary: boolean }[]; urls: string[] }>("/board"),
+  stageDisplay: () => api<{ settings: BoardSettings; state: DisplayState; displays: { id: number; label: string; primary: boolean }[]; urls: string[]; mics: BoardMic[] }>("/board"),
+  boardOpenPlan: (serviceTypeId: string, planId: string) => api<{ ok: true }>("/board/open", { method: "POST", json: { serviceTypeId, planId } }),
+  addBoardMic: (label: string, kind: BoardMic["kind"]) => api<{ id: string }>("/board/mics", { method: "POST", json: { label, kind } }),
+  removeBoardMic: (id: string) => api<{ ok: true }>(`/board/mics/${encodeURIComponent(id)}`, { method: "DELETE" }),
   saveBoard: (p: Partial<Omit<BoardSettings, "banner" | "screen">> & { banner?: Partial<BoardSettings["banner"]>; screen?: Partial<BoardSettings["screen"]> }) =>
     api<BoardSettings>("/board/settings", { method: "PUT", json: p }),
   boardImage: (key: string, dataUrl: string) => api<BoardSettings>("/board/images", { method: "POST", json: { key, dataUrl } }),

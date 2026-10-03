@@ -14,15 +14,16 @@ import type { PcoApi } from "../pco/api.js";
 import { cache, extras, mics, plots } from "./db.js";
 import { readReceiver } from "./shure.js";
 
-interface Stored { settings: BoardSettings; owner: { userId: string; demo: boolean } | null }
+interface Stored { settings: BoardSettings; owner: { userId: string; demo: boolean } | null; open?: { serviceTypeId: string; planId: string } | null }
 const KEY = "board";
 
 function load(): Stored {
   const s = extras.get<Partial<Stored>>(KEY, {});
   const settings = { ...DEFAULT_BOARD, ...s.settings } as BoardSettings;
+  settings.hidden ??= [];
   settings.banner = { ...DEFAULT_BOARD.banner, ...s.settings?.banner };
   settings.screen = { ...DEFAULT_BOARD.screen, ...s.settings?.screen };
-  return { settings, owner: s.owner ?? null };
+  return { settings, owner: s.owner ?? null, open: s.open ?? null };
 }
 let stored = load();
 const persist = () => extras.set(KEY, stored);
@@ -34,7 +35,7 @@ export function saveBoardSettings(patch: Partial<BoardSettings>) {
   stored.settings = {
     ...cur, ...patch,
     banner: { ...cur.banner, ...patch.banner }, screen: { ...cur.screen, ...patch.screen },
-    customImages: patch.customImages ?? cur.customImages,
+    customImages: patch.customImages ?? cur.customImages, hidden: patch.hidden ?? cur.hidden ?? [],
   };
   persist();
   memo = null;
@@ -45,6 +46,13 @@ export function setBoardOwner(owner: { userId: string; demo: boolean }) {
   if (stored.owner?.userId === owner.userId && stored.owner.demo === owner.demo) return;
   stored.owner = owner;
   persist();
+}
+/** The service last opened in Cool Services (the board follows it when follow is "open"). */
+export function setOpenPlan(serviceTypeId: string, planId: string) {
+  if (stored.open?.planId === planId && stored.open.serviceTypeId === serviceTypeId) return;
+  stored.open = { serviceTypeId, planId };
+  persist();
+  memo = null;
 }
 const pco = (): PcoApi | null => (stored.owner ? pcoForUser(stored.owner.userId, stored.owner.demo) : null);
 
@@ -128,7 +136,9 @@ const imageUrl = (fileId: string) => `/api/board-out/image/${encodeURIComponent(
 async function build(): Promise<DisplayState> {
   const s = stored.settings;
   const api = pco();
-  const plan = api ? await currentPlan(api, s.serviceTypeId).catch(() => null) : null;
+  const opened = s.follow !== "next" && stored.open && api
+    ? await api.getPlan(stored.open.serviceTypeId, stored.open.planId).catch(() => null) : null;
+  const plan = opened ?? (api ? await currentPlan(api, s.serviceTypeId).catch(() => null) : null);
   const { view, reason } = s.mode === "auto" ? autoView(plan, s.autoIdle) : { view: s.mode, reason: "Chosen in Cool Services" };
 
   const setup = mics.setup();
@@ -136,8 +146,9 @@ async function build(): Promise<DisplayState> {
   const statuses = await micStatuses().catch(() => [] as ReceiverStatus[]);
   const roster = new Map((plan?.roster ?? []).map((m) => [m.personId, m]));
 
-  const tiles: BoardTile[] = setup.channels
-    .filter((c) => s.kinds.includes(c.kind))
+  const hidden = new Set(s.hidden ?? []);
+  let tiles: BoardTile[] = setup.channels
+    .filter((c) => s.kinds.includes(c.kind) && !hidden.has(c.id))
     .map((c) => {
       const rx = setup.receivers.find((r) => r.id === c.receiverId) ?? null;
       const rs = rx?.ip ? statuses.find((x) => x.receiverId === rx.id) : undefined;
@@ -160,9 +171,26 @@ async function build(): Promise<DisplayState> {
         rf: ch?.txOn ? { antennas: ch.antennas, dbm: ch.rfDbm } : null,
         audio: ch?.txOn ? ch.audioLevel ?? null : null,
         muted: Boolean(ch?.muted), frequencyMHz: ch?.frequencyMHz ?? null, txModel: ch?.txModel ?? null,
+        networked: Boolean(rx?.ip), extras: [],
       };
     })
     .filter((t) => !s.hideUnassigned || t.person);
+
+  // One tile per person: their other mics stack onto the tile of their (first networked) mic.
+  if (s.stack ?? true) {
+    const byPerson = new Map<string, BoardTile[]>();
+    for (const t of tiles) if (t.person) byPerson.set(t.person.id, [...(byPerson.get(t.person.id) ?? []), t]);
+    const drop = new Set<string>();
+    for (const list of byPerson.values()) {
+      if (list.length < 2) continue;
+      const main = list.find((t) => t.networked) ?? list[0];
+      main.extras = list.filter((t) => t !== main).map((t) => {
+        drop.add(t.channelId);
+        return { channelId: t.channelId, micLabel: t.micLabel, networked: t.networked, status: t.status, note: t.note, bars: t.battery?.bars ?? null, minutes: t.battery?.minutes ?? null };
+      });
+    }
+    tiles = tiles.filter((t) => !drop.has(t.channelId));
+  }
 
   let stage: DisplayState["stage"] = null;
   if (plan) {
