@@ -64,6 +64,7 @@
     ]
   },
   "coolServices": {
-    "updateRepo": "YOUR-GITHUB-NAME/cool-services"
-  }
+    "updateRepo": "creativedamage/cool-services"
+  },
+  "repository": "github:creativedamage/cool-services"
 }
