@@ -1,7 +1,7 @@
 {
   "name": "cool-services",
   "productName": "Cool Services",
-  "version": "1.20.1",
+  "version": "1.20.2",
   "description": "Volunteer workflows and service scheduling, powered by Planning Center.",
   "author": "Wayne Goodman Productions",
   "private": true,
@@ -51,7 +51,10 @@
       ],
       "identity": "-",
       "artifactName": "Cool-Services-${version}-mac.${ext}",
-      "x64ArchFiles": "{**/app/native/**,**/Resources/micboard/**}"
+      "x64ArchFiles": "{**/app/native/**,**/Resources/micboard/**}",
+      "extendInfo": {
+        "NSLocalNetworkUsageDescription": "Cool Services and Micboard talk to your Shure receivers, ProPresenter, consoles and iPads on the church network."
+      }
     },
     "dmg": {
       "title": "Cool Services",

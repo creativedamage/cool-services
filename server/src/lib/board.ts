@@ -74,12 +74,18 @@ export const boardDisplays = () => displays;
  * Every receiver with an IP. While Micboard runs, from Micboard (it's already talking to the
  * receivers); otherwise read directly, at most every 2 seconds however many screens are watching.
  */
-export function micStatuses(): Promise<ReceiverStatus[]> {
-  if (micboardRunning()) return micboardData().then((d) => statusesFromMicboard(d));
-  return cache.wrap("mics:status", 2, async () => {
-    const rxs = mics.setup().receivers.filter((r) => r.ip);
-    return Promise.all(rxs.map((r) => readReceiver(r)));
-  });
+export async function micStatuses(): Promise<ReceiverStatus[]> {
+  const rxs = mics.setup().receivers.filter((r) => r.ip);
+  const d = micboardRunning() ? await micboardData().catch(() => null) : null;
+  // Micboard's readings for the receivers it's connected to; every other receiver (not in Micboard
+  // yet, a model Micboard doesn't support like SLX-D, or one Micboard can't reach) is read directly,
+  // as before Micboard was built in.
+  const fromMb = d ? statusesFromMicboard(d).filter((s) => s.ok) : [];
+  const direct = rxs.filter((r) => !fromMb.some((s) => s.receiverId === r.id));
+  if (!direct.length) return fromMb;
+  const key = `mics:status:${direct.map((r) => r.id).join(",")}`;
+  const read = await cache.wrap(key, 2, () => Promise.all(direct.map((r) => readReceiver(r))));
+  return rxs.map((r) => fromMb.find((s) => s.receiverId === r.id) ?? read.find((s) => s.receiverId === r.id)!).filter(Boolean);
 }
 
 function statusOf(c: ChannelStatus | undefined, rxOk: boolean | null): { status: TileStatus; note: string | null } {

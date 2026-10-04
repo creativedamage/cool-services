@@ -243,6 +243,37 @@ export function statusesFromMicboard(d: MbData, setup: MicSetup = mics.setup()):
   });
 }
 
+/* ───────────── Starting Micboard from Mic setup ───────────── */
+
+const MB_TYPE: Partial<Record<ShureModel, string>> = { ULXD: "ulxd", QLXD: "qlxd", AD: "axtd", UHFR: "uhfr" };
+
+/**
+ * A Micboard with no slots yet (a new install) gets the receivers and mics from Mic setup, through
+ * Micboard's own config API (POST /api/config), so it shows the mics that were already set up in
+ * Cool Services. Once Micboard has slots, it's set up in Micboard (and Mic setup follows it).
+ */
+async function seedFromSetup(d: MbData): Promise<boolean> {
+  if ((d.config.slots ?? []).length || extras.get("micboardSeeded", false)) return false;
+  const setup = mics.setup();
+  const rx = new Map(setup.receivers.map((r) => [r.id, r]));
+  const slots: MbSlot[] = [];
+  const offline: Record<string, string> = {};
+  for (const c of setup.channels) {
+    const r = c.receiverId ? rx.get(c.receiverId) : undefined;
+    const type = r ? MB_TYPE[r.model] : undefined;
+    if (r?.ip && type) slots.push({ slot: slots.length + 1, type, ip: r.ip.trim(), channel: c.channel });
+    else if (!r?.ip) { const slot = slots.length + 1; slots.push({ slot, type: "offline", extended_id: c.label }); offline[slot] = c.id; }
+  }
+  if (!slots.some((s) => s.type !== "offline")) return false; // nothing on the network to show yet
+  const r = await fetch(`http://127.0.0.1:${micboardSettings().port}/api/config`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(slots), signal: AbortSignal.timeout(10_000) });
+  if (!r.ok) throw new Error(`Micboard didn’t take the mic list (HTTP ${r.status})`);
+  extras.set("micboardSeeded", true);
+  extras.set("micboardOffline", offline);
+  memo = null;
+  logEvent(`micboard: set up ${slots.length} slots from Mic setup`);
+  return true;
+}
+
 /* ───────────── Micboard's slots in Mic setup ───────────── */
 
 const guessKind = (t: MbTx): MicKind => {
@@ -363,7 +394,8 @@ export async function syncNow() {
   syncing = true;
   try {
     const s = micboardSettings();
-    const d = await micboardData();
+    let d = await micboardData();
+    if (await seedFromSetup(d)) { await new Promise((r) => setTimeout(r, 2500)); d = await micboardData(); }
     const slotOf = syncSetup(d);
     const info = planSource ? await planSource().catch(() => null) : null;
 

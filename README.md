@@ -367,7 +367,7 @@ install.
   groups, TV view and extended names. Press <kbd>s</kbd> in Micboard for its settings and
   <kbd>?</kbd> for its shortcuts. Its config and log live in
   `~/Library/Application Support/Cool Services/micboard`.
-- **Mic setup follows Micboard:** each Micboard slot shows up in Mic setup by itself (matched by
+- **Mic setup follows Micboard:** the first time, Micboard starts with the receivers and mics already in Mic setup. After that, each Micboard slot shows up in Mic setup by itself (matched by
   receiver IP and channel; nothing of yours is renamed or removed), so you can put people on it in a
   service's Mics panel. While Micboard runs, Cool Services reads the receivers' battery, RF and audio
   from Micboard instead of connecting to them a second time.

@@ -4,6 +4,15 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.20.2
+Mics show up again: receivers Micboard doesn't have are read directly, and a new Micboard starts with the mics from Mic setup.
+- Since 1.20.0 the mics showed as not found: Cool Services read the receivers only through Micboard,
+  and a new Micboard has no receivers yet. Now any receiver Micboard isn't connected to (not added
+  yet, SLX-D which Micboard doesn't support, or one it can't reach) is read directly, as before.
+- A Micboard with no slots yet starts with the receivers and mics from Mic setup (through Micboard's
+  own config), so it shows them right away. After that, set them up in Micboard as usual.
+- The app tells macOS why it uses the local network, for the Local Network permission prompt.
+
 ## 1.20.1
 Fixes the Mac build for 1.20.0 (Micboard built in): Micboard's Python now ships next to the app archive instead of inside it.
 - The 1.20.0 release didn't build: the universal (Apple silicon + Intel) build couldn't merge an app
