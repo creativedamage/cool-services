@@ -31,6 +31,8 @@ export function SongKeys({ plan }: { plan: PlanDetail }) {
       const snap = await sendKey(waves, keyId);
       setSent(itemId);
       toast.success(`Waves: ${label}`, { description: `Recalled SuperRack snapshot ${snap}` });
+      // So an FOH companion's Tuning strip shows it too.
+      void fetch("/api/waves/pressed", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slot: itemId, label }) }).catch(() => undefined);
     } catch (e) {
       toast.error("Couldn’t send to Waves", { description: (e as Error).message });
     } finally { setBusy(null); }

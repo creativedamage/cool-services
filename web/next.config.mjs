@@ -11,6 +11,11 @@ const API = process.env.API_ORIGIN ?? "http://localhost:4000";
 const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
   images: { unoptimized: true },
+  // shared/*.ts import each other as "./types.js" (the server runs them as ES modules); find the .ts.
+  webpack(config) {
+    config.resolve.extensionAlias = { ...config.resolve.extensionAlias, ".js": [".ts", ".tsx", ".js"] };
+    return config;
+  },
   ...(isExport
     ? { output: "export" }
     : { async rewrites() { return [{ source: "/api/:path*", destination: `${API}/api/:path*` }]; } }),

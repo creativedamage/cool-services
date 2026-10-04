@@ -327,8 +327,18 @@ off or the receiver can't be reached), battery, audio and RF. Only that bar is a
 everything above it (Waves SuperRack, the console app) stays clickable. When a page request comes in
 the companion takes the full screen; once it's answered, the strip comes back. Hover the strip and
 press the gear (or click Cool Services in the Dock) to open the companion window: turn the strip on
-or off, make it short, medium or tall, or pick which display it's on. The mics, hidden mics and
-stacked mics follow the main computer's Mic board → Display settings.
+or off, make it short, medium or tall, and pick which display it's on (click it in the picture of
+your displays, arranged as macOS has them; hover the strip and press its display button to move it to the next display).
+The mics, hidden mics and stacked mics follow the main computer's Mic board → Display settings.
+
+**Tuning strip.** Right above the mics: the main computer's Tuning row for the service its Mic
+board follows: **Chromatic**, **Off**, then each song's key in service order. Press one and the
+**main computer** sends it to Waves SuperRack (the same MIDI its own Tuning bar sends), so the
+companion never sends MIDI and nothing changes on it. The strip is a non-activating panel: pressing
+a key doesn't take the focus from the app you're working in. The key you pressed lights up (also
+when it's pressed on the main computer's Tuning bar). Needs Waves set up on the main computer
+(Preferences → Audio) and Cool Services open there. Turn it off in the companion window
+("Tuning strip above the mics").
 
 <img src="docs/screenshots/companion-strip.png" alt="FOH companion mic strip">
 

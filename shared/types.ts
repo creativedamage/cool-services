@@ -583,10 +583,32 @@ export interface CompanionState {
   onScreenUntil: string | null;
   /** The main computer's wireless mics (as on its mic board) for the mic strip. */
   mics: BoardTile[];
+  /** The Tuning row of the service the main computer's Mic board follows (null: Waves isn't set up there). */
+  tuning: CompanionTuning | null;
   strip: CompanionStrip;
 }
-/** The FOH companion's mic strip: a short always-on-top bar across the bottom of a display. */
-export interface CompanionStrip { enabled: boolean; size: "s" | "m" | "l"; displayId: number | null }
+/**
+ * The FOH companion's mic strip: a short always-on-top bar across the bottom of a display, with the
+ * Tuning strip above it. displayLabel finds the same display again if macOS renumbers displays.
+ */
+export interface CompanionStrip { enabled: boolean; size: "s" | "m" | "l"; displayId: number | null; displayLabel: string | null; tuning: boolean }
+
+/** A display on this Mac (bounds in macOS points, for drawing the arrangement). */
+export interface DisplayInfo { id: number; label: string; primary: boolean; bounds?: { x: number; y: number; width: number; height: number } }
+
+/**
+ * The Tuning row for the FOH companion. Pressing a button goes to the main computer, which sends the
+ * MIDI to Waves SuperRack from there (the companion never sends MIDI itself).
+ */
+export interface CompanionTuning {
+  service: string | null;
+  /** Waves is turned on with a MIDI output on the main computer. */
+  live: boolean;
+  /** Chromatic Tune, Tuning Off, then each song in service order. slot = "CHROMATIC" | "OFF" | the item id. */
+  buttons: { slot: string; kind: "extra" | "song"; label: string; key: string | null; title: string; n: number | null; snapshot: number | null }[];
+  /** The last one pressed (here or on the main computer's Tuning bar). */
+  last: { slot: string; label: string; at: string } | null;
+}
 export interface CompanionInfo { id: string; name: string; pairedAt: string; lastSeen: string | null; online: boolean }
 export type AppMode = "full" | "companion";
 

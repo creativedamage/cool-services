@@ -14,7 +14,7 @@
 import crypto from "node:crypto";
 import os from "node:os";
 import type { BoardTile } from "../../../shared/board.js";
-import type { CompanionInfo, CompanionRequest, CompanionState, CompanionStrip } from "../../../shared/types.js";
+import type { CompanionInfo, CompanionRequest, CompanionState, CompanionStrip, CompanionTuning } from "../../../shared/types.js";
 import { extras, logEvent } from "./db.js";
 import { cancelRequest, holdRequest, sendRequest, status, stored } from "./paging.js";
 import { pagingStore } from "./db.js";
@@ -97,7 +97,7 @@ export function companionAct(id: string, action: "accept" | "hold" | "deny", by:
 interface Link { host: string; port: number; token: string; name: string }
 const link = () => extras.get<Link | null>("companionLink", null);
 
-const DEFAULT_STRIP: CompanionStrip = { enabled: true, size: "m", displayId: null };
+const DEFAULT_STRIP: CompanionStrip = { enabled: true, size: "m", displayId: null, displayLabel: null, tuning: true };
 export const stripSettings = (): CompanionStrip => ({ ...DEFAULT_STRIP, ...extras.get<Partial<CompanionStrip>>("companionStrip", {}) });
 export function saveStrip(p: Partial<CompanionStrip>) {
   extras.set("companionStrip", { ...stripSettings(), ...p });
@@ -115,7 +115,7 @@ function applyStrip() {
   windows?.strip({ ...s, on: s.enabled && extras.get("appMode", null) === "companion" && Boolean(link()) });
 }
 
-let state: CompanionState = { linked: false, main: null, connected: false, requests: [], onScreenUntil: null, mics: [], strip: stripSettings() };
+let state: CompanionState = { linked: false, main: null, connected: false, requests: [], onScreenUntil: null, mics: [], tuning: null, strip: stripSettings() };
 let attention: ((on: boolean) => void) | null = null;
 export const setAttentionBridge = (fn: (on: boolean) => void) => { attention = fn; };
 let loop: NodeJS.Timeout | null = null;
@@ -165,6 +165,15 @@ export async function unlink() { extras.set("companionLink", null); startCompani
 
 export const companionState = (): CompanionState => state;
 
+/** A Tuning key pressed on this companion: the main computer sends it to Waves. */
+export async function pressTuning(slot: string): Promise<{ ok: boolean; snapshot?: number; error?: string }> {
+  const l = link();
+  if (!l) throw new Error("Not linked");
+  const r = await call<{ ok: boolean; snapshot?: number; error?: string }>(l, "/tuning", { slot }, 8000);
+  void poll();
+  return r;
+}
+
 export async function act(id: string, action: "accept" | "hold" | "deny") {
   const l = link();
   if (!l) throw new Error("Not linked");
@@ -175,10 +184,10 @@ export async function act(id: string, action: "accept" | "hold" | "deny") {
 
 async function poll() {
   const l = link();
-  if (!l) { state = { linked: false, main: null, connected: false, requests: [], onScreenUntil: null, mics: [], strip: stripSettings() }; setAttention(false); return; }
+  if (!l) { state = { linked: false, main: null, connected: false, requests: [], onScreenUntil: null, mics: [], tuning: null, strip: stripSettings() }; setAttention(false); return; }
   try {
-    const v = await call<{ requests: CompanionRequest[]; onScreenUntil: string | null; mics?: BoardTile[] }>(l, "/state");
-    state = { linked: true, main: { name: l.name, host: l.host, port: l.port }, connected: true, requests: v.requests, onScreenUntil: v.onScreenUntil, mics: v.mics ?? state.mics, strip: stripSettings() };
+    const v = await call<{ requests: CompanionRequest[]; onScreenUntil: string | null; mics?: BoardTile[]; tuning?: CompanionTuning | null }>(l, "/state");
+    state = { linked: true, main: { name: l.name, host: l.host, port: l.port }, connected: true, requests: v.requests, onScreenUntil: v.onScreenUntil, mics: v.mics ?? state.mics, tuning: v.tuning ?? null, strip: stripSettings() };
   } catch (e) {
     const status = (e as { status?: number }).status;
     state = { ...state, linked: true, main: { name: l.name, host: l.host, port: l.port }, connected: false,

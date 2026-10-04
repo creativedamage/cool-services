@@ -8,7 +8,7 @@ import type { BoardSettings } from "../../shared/board";
 interface Bridge {
   settings: () => BoardSettings;
   onSettings: (fn: (s: BoardSettings) => void) => void;
-  setDisplays: (d: { id: number; label: string; primary: boolean }[]) => void;
+  setDisplays: (d: { id: number; label: string; primary: boolean; bounds?: { x: number; y: number; width: number; height: number } }[]) => void;
 }
 
 export function startBoardOutput(origin: string, bridge: Bridge) {
@@ -17,7 +17,7 @@ export function startBoardOutput(origin: string, bridge: Bridge) {
   const list = () => {
     const primary = screen.getPrimaryDisplay().id;
     bridge.setDisplays(screen.getAllDisplays().map((d, i) => ({
-      id: d.id, primary: d.id === primary, label: `${(d as { label?: string }).label || `Display ${i + 1}`} · ${d.size.width}×${d.size.height}`,
+      id: d.id, primary: d.id === primary, bounds: d.bounds, label: `${(d as { label?: string }).label || `Display ${i + 1}`} · ${d.size.width}×${d.size.height}`,
     })));
   };
   function apply(s: BoardSettings) {

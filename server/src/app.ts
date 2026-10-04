@@ -33,6 +33,7 @@ import { startClock } from "./lib/clock.js";
 import { appModeRouter, companionClientRouter } from "./routes/companionClient.js";
 import { setAttentionBridge, setCompanionWindowBridge, startCompanion } from "./lib/companion.js";
 import { micboardRouter, setFolderOpener } from "./routes/micboard.js";
+import { wavesRelayRouter } from "./routes/wavesRelay.js";
 import { initMicboard } from "./lib/micboard.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
 import { PcoError, SignedOutError } from "./pco/client.js";
@@ -67,6 +68,7 @@ export function createApp(webDir?: string) {
   app.use("/api/clock", requireAuth, clockRouter);
   app.use("/api/board", requireAuth, boardRouter);
   app.use("/api/micboard", requireAuth, micboardRouter); // Micboard inside Cool Services
+  app.use("/api/waves", requireAuth, wavesRelayRouter); // Tuning keys from FOH companions, sent to Waves from this Mac
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
   app.use("/api/app-mode", appModeRouter); // full app or FOH companion (this Mac only)
   app.use("/api/companion-client", companionClientRouter);

@@ -258,13 +258,23 @@ function openPreferences(section = "") {
 /* ───────────── FOH companion mic strip ───────────── */
 
 let strip: BrowserWindow | null = null;
-let stripCfg: { on: boolean; size: "s" | "m" | "l"; displayId: number | null } = { on: false, size: "m", displayId: null };
+let stripCfg: { on: boolean; size: "s" | "m" | "l"; displayId: number | null; displayLabel?: string | null; tuning?: boolean } = { on: false, size: "m", displayId: null };
 let attentionOn = false;
 let fullOpen = false; // the companion window opened from the strip (settings, held requests)
 let quitting = false;
 let hiddenForStrip = false; // the main window is hidden because the strip is showing
 app.on("before-quit", () => { quitting = true; });
 const STRIP_H = { s: 120, m: 170, l: 230 } as const;
+/** The Tuning strip above the mics. */
+const TUNING_H = { s: 62, m: 74, l: 88 } as const;
+/** The display you chose (found again by name if macOS renumbers displays), else the main one. */
+function stripDisplay() {
+  const all = screen.getAllDisplays();
+  const label = (d: Electron.Display, i: number) => `${(d as { label?: string }).label || `Display ${i + 1}`} · ${d.size.width}×${d.size.height}`;
+  return all.find((d) => d.id === stripCfg.displayId)
+    ?? (stripCfg.displayLabel ? all.find((d, i) => label(d, i) === stripCfg.displayLabel) : undefined)
+    ?? screen.getPrimaryDisplay();
+}
 /** The strip is showing instead of the main window. */
 const stripActive = () => stripCfg.on && !attentionOn && !fullOpen;
 
@@ -279,12 +289,15 @@ function layoutStrip() {
     if (hiddenForStrip && !attentionOn) { hiddenForStrip = false; win?.show(); }
     return;
   }
-  const display = screen.getAllDisplays().find((d) => d.id === stripCfg.displayId) ?? screen.getPrimaryDisplay();
+  const display = stripDisplay();
   const wa = display.workArea;
-  const h = STRIP_H[stripCfg.size] ?? STRIP_H.m;
+  const h = (STRIP_H[stripCfg.size] ?? STRIP_H.m) + (stripCfg.tuning === false ? 0 : TUNING_H[stripCfg.size] ?? TUNING_H.m);
   const bounds = { x: wa.x, y: wa.y + wa.height - h, width: wa.width, height: h };
   if (!strip || strip.isDestroyed()) {
     strip = new BrowserWindow({
+      // A non-activating panel: pressing a Tuning key or looking at the mics never takes the
+      // keyboard or focus away from the app you're working in (SuperRack, the console).
+      ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
       ...bounds, frame: false, transparent: true, backgroundColor: "#00000000", hasShadow: false, resizable: false, movable: false,
       minimizable: false, maximizable: false, fullscreenable: false, skipTaskbar: true, show: false, title: "Mic strip", acceptFirstMouse: true,
       webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false },

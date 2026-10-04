@@ -1,7 +1,7 @@
 import type {
   AppSettings, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, StagePlot, PlanSummary, RosterStatus, ScheduleRequest,
   ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary, WorkflowShare, WorkflowShareGroup, WorkflowAccessRequest, Person,
-  DashboardWidget, HomeService, TeamCheckIns, TeamPhonesView, TeamPhoneRole, VolunteerCheckInConfig, VolunteerCheckInSetup, TeamGroup, AppMode, CompanionState, CompanionStrip, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
+  DashboardWidget, HomeService, TeamCheckIns, TeamPhonesView, TeamPhoneRole, VolunteerCheckInConfig, VolunteerCheckInSetup, TeamGroup, AppMode, CompanionState, CompanionStrip, CompanionTuning, DisplayInfo, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 import type { ClockOutputSettings, ClockPreset, ClockState, ClockView } from "@shared/clock";
@@ -83,7 +83,7 @@ export const Api = {
     api<{ ok: true }>(`/people/${person}/cards/${card}/email`, { method: "POST", json: { subject, body } }),
 
   serviceTypes: () => api<ServiceType[]>("/services/service-types"),
-  stageDisplay: () => api<{ settings: BoardSettings; state: DisplayState; displays: { id: number; label: string; primary: boolean }[]; urls: string[]; mics: BoardMic[] }>("/board"),
+  stageDisplay: () => api<{ settings: BoardSettings; state: DisplayState; displays: DisplayInfo[]; urls: string[]; mics: BoardMic[] }>("/board"),
   boardOpenPlan: (serviceTypeId: string, planId: string) => api<{ ok: true }>("/board/open", { method: "POST", json: { serviceTypeId, planId } }),
   addBoardMic: (label: string, kind: BoardMic["kind"]) => api<{ id: string }>("/board/mics", { method: "POST", json: { label, kind } }),
   removeBoardMic: (id: string) => api<{ ok: true }>(`/board/mics/${encodeURIComponent(id)}`, { method: "DELETE" }),
@@ -158,8 +158,9 @@ export const Api = {
     return j as { file: string; list: MicboardBackground[] };
   },
   removeMicboardBackground: (file: string) => api<MicboardBackground[]>(`/micboard/backgrounds/${encodeURIComponent(file)}`, { method: "DELETE" }),
-  companionStrip: () => api<{ settings: CompanionStrip; displays: { id: number; label: string; primary: boolean }[] }>("/companion-client/strip"),
-  saveCompanionStrip: (p: Partial<CompanionStrip>) => api<{ settings: CompanionStrip; displays: { id: number; label: string; primary: boolean }[] }>("/companion-client/strip", { method: "PUT", json: p }),
+  companionStrip: () => api<{ settings: CompanionStrip; displays: DisplayInfo[] }>("/companion-client/strip"),
+  saveCompanionStrip: (p: Partial<CompanionStrip>) => api<{ settings: CompanionStrip; displays: DisplayInfo[] }>("/companion-client/strip", { method: "PUT", json: p }),
+  companionTuning: (slot: string) => api<{ ok: boolean; snapshot?: number; error?: string }>("/companion-client/tuning", { method: "POST", json: { slot } }),
   companionWindow: (view: "full" | "strip") => api<{ ok: true }>("/companion-client/window", { method: "POST", json: { view } }),
   companions: () => api<{ companions: CompanionInfo[]; addresses: string[] }>("/paging/companions"),
   pairCompanion: () => api<{ code: string; expiresAt: string }>("/paging/companions/pair", { method: "POST" }),

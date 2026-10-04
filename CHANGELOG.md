@@ -4,6 +4,17 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.21.0
+FOH companion: a Tuning strip above the mic strip (the main computer sends the keys to Waves), and you choose which display the strip is on.
+- Tuning strip on the FOH companion, right above the mics: Chromatic, Off and each song's key in
+  service order, from the service the main computer's Mic board follows.
+- Pressing a key sends it to Waves SuperRack from the main computer (its Cool Services window sends
+  the MIDI, exactly like its own Tuning bar), so nothing on the companion changes. The key lights
+  up there and on the strip.
+- The strip no longer takes the focus from the app you're working in when you press it.
+- Choose the strip's display in the companion window from a picture of your displays (found again
+  by name if macOS renumbers them), or move it to the next display from the strip itself.
+
 ## 1.20.2
 Mics show up again: receivers Micboard doesn't have are read directly, and a new Micboard starts with the mics from Mic setup.
 - Since 1.20.0 the mics showed as not found: Cool Services read the receivers only through Micboard,

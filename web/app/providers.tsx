@@ -9,6 +9,7 @@ import type { ThemePref } from "@shared/types";
 // Saving in one window (e.g. Preferences) refreshes the others.
 const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(CHANGES) : null;
 import { Toaster } from "sonner";
+import { WavesRelay } from "@/components/WavesRelay";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
@@ -35,6 +36,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       {children}
+      <WavesRelay />
       <Toaster
         theme={toastTheme}
         position="bottom-right"

@@ -9,7 +9,7 @@
  */
 import crypto from "node:crypto";
 import { DEFAULT_BOARD, type BoardSettings, type BoardTile, type DisplayState, type DisplayView, type TileStatus } from "../../../shared/board.js";
-import type { ChannelStatus, PlanDetail, ReceiverStatus } from "../../../shared/types.js";
+import type { ChannelStatus, DisplayInfo, PlanDetail, ReceiverStatus } from "../../../shared/types.js";
 import { pcoForUser } from "../auth/oauth.js";
 import type { PcoApi } from "../pco/api.js";
 import { cache, extras, mics, plots } from "./db.js";
@@ -60,7 +60,7 @@ export function setOpenPlan(serviceTypeId: string, planId: string) {
 const pco = (): PcoApi | null => (stored.owner ? pcoForUser(stored.owner.userId, stored.owner.demo) : null);
 
 /** Registered by desktop/src/main.ts (the second-display window). */
-let displays: { id: number; label: string; primary: boolean }[] = [];
+let displays: DisplayInfo[] = [];
 export const boardOutputs = {
   settings: () => stored.settings,
   onSettings: (fn: (s: BoardSettings) => void) => { listeners.add(fn); },
@@ -148,7 +148,7 @@ const imageUrl = (fileId: string) => `/api/board-out/image/${encodeURIComponent(
 
 /** The service the display follows (the one open in Cool Services, or the next), looked up every 10 s at most. */
 let planMemo: { at: number; key: string; p: Promise<PlanDetail | null> } | null = null;
-function boardPlan(): Promise<PlanDetail | null> {
+export function boardPlan(): Promise<PlanDetail | null> {
   const s = stored.settings;
   const key = JSON.stringify([s.follow, s.serviceTypeId, stored.open, stored.owner]);
   if (planMemo && planMemo.key === key && Date.now() - planMemo.at < 10_000) return planMemo.p;

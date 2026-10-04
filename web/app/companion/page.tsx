@@ -9,11 +9,12 @@ import clsx from "clsx";
 import { BellRing, Check, Hand, Link2, Loader2, PanelBottom, Search, Settings, Unlink, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { CompanionRequest, CompanionState } from "@shared/types";
+import type { CompanionRequest, CompanionState, DisplayInfo } from "@shared/types";
 import { Api } from "@/lib/api";
 import { Logo } from "@/components/Logo";
 import { MicStripRow } from "@/components/board/MicStrip";
 import { useTileHistory } from "@/components/board/DisplayView";
+import { TuningStrip } from "@/components/board/TuningStrip";
 
 const ago = (iso: string, now: number) => {
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
@@ -199,6 +200,11 @@ function StripPanel({ st, now }: { st: CompanionState; now: number }) {
         <span className="font-semibold">Mic strip</span>
         <span className="text-sm text-ink-muted">Along the bottom of the screen between page requests; everything above it stays clickable.</span>
       </div>
+      {s.tuning !== false && (
+        <div className="mb-1.5 h-[70px]">
+          <TuningStrip tuning={st.tuning} connected={st.connected} onPress={(slot) => Api.companionTuning(slot)} />
+        </div>
+      )}
       <div className="h-[150px]">
         {st.mics.length ? <MicStripRow tiles={st.mics} now={now} history={history} />
           : <div className="grid h-full place-items-center rounded-xl bg-[#222] text-sm text-[#8A8A8A]">No mics on the main computer’s mic board yet</div>}
@@ -210,17 +216,54 @@ function StripPanel({ st, now }: { st: CompanionState; now: number }) {
             <option value="s">Short</option><option value="m">Medium</option><option value="l">Tall</option>
           </select>
         </label>
-        {(cfg?.displays.length ?? 0) > 1 && (
-          <label className="flex items-center gap-2"><span className="text-ink-muted">Display</span>
-            <select className="input w-56 py-1" value={s.displayId ?? ""} onChange={(e) => void save({ displayId: e.target.value ? Number(e.target.value) : null })}>
-              <option value="">Main display</option>
-              {cfg!.displays.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
-            </select>
-          </label>
-        )}
+        <label className="flex items-center gap-2"><input type="checkbox" checked={s.tuning !== false} onChange={(e) => void save({ tuning: e.target.checked })} /> Tuning strip above the mics</label>
         {s.enabled && <button className="btn-primary ml-auto" onClick={() => void Api.companionWindow("strip")}><PanelBottom size={15} /> Back to the mic strip</button>}
       </div>
-      <p className="mt-2 text-xs text-ink-faint">Which mics show, and stacking a person’s mics, follow the main computer’s Mic board → Display settings. Hover the strip and press the gear (or click Cool Services in the Dock) to come back here.</p>
+      <DisplayPicker displays={cfg?.displays ?? []} chosen={s.displayId} chosenLabel={s.displayLabel ?? null}
+        onPick={(d) => void save(d ? { displayId: d.id, displayLabel: d.label } : { displayId: null, displayLabel: null })} />
+      <p className="mt-2 text-xs text-ink-faint">
+        Tuning keys pressed here are sent to Waves SuperRack by the main computer (its Tuning bar, the service its Mic board follows), so nothing on this computer changes and the strip never takes the focus from the app you’re in.
+        Which mics show, and stacking a person’s mics, follow the main computer’s Mic board → Display settings. Hover the strip and press the gear (or click Cool Services in the Dock) to come back here.
+      </p>
+    </div>
+  );
+}
+
+/** Your displays as macOS arranges them: click the one the strip goes on. */
+function DisplayPicker({ displays, chosen, chosenLabel, onPick }: {
+  displays: DisplayInfo[]; chosen: number | null; chosenLabel: string | null; onPick: (d: DisplayInfo | null) => void;
+}) {
+  if (!displays.length) return null;
+  const sel = displays.find((d) => d.id === chosen) ?? displays.find((d) => d.label === chosenLabel) ?? null;
+  const b = displays.map((d) => d.bounds ?? { x: 0, y: 0, width: 1920, height: 1080 });
+  const minX = Math.min(...b.map((r) => r.x)), minY = Math.min(...b.map((r) => r.y));
+  const maxX = Math.max(...b.map((r) => r.x + r.width)), maxY = Math.max(...b.map((r) => r.y + r.height));
+  const W = 420, k = W / (maxX - minX), H = Math.max(60, (maxY - minY) * k);
+  return (
+    <div className="mt-4 flex flex-wrap items-start gap-5 rounded-xl border border-line p-3">
+      <div>
+        <div className="text-sm font-medium">Which display</div>
+        <p className="mt-0.5 max-w-[16rem] text-xs text-ink-muted">Click the display the strip goes along the bottom of. {sel ? "" : "Now: the main display (with the menu bar)."}</p>
+        <button className={clsx("mt-2 rounded-lg border px-2.5 py-1 text-xs", !sel ? "border-accent bg-accent-soft text-accent" : "border-line text-ink-soft hover:border-line-strong")} onClick={() => onPick(null)}>
+          Always the main display
+        </button>
+      </div>
+      <div className="relative" style={{ width: W, height: H }}>
+        {displays.map((d, i) => {
+          const r = b[i];
+          const on = sel?.id === d.id;
+          return (
+            <button key={d.id} onClick={() => onPick(d)} title={d.label}
+              className={clsx("absolute flex flex-col items-center justify-center overflow-hidden rounded-md border-2 px-1 text-center transition",
+                on ? "border-accent bg-accent/25 text-ink" : "border-line bg-hover/60 text-ink-soft hover:border-accent/60")}
+              style={{ left: (r.x - minX) * k + 2, top: (r.y - minY) * k + 2, width: r.width * k - 4, height: r.height * k - 4 }}>
+              <span className="w-full truncate text-[11px] font-medium">{d.label.split(" · ")[0]}</span>
+              <span className="text-[10px] text-ink-muted">{d.label.split(" · ")[1] ?? ""}{d.primary ? " · main" : ""}</span>
+              {on && <span className="absolute inset-x-1 bottom-1 h-1.5 rounded-sm bg-accent" />}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
