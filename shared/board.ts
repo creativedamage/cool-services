@@ -1,15 +1,15 @@
 /**
- * The stage display: a board of the wireless mics (in the spirit of Micboard: a tile per mic with the
- * person's photo, name, battery, RF and audio), the stage plot, or the production clock. The main app
- * chooses which one shows, or lets it follow the service: stage plot during rehearsal times, mic
- * board during service times.
+ * The stage display: the mic board (Micboard, built in) or the production clock, under a banner. The
+ * main app chooses which one shows, or lets it follow the service: the mic board from before a
+ * rehearsal or service until it ends, the idle choice otherwise. (The tiles below also feed the FOH
+ * companion's mic strip.)
  */
 
-export type DisplayView = "micboard" | "stageplot" | "clock";
+export type DisplayView = "micboard" | "clock";
 export type DisplayMode = "auto" | DisplayView;
 
 export interface BoardSettings {
-  /** What the display shows ("auto": stage plot in rehearsal, mic board for services). */
+  /** What the display shows ("auto": the mic board around rehearsals and services). */
   mode: DisplayMode;
   /** In auto, outside rehearsal and service times. */
   autoIdle: DisplayView;
@@ -83,13 +83,6 @@ export interface DisplayState {
   micboard: { running: boolean; port: number; hash: string; rev: string; error: string | null } | null;
   service: { planId: string; serviceTypeId: string; title: string; serviceTypeName: string; when: string; nextTime: string | null } | null;
   tiles: BoardTile[];
-  /** For the stage plot view. */
-  stage: {
-    plot: { id: string; name: string; background: { url: string; width: number; height: number } | null; items: unknown[] } | null;
-    roster: { personId: string; name: string; positionName: string; status: string }[];
-    assignments: { channelId: string; personId: string; name: string }[];
-    channels: { id: string; label: string; kind: string; positions: string[] }[];
-  } | null;
   error: string | null;
   at: string;
 }

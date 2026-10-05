@@ -120,7 +120,7 @@ async function boot() {
   await startServer({ port, webDir: path.join(__dirname, "web") });
   // Production clock: NDI output and the second-display window.
   startClockOutputs(origin, clockOutputs);
-  // Stage display (mic board / stage plot / clock) on a second display.
+  // Stage display (mic board / clock) on a second display.
   startBoardOutput(origin, boardOutputs);
 
   // Check for Updates (GitHub Releases). Only the packaged app can replace itself.

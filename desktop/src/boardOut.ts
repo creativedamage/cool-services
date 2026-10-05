@@ -1,5 +1,5 @@
 /**
- * The stage display (mic board / stage plot / clock) full screen on another display of this Mac.
+ * The stage display (mic board / clock) full screen on another display of this Mac.
  * Settings come from the server (Mic board → Display settings); the list of displays goes back.
  */
 import { BrowserWindow, screen } from "electron";

@@ -11,12 +11,14 @@ export default function StartPage() {
   useEffect(() => {
     (async () => {
       try {
-        // First time on this Mac: full app or FOH companion?
+        // First time on this Mac: Full Mode, Service Mode or FOH Companion?
         const { mode } = await Api.appMode().catch(() => ({ mode: "full" as const }));
         if (mode === null) return router.replace("/setup-mode");
         if (mode === "companion") return router.replace("/companion");
         const s = await Api.settings();
-        const v = s.startView;
+        let v = s.startView;
+        // Service Mode opens only what it keeps (Services by default).
+        if (mode === "service" && !["services", "propresenter", "paging", "next-service", "next-runsheet"].includes(v.kind)) v = { kind: "services" };
         if (v.kind === "workflow") return router.replace(routes.board(v.workflowId));
         if (v.kind === "services") return router.replace("/services");
         if (v.kind === "dashboard") return router.replace("/dashboard");

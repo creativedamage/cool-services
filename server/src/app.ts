@@ -14,7 +14,6 @@ import { peopleRouter } from "./routes/people.js";
 import { servicesRouter } from "./routes/services.js";
 import { micsRouter } from "./routes/mics.js";
 import { settingsRouter } from "./routes/settings.js";
-import { stageRouter } from "./routes/stage.js";
 import { pagingRouter } from "./routes/paging.js";
 import { setUpdateBridge, updatesRouter } from "./routes/updates.js";
 import { desktopRouter, setEmbedBridge, setPrefsOpener } from "./routes/desktop.js";
@@ -33,6 +32,7 @@ import { startClock } from "./lib/clock.js";
 import { appModeRouter, companionClientRouter } from "./routes/companionClient.js";
 import { setAttentionBridge, setCompanionWindowBridge, startCompanion } from "./lib/companion.js";
 import { micboardRouter, setFolderOpener } from "./routes/micboard.js";
+import { serviceModeGuard } from "./lib/appMode.js";
 import { wavesRelayRouter } from "./routes/wavesRelay.js";
 import { initMicboard } from "./lib/micboard.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
@@ -43,16 +43,16 @@ export function createApp(webDir?: string) {
   const app = express();
   app.use(helmet({ contentSecurityPolicy: false })); // UI is our own static files; PCO avatars load from their CDN
   app.use(cookieParser());
-  app.use(express.json({ limit: "25mb" })); // logos and stage-plot backgrounds
+  app.use(express.json({ limit: "25mb" })); // logos and pictures
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, version: process.env.APP_VERSION ?? "dev" }));
   app.use("/api/auth", authRouter);
-  app.use("/api/board-out", boardOutRouter); // the stage display (mic board / stage plot / clock)
+  app.use(serviceModeGuard); // Service Mode: Workflows, Check-Ins, Dashboard and Chat are closed
+  app.use("/api/board-out", boardOutRouter); // the stage display (mic board / clock)
   app.use("/api/clock-out", clockOutRouter); // clock outputs (NDI window, second display) and control links
   app.use("/api/settings", settingsRouter);
   app.use("/api/services", requireAuth, servicesRouter);
   app.use("/api/mics", requireAuth, micsRouter);
-  app.use("/api/stage", requireAuth, stageRouter);
   app.use("/api/paging", requireAuth, pagingRouter);
   app.use("/api/updates", requireAuth, updatesRouter);
   app.use("/api/desktop", requireAuth, desktopRouter);
@@ -70,7 +70,7 @@ export function createApp(webDir?: string) {
   app.use("/api/micboard", requireAuth, micboardRouter); // Micboard inside Cool Services
   app.use("/api/waves", requireAuth, wavesRelayRouter); // Tuning keys from FOH companions, sent to Waves from this Mac
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
-  app.use("/api/app-mode", appModeRouter); // full app or FOH companion (this Mac only)
+  app.use("/api/app-mode", appModeRouter); // Full Mode, Service Mode or FOH Companion (this Mac only)
   app.use("/api/companion-client", companionClientRouter);
   app.use("/api", requireAuth, peopleRouter);
   app.use("/api", (_req, res) => res.status(404).json({ error: "not_found" }));

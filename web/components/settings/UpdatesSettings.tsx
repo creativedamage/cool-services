@@ -87,7 +87,7 @@ export function UpdatesSettings() {
               {s.state === "available" ? `Update now to ${s.latest.version}` : "Updating…"}
             </button>
           )}
-          <p className="mt-2 text-[11px] text-ink-faint">Cool Services restarts to finish. Your sign-in, settings, notes and stage plots stay as they are.</p>
+          <p className="mt-2 text-[11px] text-ink-faint">Cool Services restarts to finish. Your sign-in, settings and notes stay as they are.</p>
         </div>
       )}
     </section>

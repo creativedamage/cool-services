@@ -1,16 +1,13 @@
 "use client";
 /**
  * The stage display as it appears on a TV / stage screen / second display: the banner across the
- * top (your message or mission statement), then the mic board, the stage plot or the clock.
+ * top (your message or mission statement), then the mic board (Micboard) or the clock.
  * Sized by its container, so the same thing works full screen and as a preview in the app.
  */
 import { useEffect, useRef, useState } from "react";
 import type { BoardTile, DisplayState } from "@shared/board";
-import type { MicAssignment, MicChannel, PlanDetail, PlotItem } from "@shared/types";
-import { peopleForPlan } from "@/lib/stage";
 import { ClockFace } from "@/components/clock/ClockFace";
 import { useClockStream } from "@/components/clock/useClock";
-import { PlotCanvas } from "@/components/stage/PlotCanvas";
 import type { TileHistory } from "./MicBoard";
 
 /** Recent audio and RF readings per mic (kept on this screen) for the graphs; `at` changes with new readings. */
@@ -67,25 +64,6 @@ export function Banner({ s, now }: { s: DisplayState; now: number }) {
   );
 }
 
-function StageView({ s }: { s: DisplayState }) {
-  const st = s.stage;
-  if (!st?.plot) return <Empty text="No stage plot for this service yet. Make one in Stage plots and set it as the default for this service type." />;
-  const plot = st.plot;
-  const bg = plot.background;
-  const ratio = bg ? bg.width / bg.height : 16 / 10;
-  const plan = { roster: st.roster } as unknown as PlanDetail;
-  const people = peopleForPlan(plot.items as PlotItem[], plan, st.assignments as MicAssignment[], st.channels as MicChannel[]);
-  const micLabels = new Map(st.channels.map((c) => [c.id, c.label]));
-  return (
-    <div className="flex h-full w-full items-center justify-center [container-type:size]" style={{ padding: "1.5cqh 1.5cqw" }}>
-      <div style={{ width: `min(100cqw, calc(100cqh * ${ratio}))` }}>
-        <PlotCanvas plot={{ background: bg ? { fileId: "", width: bg.width, height: bg.height, source: "" } : null, items: plot.items as PlotItem[] }}
-          backgroundUrl={bg?.url} people={people} micLabels={micLabels} />
-      </div>
-    </div>
-  );
-}
-
 function ClockView() {
   const { out, now } = useClockStream("/api/clock-out", 10);
   if (!out) return <div className="h-full w-full bg-black" />;
@@ -119,7 +97,6 @@ export function DisplayView({ s, now }: { s: DisplayState; now: number }) {
       <Banner s={s} now={now} />
       <div ref={ref} className="relative min-h-0 flex-1" style={{ padding: 0 }}>
         {s.view === "micboard" && <MicboardFrame s={s} />}
-        {s.view === "stageplot" && <StageView s={s} />}
         {s.view === "clock" && <ClockView />}
       </div>
     </div>

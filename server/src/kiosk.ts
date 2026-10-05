@@ -290,7 +290,7 @@ function createKioskApp() {
       next();
     });
     app.get(["/", "/nursery", "/kids"], ipadsOn, send);
-    // The stage display (mic board / stage plot / clock).
+    // The stage display (mic board / clock).
     app.get("/display", (_req, res, next) => (boardSettings().lan ? next() : res.status(404).send("The stage display isn’t shared on the network. Turn it on in Cool Services → Mic board → Display settings.")),
       (_req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(webRoot!, "displayout.html")));
     // The production clock (full screen in any browser on the network).

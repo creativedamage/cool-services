@@ -1,20 +1,21 @@
 "use client";
 import clsx from "clsx";
-import { CalendarDays, LayoutTemplate, ScrollText, UserCheck } from "lucide-react";
+import { CalendarDays, ScrollText, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { routes } from "@/lib/routes";
+import { serviceLocked, useAppMode } from "@/lib/appMode";
 
-/** Plan · Check-ins · Stage plot, for the service you're on. */
-export function PlanTabs({ st, plan, active }: { st: string; plan: string; active: "plan" | "checkins" | "stage" }) {
+/** Plan · Check-ins · Run sheet, for the service you're on. */
+export function PlanTabs({ st, plan, active }: { st: string; plan: string; active: "plan" | "checkins" }) {
   const tabs = [
     { key: "plan", label: "Plan", icon: CalendarDays, href: routes.plan(st, plan) },
     { key: "checkins", label: "Check-ins", icon: UserCheck, href: routes.checkins(st, plan) },
-    { key: "stage", label: "Stage plot", icon: LayoutTemplate, href: routes.planStage(st, plan) },
     { key: "runsheet", label: "Run sheet", icon: ScrollText, href: routes.runSheet(st, plan) },
   ] as const;
+  const locked = serviceLocked(useAppMode().data); // Service Mode: no Check-ins tab
   return (
     <div className="no-print flex gap-1">
-      {tabs.map(({ key, label, icon: Icon, href }) => (
+      {tabs.filter((t) => !(locked && t.key === "checkins")).map(({ key, label, icon: Icon, href }) => (
         <Link key={key} href={href}
           className={clsx("flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition",
             active === key ? "bg-accent-soft text-accent" : "text-ink-muted hover:bg-hover hover:text-ink-soft")}>
@@ -25,9 +26,9 @@ export function PlanTabs({ st, plan, active }: { st: string; plan: string; activ
   );
 }
 
-/** Compact header used on Check-ins and Stage plot: date, title, tabs. */
+/** Compact header used on Check-ins: date, title, tabs. */
 export function PlanHeader({ st, plan, active, date, title, typeName, right }: {
-  st: string; plan: string; active: "plan" | "checkins" | "stage";
+  st: string; plan: string; active: "plan" | "checkins";
   date?: string; title?: string; typeName?: string; right?: React.ReactNode;
 }) {
   return (

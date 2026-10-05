@@ -1,12 +1,12 @@
 /**
- * This Mac as an FOH companion: which way the app runs (full / companion), linking to the main
+ * How this Mac runs (Full Mode / Service Mode / FOH Companion; see lib/appMode.ts), and as an FOH
+ * companion: linking to the main
  * computer, and the page requests it shows. Only reachable on this Mac (127.0.0.1), no sign-in needed:
  * a companion doesn't sign in to Planning Center at all.
  */
 import { Router } from "express";
 import { z } from "zod";
-import type { AppMode } from "../../../shared/types.js";
-import { extras } from "../lib/db.js";
+import { appMode, appModeView, lockServiceMode, setAppMode, unlockServiceMode } from "../lib/appMode.js";
 import { act, pressTuning, companionState, findMains, linkTo, saveStrip, showCompanionWindow, startCompanion, stripSettings, unlink } from "../lib/companion.js";
 import { boardDisplays } from "../lib/board.js";
 import { restartMicboard } from "../lib/micboard.js";
@@ -15,14 +15,26 @@ const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any,
   fn(req, res).catch((e: Error) => res.status(400).json({ error: "companion", message: e.message }));
 
 export const appModeRouter = Router();
-appModeRouter.get("/", (_req, res) => res.json({ mode: extras.get<AppMode | null>("appMode", null) }));
-appModeRouter.put("/", (req, res) => {
-  const { mode } = z.object({ mode: z.enum(["full", "companion"]).nullable() }).parse(req.body);
-  extras.set("appMode", mode);
-  startCompanion();
-  restartMicboard(); // an FOH companion doesn't run Micboard
-  res.json({ mode });
-});
+const pinErr = (fn: (req: any, res: any) => unknown) => (req: any, res: any) => {
+  try { fn(req, res); } catch (e) {
+    const st = (e as { status?: number }).status ?? 400;
+    res.status(st).json({ error: st === 403 ? "pin" : "invalid_request", message: (e as Error).message });
+  }
+};
+const Pin = z.string().regex(/^\d{4,8}$/, "The PIN is 4 to 8 numbers.");
+appModeRouter.get("/", (_req, res) => res.json(appModeView()));
+appModeRouter.put("/", pinErr((req, res) => {
+  const { mode, pin, newPin } = z.object({ mode: z.enum(["full", "service", "companion"]).nullable(), pin: z.string().max(12).optional(), newPin: Pin.optional() }).parse(req.body);
+  const before = appMode();
+  const v = setAppMode(mode, { pin, newPin });
+  if ((before === "companion") !== (mode === "companion")) {
+    startCompanion();
+    restartMicboard(); // an FOH companion doesn't run Micboard
+  }
+  res.json(v);
+}));
+appModeRouter.post("/unlock", pinErr((req, res) => res.json(unlockServiceMode(z.object({ pin: z.string().max(12) }).parse(req.body).pin))));
+appModeRouter.post("/lock", (_req, res) => res.json(lockServiceMode()));
 
 export const companionClientRouter = Router();
 companionClientRouter.get("/state", (_req, res) => res.json(companionState()));

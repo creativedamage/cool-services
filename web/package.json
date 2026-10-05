@@ -5,8 +5,7 @@
     "dev": "next dev -H 127.0.0.1 -p 5173",
     "build": "NEXT_EXPORT=1 next build",
     "typecheck": "tsc --noEmit",
-    "predev": "node scripts/copy-pdf-worker.mjs",
-    "prebuild": "node scripts/copy-pdf-worker.mjs"
+    "predev": "node scripts/copy-pdf-worker.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -14,7 +13,6 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
     "next": "^15.5.26",
-    "pdfjs-dist": "^4.10.38",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "sonner": "^1.7.1",

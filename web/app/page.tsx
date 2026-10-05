@@ -62,7 +62,7 @@ function Login() {
 
           <PlanningCenterButton href={back && back.startsWith("/") && !back.startsWith("//") ? `/api/auth/login?return=${encodeURIComponent(back)}` : undefined} />
           <p className="mt-2.5 text-center text-xs text-ink-muted">Use the same email and password you use for Planning Center.</p>
-          <a href="/setup-mode" className="mt-3 block text-center text-[11px] text-ink-faint hover:text-warn">Setting up the front-of-house computer? Use it as an FOH companion →</a>
+          <a href="/setup-mode" className="mt-3 block text-center text-[11px] text-ink-faint hover:text-warn">Setting up a shared or front-of-house computer? Service Mode or FOH Companion →</a>
 
           {status && !status.signInAvailable && (
             <p className="mt-3 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs text-warn">

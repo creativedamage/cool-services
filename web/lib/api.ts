@@ -1,7 +1,7 @@
 import type {
-  AppSettings, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, StagePlot, PlanSummary, RosterStatus, ScheduleRequest,
+  AppSettings, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, PlanSummary, RosterStatus, ScheduleRequest,
   ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary, WorkflowShare, WorkflowShareGroup, WorkflowAccessRequest, Person,
-  DashboardWidget, HomeService, TeamCheckIns, TeamPhonesView, TeamPhoneRole, VolunteerCheckInConfig, VolunteerCheckInSetup, TeamGroup, AppMode, CompanionState, CompanionStrip, CompanionTuning, DisplayInfo, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
+  DashboardWidget, HomeService, TeamCheckIns, TeamPhonesView, TeamPhoneRole, VolunteerCheckInConfig, VolunteerCheckInSetup, TeamGroup, AppMode, AppModeView, CompanionState, CompanionStrip, CompanionTuning, DisplayInfo, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 import type { ClockOutputSettings, ClockPreset, ClockState, ClockView } from "@shared/clock";
@@ -137,8 +137,10 @@ export const Api = {
   teamGroups: () => api<TeamGroup[]>("/team-groups"),
   knownTeams: () => api<{ id: string; name: string }[]>("/team-groups/teams"),
   saveTeamGroups: (g: TeamGroup[]) => api<TeamGroup[]>("/team-groups", { method: "PUT", json: g }),
-  appMode: () => api<{ mode: AppMode | null }>("/app-mode"),
-  setAppMode: (mode: AppMode | null) => api<{ mode: AppMode | null }>("/app-mode", { method: "PUT", json: { mode } }),
+  appMode: () => api<AppModeView>("/app-mode"),
+  setAppMode: (mode: AppMode | null, opts: { pin?: string; newPin?: string } = {}) => api<AppModeView>("/app-mode", { method: "PUT", json: { mode, ...opts } }),
+  unlockServiceMode: (pin: string) => api<AppModeView>("/app-mode/unlock", { method: "POST", json: { pin } }),
+  lockServiceMode: () => api<AppModeView>("/app-mode/lock", { method: "POST" }),
   companionState: () => api<CompanionState>("/companion-client/state"),
   companionFind: () => api<{ host: string; port: number; name: string }[]>("/companion-client/find"),
   companionLink: (host: string, port: number, code: string) => api<CompanionState>("/companion-client/link", { method: "POST", json: { host, port, code } }),
@@ -200,14 +202,6 @@ export const Api = {
   savePlanMics: (plan: string, assignments: MicAssignment[]) =>
     api<PlanMics>(`/mics/plans/${plan}`, { method: "PUT", json: { assignments } }),
   micStatus: () => api<ReceiverStatus[]>("/mics/status"),
-  plots: () => api<StagePlot[]>("/stage/plots"),
-  plot: (id: string) => api<StagePlot>(`/stage/plots/${id}`),
-  createPlot: (p: Partial<StagePlot>) => api<StagePlot>("/stage/plots", { method: "POST", json: p }),
-  savePlot: (p: StagePlot) => api<StagePlot>(`/stage/plots/${p.id}`, { method: "PUT", json: p }),
-  deletePlot: (id: string) => api<void>(`/stage/plots/${id}`, { method: "DELETE" }),
-  planPlot: (plan: string) => api<{ plotId: string | null }>(`/stage/plans/${plan}`),
-  setPlanPlot: (plan: string, plotId: string | null) => api<{ plotId: string | null }>(`/stage/plans/${plan}`, { method: "PUT", json: { plotId } }),
-  uploadImage: (dataUrl: string) => api<{ fileId: string }>("/stage/files", { method: "POST", json: { dataUrl } }),
   pagingConfig: () => api<PagingConfig>("/paging/config"),
   savePaging: (patch: PagingPatch) => api<PagingConfig>("/paging/config", { method: "PUT", json: patch }),
   setPin: (m: Ministry, pin: string | null) => api<PagingConfig>(`/paging/pin/${m}`, { method: "PUT", json: { pin } }),
@@ -248,7 +242,6 @@ export const qk = {
   checkins: (plan: string) => ["checkins", plan] as const,
   micSetup: ["micSetup"] as const,
   micStatus: ["micStatus"] as const,
-  plots: ["plots"] as const,
   plot: (id: string) => ["plot", id] as const,
   planPlot: (plan: string) => ["planPlot", plan] as const,
   planMics: (plan: string) => ["planMics", plan] as const,

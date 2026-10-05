@@ -1,36 +1,102 @@
 "use client";
-/** First time on this Mac: run the full Cool Services, or be an FOH companion for page requests. */
+/**
+ * How this Mac uses Cool Services (after signing in the first time, or from Preferences / the
+ * sidebar): Full Mode, Service Mode (a shared computer) or FOH Companion.
+ */
+import clsx from "clsx";
+import { BellRing, CalendarDays, LayoutDashboard, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { BellRing, LayoutDashboard } from "lucide-react";
+import type { AppMode } from "@shared/types";
 import { Api } from "@/lib/api";
+import { APP_MODE_KEY, serviceLocked, useAppMode } from "@/lib/appMode";
+import { useQueryClient } from "@tanstack/react-query";
 import { Logo } from "@/components/Logo";
+
+const MODES: { mode: AppMode; title: string; icon: typeof BellRing; tone: string; body: string }[] = [
+  { mode: "full", title: "Full Mode", icon: LayoutDashboard, tone: "text-accent hover:border-accent/60",
+    body: "Everything: workflows, services, check-ins, run sheets, dashboard, ProPresenter, clock, mic board, paging and chat, with your Planning Center sign-in." },
+  { mode: "service", title: "Service Mode", icon: CalendarDays, tone: "text-ok hover:border-ok/60",
+    body: "For a shared computer: only Services, ProPresenter, Clock, Mic board and Parent paging. No Workflows or Check-Ins. A PIN you choose is needed to leave it or open Preferences." },
+  { mode: "companion", title: "FOH Companion", icon: BellRing, tone: "text-warn hover:border-warn/60",
+    body: "For the front-of-house computer: links to your main Cool Services computer for page requests, the mic strip and the Tuning strip. No sign-in needed." },
+];
 
 export default function SetupModePage() {
   const router = useRouter();
+  const qc = useQueryClient();
+  const cur = useAppMode().data;
+  const [pick, setPick] = useState<AppMode | null>(null);
+  const [newPin, setNewPin] = useState({ a: "", b: "" });
+  const [pin, setPin] = useState("");
+  const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const choose = async (mode: "full" | "companion") => {
-    setBusy(true);
-    await Api.setAppMode(mode).catch(() => {});
-    router.replace(mode === "companion" ? "/companion" : "/start");
+  const needOldPin = serviceLocked(cur) && pick !== null && pick !== "service";
+  const needNewPin = pick === "service" && (!cur?.hasPin || cur.mode !== "service");
+
+  const go = async (mode: AppMode) => {
+    setBusy(true); setErr(null);
+    try {
+      qc.setQueryData(APP_MODE_KEY, await Api.setAppMode(mode, { ...(needOldPin ? { pin } : {}), ...(mode === "service" && newPin.a ? { newPin: newPin.a } : {}) }));
+      void qc.invalidateQueries();
+      router.replace(mode === "companion" ? "/companion" : "/start");
+    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   };
+  const choose = (mode: AppMode) => {
+    setPick(mode); setErr(null);
+    // Straight in when nothing else is needed.
+    const old = serviceLocked(cur) && mode !== "service";
+    const fresh = mode === "service" && (!cur?.hasPin || cur.mode !== "service");
+    if (!old && !fresh) void go(mode);
+  };
+  const pinOk = !needNewPin || (/^\d{4,8}$/.test(newPin.a) && newPin.a === newPin.b);
+
   return (
-    <main className="grid min-h-screen place-items-center bg-canvas px-6">
-      <div className="w-full max-w-3xl">
-        <div className="mb-8 flex items-center gap-3"><Logo size={36} /><div className="text-xl font-semibold">How will this Mac use Cool Services?</div></div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <button disabled={busy} onClick={() => choose("full")} className="panel p-6 text-left transition hover:border-accent/60 disabled:opacity-50">
-            <LayoutDashboard className="text-accent" size={28} />
-            <div className="mt-3 text-lg font-semibold">Full Cool Services</div>
-            <p className="mt-1 text-sm text-ink-muted">Workflows, services, run sheets, dashboard, paging and everything else, with your Planning Center sign-in.</p>
-          </button>
-          <button disabled={busy} onClick={() => choose("companion")} className="panel p-6 text-left transition hover:border-warn/60 disabled:opacity-50">
-            <BellRing className="text-warn" size={28} />
-            <div className="mt-3 text-lg font-semibold">FOH companion</div>
-            <p className="mt-1 text-sm text-ink-muted">For the front-of-house computer. Links to your main Cool Services computer and takes over the screen when Kids or Nursery ask for a page, with big Accept, Hold and Deny buttons for a touch screen. Children’s names are never shown.</p>
-          </button>
+    <main className="grid min-h-screen place-items-center bg-canvas px-6 py-10">
+      <div className="w-full max-w-5xl">
+        <div className="mb-2 flex items-center gap-3"><Logo size={36} /><div className="text-xl font-semibold">How will this computer use Cool Services?</div></div>
+        <p className="mb-8 text-sm text-ink-muted">{cur?.mode ? <>Now: <b className="text-ink">{MODES.find((m) => m.mode === cur.mode)?.title}</b>. </> : null}You can change it later.</p>
+        <div className="grid gap-4 md:grid-cols-3">
+          {MODES.map(({ mode, title, icon: Icon, tone, body }) => (
+            <button key={mode} disabled={busy} onClick={() => choose(mode)}
+              className={clsx("panel p-6 text-left transition disabled:opacity-50", tone, pick === mode && "ring-2 ring-current", cur?.mode === mode && "border-line-strong")}>
+              <Icon size={28} />
+              <div className="mt-3 flex items-center gap-2 text-lg font-semibold text-ink">{title}{cur?.mode === mode && <span className="rounded-full bg-hover px-2 py-0.5 text-[11px] font-normal text-ink-muted">Now</span>}</div>
+              <p className="mt-1 text-sm text-ink-muted">{body}</p>
+            </button>
+          ))}
         </div>
-        <p className="mt-4 text-xs text-ink-faint">You can change this later in Preferences → Default Startup (full app) or from the companion screen’s ⚙.</p>
+
+        {(needOldPin || needNewPin) && pick && (
+          <form className="panel mx-auto mt-6 max-w-md space-y-3 p-5" onSubmit={(e) => { e.preventDefault(); if (pinOk && (!needOldPin || pin.length >= 4)) void go(pick); }}>
+            {needOldPin && (
+              <label className="block">
+                <span className="flex items-center gap-1.5 text-sm font-medium"><Lock size={14} /> Service Mode PIN</span>
+                <span className="block text-xs text-ink-muted">Leaving Service Mode needs its PIN.</span>
+                <input autoFocus className="input mt-2 text-center font-mono text-2xl tracking-[0.4em]" type="password" inputMode="numeric" maxLength={8}
+                  value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} />
+              </label>
+            )}
+            {needNewPin && (
+              <div>
+                <span className="flex items-center gap-1.5 text-sm font-medium"><Lock size={14} /> Choose a PIN for Service Mode</span>
+                <span className="block text-xs text-ink-muted">4 to 8 numbers. It’s needed to leave Service Mode or open Preferences on this computer, so keep it to staff.</span>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <input autoFocus className="input text-center font-mono text-xl tracking-[0.3em]" type="password" inputMode="numeric" maxLength={8} placeholder="PIN"
+                    value={newPin.a} onChange={(e) => setNewPin({ ...newPin, a: e.target.value.replace(/\D/g, "") })} />
+                  <input className="input text-center font-mono text-xl tracking-[0.3em]" type="password" inputMode="numeric" maxLength={8} placeholder="Again"
+                    value={newPin.b} onChange={(e) => setNewPin({ ...newPin, b: e.target.value.replace(/\D/g, "") })} />
+                </div>
+                {newPin.b.length >= 4 && newPin.a !== newPin.b && <p className="mt-1 text-xs text-bad">The two PINs aren’t the same.</p>}
+              </div>
+            )}
+            {err && <p className="text-sm text-bad">{err}</p>}
+            <button className="btn-primary w-full py-2.5" disabled={busy || !pinOk || (needOldPin && pin.length < 4)}>
+              Use {MODES.find((m) => m.mode === pick)?.title}
+            </button>
+          </form>
+        )}
+        {err && !(needOldPin || needNewPin) && <p className="mt-4 text-center text-sm text-bad">{err}</p>}
       </div>
     </main>
   );

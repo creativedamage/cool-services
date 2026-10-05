@@ -16,6 +16,7 @@ import { SECTION_TAB, type PrefsTab } from "@/lib/prefs";
 import { setTheme } from "@/lib/theme";
 import { Logo } from "@/components/Logo";
 import { Spinner } from "@/components/ui";
+import { APP_MODE_KEY, MODE_LABEL, PinDialog, serviceLocked, useAppMode } from "@/lib/appMode";
 import { PagingSettings } from "@/components/paging/PagingSettings";
 import { ProComputersSettings } from "@/components/pro/ProComputersSettings";
 import { WavesSettings } from "@/components/settings/WavesSettings";
@@ -58,6 +59,24 @@ function useHashTab(): [PrefsTab, (t: PrefsTab) => void] {
 const TAB_IDS = Object.fromEntries(TABS.map((t) => [t.id, true]));
 
 export function Preferences({ standalone }: { standalone?: boolean }) {
+  const mode = useAppMode();
+  if (mode.data && serviceLocked(mode.data)) return <PrefsLocked standalone={standalone} />;
+  return <PreferencesOpen standalone={standalone} />;
+}
+
+/** Service Mode: Preferences need the PIN (it unlocks everything for 15 minutes). */
+function PrefsLocked({ standalone }: { standalone?: boolean }) {
+  const qc = useQueryClient();
+  return (
+    <div className={clsx("grid place-items-center bg-canvas", standalone ? "h-screen" : "h-full")}>
+      <PinDialog title="Preferences are locked" sub="This computer is in Service Mode. Enter its PIN to open Preferences (and everything else) for 15 minutes." action="Unlock"
+        onClose={() => { if (standalone) window.close(); else history.back(); }}
+        onPin={async (pin) => { qc.setQueryData(APP_MODE_KEY, await Api.unlockServiceMode(pin)); }} />
+    </div>
+  );
+}
+
+function PreferencesOpen({ standalone }: { standalone?: boolean }) {
   const qc = useQueryClient();
   const settings = useQuery({ queryKey: qk.settings, queryFn: Api.settings });
   const [tab, setTab] = useHashTab();
@@ -223,16 +242,40 @@ function StartupSection({ s, save }: { s: AppSettings; save: Save }) {
   );
 }
 
-/** Run this Mac as the full app, or as an FOH companion for page requests. */
+/** Full Mode, Service Mode or FOH Companion; and Service Mode's PIN. */
 function AppModeSection() {
+  const qc = useQueryClient();
+  const m = useAppMode().data;
+  const [pinA, setPinA] = useState("");
+  const [pinB, setPinB] = useState("");
+  const setPin = useMutation({
+    mutationFn: () => Api.setAppMode("service", { newPin: pinA }),
+    onSuccess: (v) => { qc.setQueryData(APP_MODE_KEY, v); setPinA(""); setPinB(""); toast.success("Service Mode PIN changed"); },
+    onError: (e) => toast.error("Couldn’t change the PIN", { description: (e as Error).message }),
+  });
   return (
-    <section id="app-mode" className="panel scroll-mt-6 p-5">
-      <h2 className="font-semibold">This Mac</h2>
-      <p className="mt-0.5 text-sm text-ink-muted">Runs the full Cool Services. The front-of-house computer can run it as an <b>FOH companion</b> instead: it only shows page requests, full screen, with big buttons.</p>
-      <button className="btn-outline mt-3 text-xs" onClick={async () => {
-        if (!confirm("Switch this Mac to an FOH companion? It will only show page requests (you can switch back from its ⚙).")) return;
-        await Api.setAppMode("companion"); window.location.href = "/companion";
-      }}>Use this Mac as an FOH companion</button>
+    <section id="app-mode" className="panel scroll-mt-6 space-y-3 p-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="font-semibold">This computer</h2>
+        {m?.mode && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs text-accent">{MODE_LABEL[m.mode]}</span>}
+        <a href="/setup-mode" className="btn-outline ml-auto py-1 text-xs">Change mode…</a>
+      </div>
+      <ul className="space-y-1 text-sm text-ink-muted">
+        <li><b className="text-ink">Full Mode</b>: everything.</li>
+        <li><b className="text-ink">Service Mode</b>: for a shared computer. Only Services, ProPresenter, Clock, Mic board and Parent paging; no Workflows or Check-Ins. Its PIN is needed to leave it or open Preferences.</li>
+        <li><b className="text-ink">FOH Companion</b>: the front-of-house computer (page requests, the mic strip and the Tuning strip).</li>
+      </ul>
+      {m?.mode === "service" && (
+        <form className="flex flex-wrap items-end gap-2 border-t border-line pt-3" onSubmit={(e) => { e.preventDefault(); setPin.mutate(); }}>
+          <label className="block"><span className="text-xs text-ink-muted">New Service Mode PIN</span>
+            <input className="input mt-1 w-32 font-mono" type="password" inputMode="numeric" maxLength={8} value={pinA} onChange={(e) => setPinA(e.target.value.replace(/\D/g, ""))} />
+          </label>
+          <label className="block"><span className="text-xs text-ink-muted">Again</span>
+            <input className="input mt-1 w-32 font-mono" type="password" inputMode="numeric" maxLength={8} value={pinB} onChange={(e) => setPinB(e.target.value.replace(/\D/g, ""))} />
+          </label>
+          <button className="btn-outline" disabled={!/^\d{4,8}$/.test(pinA) || pinA !== pinB || setPin.isPending}>Change PIN</button>
+        </form>
+      )}
     </section>
   );
 }

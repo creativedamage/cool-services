@@ -1,6 +1,6 @@
 /**
- * The stage display: mic board, stage plot or clock, chosen in the app or following the service
- * (stage plot during rehearsal times, mic board during service times).
+ * The stage display: mic board (Micboard) or clock, chosen in the app or following the service (the
+ * mic board from before each rehearsal and service until it ends, the idle choice otherwise).
  *
  * The board joins three things: the mic setup (which mic is on which receiver channel), this
  * service's mic assignments (who has which mic), and the receivers' live status (battery, RF,
@@ -12,7 +12,7 @@ import { DEFAULT_BOARD, type BoardSettings, type BoardTile, type DisplayState, t
 import type { ChannelStatus, DisplayInfo, PlanDetail, ReceiverStatus } from "../../../shared/types.js";
 import { pcoForUser } from "../auth/oauth.js";
 import type { PcoApi } from "../pco/api.js";
-import { cache, extras, mics, plots } from "./db.js";
+import { cache, extras, mics } from "./db.js";
 import { readReceiver } from "./shure.js";
 import { micboardData, micboardRunning, micboardStatus, setMicboardPlanSource, statusesFromMicboard } from "./micboard.js";
 
@@ -26,6 +26,9 @@ function load(): Stored {
   settings.banner = { ...DEFAULT_BOARD.banner, ...s.settings?.banner };
   settings.screen = { ...DEFAULT_BOARD.screen, ...s.settings?.screen };
   settings.micboard = { ...DEFAULT_BOARD.micboard, ...s.settings?.micboard };
+  // Stage plots were removed in 1.22: a display set to the stage plot shows the mic board.
+  if ((settings.mode as string) === "stageplot") settings.mode = "micboard";
+  if ((settings.autoIdle as string) === "stageplot") settings.autoIdle = "micboard";
   return { settings, owner: s.owner ?? null, open: s.open ?? null };
 }
 let stored = load();
@@ -124,7 +127,7 @@ function autoView(plan: PlanDetail | null, idle: DisplayView): { view: DisplayVi
   const within = (t: PlanDetail["times"][number], before: number, after: number) =>
     now >= Date.parse(t.startsAt) - before && now <= Date.parse(t.endsAt || t.startsAt) + after;
   const reh = plan.times.find((t) => t.kind === "rehearsal" && within(t, 30 * 60e3, 0));
-  if (reh) return { view: "stageplot", reason: `Rehearsal ${clock(reh.startsAt)}` };
+  if (reh) return { view: "micboard", reason: `Rehearsal ${clock(reh.startsAt)}` };
   const svc = plan.times.find((t) => t.kind === "service" && within(t, 60 * 60e3, 15 * 60e3));
   if (svc) return { view: "micboard", reason: `${clock(svc.startsAt)} service` };
   return { view: idle, reason: "Between services" };
@@ -137,7 +140,7 @@ export function displayState(): Promise<DisplayState> {
   if (memo && Date.now() - memo.at < 1500) return memo.p;
   const p = build().catch((e): DisplayState => ({
     view: stored.settings.mode === "auto" ? stored.settings.autoIdle : stored.settings.mode, mode: stored.settings.mode, reason: "",
-    settings: { banner: stored.settings.banner, columns: stored.settings.columns, imageStyle: stored.settings.imageStyle }, micboard: null, service: null, tiles: [], stage: null,
+    settings: { banner: stored.settings.banner, columns: stored.settings.columns, imageStyle: stored.settings.imageStyle }, micboard: null, service: null, tiles: [],
     error: (e as Error).message, at: new Date().toISOString(),
   }));
   memo = { at: Date.now(), p };
@@ -236,21 +239,6 @@ async function build(): Promise<DisplayState> {
     tiles = tiles.filter((t) => !drop.has(t.channelId));
   }
 
-  let stage: DisplayState["stage"] = null;
-  if (plan) {
-    const plotId = plots.forPlan(plan.id) ?? plots.list().find((p) => p.serviceTypeId === plan.serviceTypeId)?.id ?? null;
-    const plot = plotId ? plots.get(plotId) : null;
-    stage = {
-      plot: plot ? {
-        id: plot.id, name: plot.name, items: plot.items,
-        background: plot.background ? { url: imageUrl(plot.background.fileId), width: plot.background.width, height: plot.background.height } : null,
-      } : null,
-      roster: plan.roster.filter((m) => m.status !== "D").map((m) => ({ personId: m.personId, name: m.name, positionName: m.positionName, status: m.status })),
-      assignments,
-      channels: setup.channels.map((c) => ({ id: c.id, label: c.label, kind: c.kind, positions: c.positions })),
-    };
-  }
-
   const now = Date.now();
   const next = plan?.times.filter((t) => t.kind === "service" && Date.parse(t.endsAt || t.startsAt) > now).sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
   const mb = micboardStatus();
@@ -267,14 +255,12 @@ async function build(): Promise<DisplayState> {
       when: new Date(plan.sortDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }),
       nextTime: next ? clock(next.startsAt) : null,
     } : null,
-    tiles, stage, error: api ? null : "Open the Mic board in Cool Services once so the display can read Planning Center.",
+    tiles, error: api ? null : "Open the Mic board in Cool Services once so the display can read Planning Center.",
     at: new Date().toISOString(),
   };
 }
 
-/** Files the display may show without signing in: the current plot's background and board pictures. */
+/** Files the display may show without signing in: the board's pictures. */
 export function publicImage(fileId: string): boolean {
-  const s = stored.settings;
-  if (Object.values(s.customImages).includes(fileId)) return true;
-  return plots.list().some((p) => p.background?.fileId === fileId);
+  return Object.values(stored.settings.customImages).includes(fileId);
 }

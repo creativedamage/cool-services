@@ -448,48 +448,6 @@ export interface CheckInsForPlan {
   fetchedAt: string;
 }
 
-/* ───────────── Stage plots ───────────── */
-
-export type PlotItemType =
-  | "vocal" | "mic" | "di" | "wedge" | "iem" | "amp" | "keys" | "drums"
-  | "acoustic" | "electric" | "bass" | "person" | "power" | "riser" | "label";
-
-/** What an item shows on a given Sunday: the person on a mic channel, or whoever's in a position. */
-export type PlotLink = { kind: "mic"; channelId: string } | { kind: "position"; position: string } | null;
-
-export interface PlotItem {
-  id: string;
-  type: PlotItemType;
-  x: number; // 0–1 across the stage (centre of the item)
-  y: number; // 0–1 down the stage
-  w?: number; // risers and labels: 0–1 width
-  h?: number; // risers: 0–1 height
-  rotation: number; // degrees
-  label: string;
-  link: PlotLink;
-  /** Card fill color (hex). Text switches between dark and light automatically. */
-  color?: string;
-  /** Card corner radius in px. */
-  radius?: number;
-}
-
-/** Who a stage-plot card shows on a given service. */
-export interface PlotPerson {
-  name: string;
-  position: string;
-  mics: string[]; // mic labels assigned to them this service, e.g. ["Vox 2", "AG Pack"]
-}
-
-export interface StagePlot {
-  id: string;
-  name: string;
-  /** Used by default for this service type's services. */
-  serviceTypeId: string | null;
-  /** Background image (a PDF page is converted to an image when it's added). */
-  background: { fileId: string; width: number; height: number; source: string } | null;
-  items: PlotItem[];
-  updatedAt: string;
-}
 
 /* ───────────── Parent paging (ProPresenter messages) ───────────── */
 
@@ -610,7 +568,21 @@ export interface CompanionTuning {
   last: { slot: string; label: string; at: string } | null;
 }
 export interface CompanionInfo { id: string; name: string; pairedAt: string; lastSeen: string | null; online: boolean }
-export type AppMode = "full" | "companion";
+/**
+ * How this Mac uses Cool Services: Full Mode (everything), Service Mode (a shared computer: Services,
+ * ProPresenter, Clock, Mic board and Parent paging only; a PIN to leave it or open Preferences), or
+ * FOH Companion.
+ */
+export type AppMode = "full" | "service" | "companion";
+export interface AppModeView {
+  mode: AppMode | null;
+  /** Service Mode: a PIN is set (leaving Service Mode and Preferences ask for it). */
+  hasPin: boolean;
+  /** Service Mode: unlocked with the PIN until then (Preferences, everything else). */
+  unlockedUntil: string | null;
+}
+/** What Service Mode keeps (sidebar links); everything else is closed until the PIN is entered. */
+export const SERVICE_MODE_PAGES = ["/services", "/propresenter", "/clock", "/micboard", "/paging"] as const;
 
 /** Settings → iPad addresses for each ministry. */
 export interface KioskAddresses {

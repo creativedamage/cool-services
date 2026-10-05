@@ -15,7 +15,7 @@ import crypto from "node:crypto";
 import { config } from "../config.js";
 import { KEY_ROOTS, TUNING_EXTRAS } from "../../../shared/types.js";
 import type { RunSheetView } from "../../../shared/types.js";
-import type { AppSettings, MicAssignment, MicSetup, Ministry, MinistryPaging, PagingConfig, StagePlot } from "../../../shared/types.js";
+import type { AppSettings, MicAssignment, MicSetup, Ministry, MinistryPaging, PagingConfig } from "../../../shared/types.js";
 
 /* ───────────── Models ───────────── */
 
@@ -83,9 +83,6 @@ interface Data {
   /** "<kind>:<personId>" → channelId they used most recently (one per mic kind). */
   micUsual: Record<string, string>;
   settings: AppSettings | null;
-  stagePlots: StagePlot[];
-  /** planId → stage plot chosen for that service (otherwise the service type's default). */
-  planStage: Record<string, string>;
   /** Parent paging (ProPresenter) and the Kids/Nursery iPad pages. */
   paging: PagingStored | null;
   /** Full run sheet operator views. */
@@ -107,7 +104,7 @@ export interface PagingStored {
 
 /* ───────────── File handling ───────────── */
 
-const empty = (): Data => ({ version: 1, users: [], tokens: [], sessions: [], notes: [], audit: [], micSetup: null, planMics: {}, micUsual: {}, settings: null, stagePlots: [], planStage: {}, paging: null, runSheetViews: [], extras: {} });
+const empty = (): Data => ({ version: 1, users: [], tokens: [], sessions: [], notes: [], audit: [], micSetup: null, planMics: {}, micUsual: {}, settings: null, paging: null, runSheetViews: [], extras: {} });
 const file = () => path.resolve(process.cwd(), config.dataDir, "cool-services.json");
 const now = () => new Date().toISOString();
 const newId = () => crypto.randomUUID();
@@ -286,35 +283,7 @@ export const extras = {
   set(key: string, value: unknown) { const d = load(); d.extras = { ...(d.extras ?? {}), [key]: value }; save(); },
 };
 
-/* ───────────── Stage plots ───────────── */
-
-export const plots = {
-  list: () => load().stagePlots,
-  get: (id: string) => load().stagePlots.find((p) => p.id === id) ?? null,
-  save(p: StagePlot) {
-    const d = load();
-    const row = { ...p, updatedAt: now() };
-    // Only one default plot per service type.
-    if (row.serviceTypeId) for (const x of d.stagePlots) if (x.id !== row.id && x.serviceTypeId === row.serviceTypeId) x.serviceTypeId = null;
-    d.stagePlots = [...d.stagePlots.filter((x) => x.id !== p.id), row];
-    save();
-    return row;
-  },
-  remove(id: string) {
-    const d = load();
-    d.stagePlots = d.stagePlots.filter((x) => x.id !== id);
-    for (const [plan, plot] of Object.entries(d.planStage)) if (plot === id) delete d.planStage[plan];
-    save();
-  },
-  forPlan: (planId: string) => load().planStage[planId] ?? null,
-  setForPlan(planId: string, plotId: string | null) {
-    const d = load();
-    if (plotId) d.planStage[planId] = plotId; else delete d.planStage[planId];
-    save();
-  },
-};
-
-/** Uploaded files (stage-plot backgrounds) in <DATA_DIR>/files. */
+/** Uploaded files (mic board pictures) in <DATA_DIR>/files. */
 export const files = {
   dir: () => path.resolve(process.cwd(), config.dataDir, "files"),
   save(buf: Buffer, ext: "png" | "jpg" | "webp"): string {

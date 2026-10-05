@@ -1,12 +1,12 @@
 "use client";
 /**
- * Mic board & stage display. Choose what the display shows (Auto: stage plot in rehearsal, mic board
- * for the service; or pick one), change the banner message, and set pictures. The preview is exactly
+ * Mic board & stage display. Choose what the display shows (Auto: the mic board around rehearsals and
+ * services; or pick one), change the banner message, and set pictures. The preview is exactly
  * what the network display and the second display show.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { Copy, Eye, EyeOff, ImagePlus, Plus, Trash2, WifiOff, LayoutTemplate, MicVocal, MonitorUp, RotateCcw, Settings2, Sparkles, Timer, Tv, Wifi, X } from "lucide-react";
+import { Copy, Eye, EyeOff, ImagePlus, Plus, Trash2, WifiOff, MicVocal, MonitorUp, RotateCcw, Settings2, Sparkles, Timer, Tv, Wifi, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { BoardMic, BoardSettings, DisplayMode } from "@shared/board";
@@ -17,12 +17,11 @@ import { Drawer, Spinner } from "@/components/ui";
 
 const KEY = ["stageDisplay"];
 const MODES: { mode: DisplayMode; label: string; icon: typeof Tv; hint: string }[] = [
-  { mode: "auto", label: "Auto", icon: Sparkles, hint: "Stage plot during rehearsal times, mic board during service times (from Planning Center)" },
+  { mode: "auto", label: "Auto", icon: Sparkles, hint: "The mic board from before each rehearsal and service until it ends (from Planning Center); otherwise your idle choice" },
   { mode: "micboard", label: "Mic board", icon: MicVocal, hint: "Always the mic board" },
-  { mode: "stageplot", label: "Stage plot", icon: LayoutTemplate, hint: "Always the stage plot" },
   { mode: "clock", label: "Clock", icon: Timer, hint: "The production clock" },
 ];
-const VIEW_NAME = { micboard: "Mic board", stageplot: "Stage plot", clock: "Clock" } as const;
+const VIEW_NAME = { micboard: "Mic board", clock: "Clock" } as const;
 
 /** Shrink a picture to at most 900 px on its long side (a JPEG), so boards load fast on TVs. */
 async function shrink(file: File): Promise<string> {
@@ -184,10 +183,10 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
           </label>
           <label className="block"><span className="text-xs text-ink-muted">In Auto, outside rehearsal and service times show</span>
             <select className="input mt-1" value={s.autoIdle} onChange={(e) => onSave({ autoIdle: e.target.value as BoardSettings["autoIdle"] })}>
-              <option value="micboard">Mic board</option><option value="stageplot">Stage plot</option><option value="clock">Clock</option>
+              <option value="micboard">Mic board</option><option value="clock">Clock</option>
             </select>
           </label>
-          <p className="text-[11px] text-ink-faint">Auto uses the service’s times in Planning Center: the stage plot from 30 minutes before a rehearsal until it ends, the mic board from an hour before each service until 15 minutes after.</p>
+          <p className="text-[11px] text-ink-faint">Auto uses the service’s times in Planning Center: the mic board from 30 minutes before a rehearsal until it ends, and from an hour before each service until 15 minutes after.</p>
         </section>
 
         <section className="space-y-2">

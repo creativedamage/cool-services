@@ -28,7 +28,7 @@ Applications. After that, Cool Services updates itself (Cool Services → Check 
 <td><img src="docs/screenshots/team-checkins.png" alt="Team check-ins"><br><b>Team check-ins</b>: a tile per team (8/10 in), grouped by ministry, with staff check-in.</td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/stage-plot.png" alt="Stage plot"><br><b>Stage plots</b>: build a plot once; each service fills in who's where from the roster and mics.</td>
+<td><img src="docs/screenshots/modes.png" alt="Full Mode, Service Mode, FOH Companion"><br><b>Modes</b>: Full Mode, Service Mode for a shared computer (PIN to leave it), or FOH Companion.</td>
 <td><img src="docs/screenshots/clock.png" alt="Production clock"><br><b>Production clock</b>: countdowns, until-service and Live item timers, saved timers on a schedule, messages.</td>
 </tr>
 <tr>
@@ -36,7 +36,7 @@ Applications. After that, Cool Services updates itself (Cool Services → Check 
 <td><img src="docs/screenshots/micboard-display.png" alt="Mic board display"><br><b>Mic board</b>: every wireless mic with who's on it, battery, RF and audio, on any screen in the building.</td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/micboard.png" alt="Mic board control"><br><b>Stage display control</b>: switch between the mic board, stage plot and clock (or let rehearsal and service times decide), and set the banner message.</td>
+<td><img src="docs/screenshots/micboard.png" alt="Mic board control"><br><b>Stage display control</b>: switch between the mic board and the clock (or let rehearsal and service times decide), and set the banner message.</td>
 <td><img src="docs/screenshots/phone-staff.png" alt="Team check-ins on a phone" width="45%"><br><b>On phones</b>: team leads see who's in; staff check people in, from <code>staff.yourchurch.org</code>.</td>
 </tr>
 <tr>
@@ -94,8 +94,8 @@ Screenshots use the built-in sample data (Sign in → "Or explore with sample da
 - **Mic board & stage display** (sidebar → Mic board): [Micboard](https://github.com/creativedamage/micboard)
   built in (creativedamage/micboard, unchanged), with names and photos from Planning Center and your
   own backgrounds (Preferences → Micboard), on the network at `http://<this Mac>:8058`. The stage
-  display adds a banner message across the top and can show the mic board, the stage plot or the
-  clock, chosen in the app or automatically (stage plot during rehearsal, mic board for the service).
+  display adds a banner message across the top and can show the mic board or the clock, chosen in
+  the app or automatically (the mic board around rehearsals and services).
   Open it on any other computer or TV at `http://<this Mac>/display`.
 - **Tuning**: every song's key, big, across the top of each service in service order ("Song 1 · A",
   "Song 2 · Db"). With Waves SuperRack connected in Settings, pressing a key recalls that key's
@@ -115,9 +115,10 @@ Screenshots use the built-in sample data (Sign in → "Or explore with sample da
 - **Check-ins**: a Check-ins tab on every service shows who's checked in (Planning Center
   Check-Ins) for that service, grouped by room, with regulars, guests, volunteers and check-outs.
   It refreshes every 10 seconds and highlights new arrivals.
-- **Stage plots**: build plots on a blank stage or on top of your own PDF (any page) or image.
-  Link items to a mic or a position and each service's Stage plot tab fills in who's where. Print
-  from there.
+- **Modes** (after signing in, or Preferences → Default Startup → This computer): **Full Mode**
+  (everything), **Service Mode** for a shared computer (Services, ProPresenter, Clock, Mic board and
+  Parent paging only, no Workflows or Check-Ins; a PIN to leave it or open Preferences), or **FOH
+  Companion**. See [Modes](#modes).
 - **Parent paging (ProPresenter)**: show a child's security code on the auditorium screens as a
   ProPresenter message: from **Parent paging** in the sidebar, the Page button on any service's
   Check-ins tab, or the Kids and Nursery iPads. While a page is on screen (15 seconds by default),
@@ -151,7 +152,7 @@ Cool Services updates itself from this project's GitHub Releases: **Cool Service
 Updates…** in the menu bar, or **Preferences → About**. It also checks on its own a few seconds after
 opening and every six hours, and shows "Update to x.y.z" at the bottom of the sidebar when there's
 one. **Update now** downloads it, checks it against the release's checksums, closes Cool Services,
-replaces the app in Applications and opens the new version. Sign-ins, settings, notes and stage plots
+replaces the app in Applications and opens the new version. Sign-ins, settings and notes
 stay as they are (they live in `~/Library/Application Support/Cool Services`).
 
 The app must be running from the Applications folder (not from the DMG) to update itself.
@@ -223,6 +224,24 @@ default campus**. Cool Services opens on your default campus; the switcher at th
 shows another campus (or all) for now. The Services list, the sidebar and Schedule in Services
 follow it (Schedule has an "All campuses" link). Campuses are kept on this Mac; the default is per person.
 
+## Modes
+
+The first time someone signs in on a computer, Cool Services asks how it will be used:
+
+- **Full Mode**: everything.
+- **Service Mode**: for a shared computer (the booth, a volunteer laptop). The sidebar has only
+  **Services, ProPresenter, Clock, Mic board** and **Parent paging**. Workflows, Check-Ins (Team
+  check-ins and each service's Check-ins tab), the Dashboard and Chat are closed, in the app and on
+  its server. Choosing Service Mode asks for a **PIN** (4 to 8 numbers). The PIN is needed to
+  **switch back to Full Mode** (sidebar → Service Mode → Switch to Full Mode…) or to **open
+  Preferences**; entering it unlocks everything for 15 minutes (or **Lock now**). Five wrong PINs
+  wait a minute. Change the PIN in Preferences → Default Startup → This computer.
+- **FOH Companion**: the front-of-house computer (page requests, the mic strip and the Tuning
+  strip); see [FOH companion](#foh-companion-a-second-computer-at-front-of-house).
+
+Change the mode any time in Preferences → Default Startup → **This computer → Change mode…**, or
+from the sign-in screen ("Setting up a shared or front-of-house computer?").
+
 ## Preferences
 
 **Cool Services → Preferences…** (⌘,) opens Preferences in their own window (the ⚙ next to your
@@ -232,7 +251,8 @@ name does too):
 - **Appearance**: dark / light / system, and your logo.
 - **Default Startup**: what opens first: the Dashboard, Services, the next service, its run sheet or
   check-ins (for "your service" from the Dashboard, or a chosen type), a workflow, ProPresenter or
-  Parent paging.
+  Parent paging (Service Mode opens Services unless it's one of its own pages); and **This
+  computer**: Full Mode, Service Mode (and its PIN) or FOH Companion.
 - **Campuses**: group service types by campus, and your default campus.
 - **Audio**: Allen & Heath console, Waves SuperRack, Smaart.
 - **Network Connections**: ProPresenter for paging, Kids & Nursery paging and the iPad pages.
@@ -398,9 +418,9 @@ install.
 
 - **Banner**: type a message or your mission statement in the Banner box and press Show. It can scroll,
   be small/medium/large, use your colors, and show the service and the time on either side.
-- **What the display shows**: **Auto** (the stage plot from 30 minutes before a rehearsal until it
-  ends, the mic board from an hour before each service until 15 minutes after, from the service's
-  times in Planning Center), or always the **Mic board**, the **Stage plot** or the **Clock**.
+- **What the display shows**: **Auto** (the mic board from 30 minutes before a rehearsal until it
+  ends and from an hour before each service until 15 minutes after, from the service's times in
+  Planning Center; your idle choice otherwise), or always the **Mic board** or the **Clock**.
 - **Which service**: **The service I have open** (default): open a service under Services and the
   board switches to it; until you open one, it shows the next service. Or **Always the next service**
   (of a type you choose, or any type).

@@ -2,7 +2,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { BellRing, CalendarDays, UsersRound, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, LayoutTemplate, LogOut, Settings, Timer, MicVocal } from "lucide-react";
+import { BellRing, CalendarDays, UsersRound, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, Lock, LockOpen, LogOut, Settings, Timer, MicVocal } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -17,6 +17,7 @@ import { routes } from "@/lib/routes";
 import { PrefsLink } from "@/components/settings/PrefsLink";
 import { PageRequestsBar } from "@/components/paging/PageRequests";
 import { useCampus } from "@/lib/campus";
+import { APP_MODE_KEY, PinDialog, serviceLocked, serviceModeAllows, useAppMode, useUnlock } from "@/lib/appMode";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return <Suspense><Shell>{children}</Shell></Suspense>;
@@ -30,7 +31,11 @@ function Shell({ children }: { children: React.ReactNode }) {
   // Warm up the upcoming-services list right away, so "Schedule in Services" opens instantly.
   useEffect(() => { void prefetchPlans(qc); }, [qc]);
   const me = useQuery({ queryKey: qk.me, queryFn: Api.me, staleTime: Infinity });
-  const workflows = useQuery({ queryKey: qk.workflows, queryFn: Api.workflows, refetchInterval: 60_000 });
+  // Service Mode (a shared computer): only Services, ProPresenter, Clock, Mic board and Parent paging.
+  const mode = useAppMode().data;
+  const locked = serviceLocked(mode);
+  const closed = locked && !serviceModeAllows(path);
+  const workflows = useQuery({ queryKey: qk.workflows, queryFn: Api.workflows, refetchInterval: 60_000, enabled: Boolean(mode) && !locked });
   const updates = useUpdates();
   const version = useQuery({ queryKey: ["version"], queryFn: Api.version, staleTime: Infinity }).data;
 
@@ -56,7 +61,6 @@ function Shell({ children }: { children: React.ReactNode }) {
     { href: "/workflows", label: "Workflows", icon: KanbanSquare },
     { href: "/services", to: servicesHref, label: "Services", icon: CalendarDays },
     { href: "/team-checkins", label: "Team check-ins", icon: UsersRound },
-    { href: "/stage-plots", label: "Stage plots", icon: LayoutTemplate },
     { href: "/propresenter", label: "ProPresenter", icon: MonitorUp },
     { href: "/clock", label: "Clock", icon: Timer },
     { href: "/micboard", label: "Mic board", icon: MicVocal },
@@ -77,7 +81,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <CampusSwitcher />
 
         <nav className="space-y-0.5 px-2">
-          {nav.map(({ href, to, label, icon: Icon }: { href: string; to?: string; label: string; icon: typeof CalendarDays }) => (
+          {(locked ? nav.filter((n) => serviceModeAllows(n.href)) : nav).map(({ href, to, label, icon: Icon }: { href: string; to?: string; label: string; icon: typeof CalendarDays }) => (
             <Link key={href} href={to ?? href}
               className={clsx("flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition",
                 path.startsWith(href) ? "bg-hover text-ink" : "text-ink-muted hover:bg-hover/60 hover:text-ink-soft")}>
@@ -86,10 +90,12 @@ function Shell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        {path.startsWith("/services") ? (
+        {mode?.mode === "service" && <ServiceModeBox locked={locked} unlockedUntil={mode.unlockedUntil} />}
+
+        {closed ? (
+          <div className="flex-1" />
+        ) : path.startsWith("/services") ? (
           <ServicesNav activeSt={search.get("st")} activePlan={search.get("plan")} tab={path} />
-        ) : path.startsWith("/stage-plots") ? (
-          <StagePlotsNav activeId={search.get("id")} />
         ) : path.startsWith("/paging") ? (
           <PagingNav />
         ) : path.startsWith("/chat") || path.startsWith("/propresenter") || path.startsWith("/dashboard") || path.startsWith("/team-checkins") || path.startsWith("/clock") || path.startsWith("/micboard") ? (
@@ -141,8 +147,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="pointer-events-none absolute bottom-3 right-4 z-10"><Badge tone="violet">Demo data</Badge></div>
         )}
         <PageRequestsBar />
-        <WorkflowWatcher />
-        <div className="relative flex min-h-0 flex-1 flex-col">{children}</div>
+        {!locked && mode && <WorkflowWatcher />}
+        <div className="relative flex min-h-0 flex-1 flex-col">{closed ? <ClosedInServiceMode /> : children}</div>
       </main>
 
       <ScheduleModal />
@@ -155,8 +161,8 @@ function Shell({ children }: { children: React.ReactNode }) {
  * (or every service type, grouped, on the Services overview).
  */
 function ServicesNav({ activeSt, activePlan, tab }: { activeSt: string | null; activePlan: string | null; tab: string }) {
-  // Stay on the same tab (Plan / Check-ins / Stage plot) when switching services.
-  const link = tab === "/services/checkins" ? routes.checkins : tab === "/services/stage" ? routes.planStage : routes.plan;
+  // Stay on the same tab (Plan / Check-ins) when switching services.
+  const link = tab === "/services/checkins" ? routes.checkins : routes.plan;
   const qc = useQueryClient();
   const plans = usePlans();
   const list = plans.data ?? [];
@@ -214,29 +220,6 @@ function ServicesNav({ activeSt, activePlan, tab }: { activeSt: string | null; a
   );
 }
 
-/** Sidebar on Stage plots: every plot, with the one being edited highlighted. */
-function StagePlotsNav({ activeId }: { activeId: string | null }) {
-  const plots = useQuery({ queryKey: qk.plots, queryFn: Api.plots });
-  const plans = usePlans();
-  const typeName = (id: string | null) => (plans.data ?? []).find((p) => p.serviceTypeId === id)?.serviceTypeName;
-  return (
-    <>
-      <div className="label mt-6 px-4 pb-2">Stage plots</div>
-      <div className="flex-1 space-y-0.5 overflow-y-auto px-2">
-        {plots.isLoading && <div className="px-2 text-xs text-ink-faint">Loading…</div>}
-        {plots.data?.length === 0 && <div className="px-2 text-xs text-ink-faint">No stage plots yet.</div>}
-        {plots.data?.map((p) => (
-          <Link key={p.id} href={routes.stagePlot(p.id)}
-            className={clsx("block rounded-lg px-2.5 py-1.5 transition", activeId === p.id ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-hover/60")}>
-            <span className="block truncate text-[13px]">{p.name}</span>
-            <span className="block truncate text-[10px] text-ink-faint">{p.serviceTypeId ? `Default for ${typeName(p.serviceTypeId) ?? "a service type"}` : "Not a default"}</span>
-          </Link>
-        ))}
-        <Link href="/stage-plots" className="block px-2.5 pt-2 text-[11px] text-ink-muted hover:text-accent">All stage plots →</Link>
-      </div>
-    </>
-  );
-}
 
 /** Sidebar on Parent paging: what's on screen, and today's pages. */
 function PagingNav() {
@@ -278,6 +261,52 @@ function CampusSwitcher() {
         <option value="">All campuses</option>
         {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}{c.id === myDefault ? " (default)" : ""}</option>)}
       </select>
+    </div>
+  );
+}
+
+/** Service Mode in the sidebar: locked or unlocked, and the way out (with the PIN). */
+function ServiceModeBox({ locked, unlockedUntil }: { locked: boolean; unlockedUntil: string | null }) {
+  const qc = useQueryClient();
+  const unlock = useUnlock();
+  const [leaving, setLeaving] = useState(false);
+  return (
+    <div className="mx-2 mt-3 rounded-lg border border-accent/30 bg-accent-soft/60 px-3 py-2 text-xs">
+      <div className="flex items-center gap-1.5 font-semibold text-accent">
+        {locked ? <Lock size={12} /> : <LockOpen size={12} />} Service Mode
+        <span className="ml-auto font-normal text-ink-muted">{locked ? "Locked" : `Unlocked until ${new Date(unlockedUntil!).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`}</span>
+      </div>
+      <div className="mt-1.5 flex gap-2">
+        {locked
+          ? <button className="text-ink hover:text-accent" onClick={unlock.ask}>Unlock…</button>
+          : <button className="text-ink-soft hover:text-accent" onClick={async () => qc.setQueryData(APP_MODE_KEY, await Api.lockServiceMode())}>Lock now</button>}
+        <button className="ml-auto text-ink hover:text-accent" onClick={() => (locked ? setLeaving(true) : void Api.setAppMode("full").then((v) => { qc.setQueryData(APP_MODE_KEY, v); void qc.invalidateQueries(); }))}>Switch to Full Mode…</button>
+      </div>
+      {unlock.dialog}
+      {leaving && (
+        <PinDialog title="Leave Service Mode" sub="Enter the Service Mode PIN to switch this computer to Full Mode." action="Switch to Full Mode"
+          onClose={() => setLeaving(false)}
+          onPin={async (pin) => { qc.setQueryData(APP_MODE_KEY, await Api.setAppMode("full", { pin })); setLeaving(false); void qc.invalidateQueries(); }} />
+      )}
+    </div>
+  );
+}
+
+/** A page Service Mode closes (Workflows, Check-Ins, Dashboard, Chat). */
+function ClosedInServiceMode() {
+  const unlock = useUnlock();
+  return (
+    <div className="grid flex-1 place-items-center p-8">
+      <div className="max-w-md text-center">
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-accent-soft text-accent"><Lock size={26} /></span>
+        <h1 className="mt-4 text-xl font-semibold">Not in Service Mode</h1>
+        <p className="mt-1 text-sm text-ink-muted">This computer is in Service Mode: Services, ProPresenter, Clock, Mic board and Parent paging. Workflows and Check-Ins need the Service Mode PIN.</p>
+        <div className="mt-5 flex justify-center gap-2">
+          <Link href="/services" className="btn-primary">Go to Services</Link>
+          <button className="btn-outline" onClick={unlock.ask}><LockOpen size={14} /> Unlock with the PIN</button>
+        </div>
+      </div>
+      {unlock.dialog}
     </div>
   );
 }

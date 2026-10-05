@@ -4,6 +4,18 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.22.0
+Three modes after signing in: Full Mode, Service Mode for a shared computer (PIN to leave it), and FOH Companion; stage plots are removed.
+- **Service Mode**: only Services, ProPresenter, Clock, Mic board and Parent paging. Workflows,
+  Check-Ins (Team check-ins and the services' Check-ins tab), the Dashboard and Chat are closed, in
+  the app and on its server. A PIN you choose is needed to switch back to Full Mode or to open
+  Preferences; it unlocks everything for 15 minutes.
+- The first sign-in on a computer asks for its mode: **Full Mode**, **Service Mode** or **FOH
+  Companion**. Change it in Preferences → Default Startup → This computer (also the PIN).
+- **Stage plots are removed** (the Stage plots page, each service's Stage plot tab, and the stage
+  plot on the stage display). Auto on the stage display now shows the mic board around rehearsals
+  too; a display set to the stage plot shows the mic board.
+
 ## 1.21.0
 FOH companion: a Tuning strip above the mic strip (the main computer sends the keys to Waves), and you choose which display the strip is on.
 - Tuning strip on the FOH companion, right above the mics: Chromatic, Off and each song's key in

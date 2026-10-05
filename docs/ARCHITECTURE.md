@@ -127,12 +127,18 @@ every 60s there's a full refresh, which picks up check-outs. Check-ins are kept 
 never written to disk. Medical notes and emergency contacts are never passed to the app. Requires
 the `check_ins` OAuth scope; older sign-ins get a "Sign in again" prompt.
 
-## 5d. Stage plots
+## 5d. (Stage plots were removed in 1.22)
 
-Plots (items positioned 0–1 across the stage, with an optional link to a mic channel or a
-position) live in the data file. Backgrounds live in `<DATA_DIR>/files`. A PDF page is rendered to
-a PNG on the Mac with PDF.js when it's added, so the plot never needs the PDF again. Each service
-uses its own chosen plot, or else its service type's default (only one default per type).
+## 5e. Modes (1.22)
+
+`lib/appMode.ts`: `appMode` in the data file is `full`, `service` or `companion`. Service Mode keeps
+Services, ProPresenter, Clock, Mic board and Parent paging; `serviceModeGuard` (before every API
+router) answers 403 `service_mode` for Workflows, Check-Ins (`/services/plans/:st/:plan/checkins`,
+`team-checkins`), the Dashboard, team groups/phones, volunteer check-in and the Chat embed. The
+PIN is stored as a scrypt hash; `PUT /api/app-mode` needs it to leave Service Mode, and
+`POST /api/app-mode/unlock` opens everything for 15 minutes (5 wrong PINs → a minute's wait). Web:
+`lib/appMode.tsx` (`useAppMode`, `PinDialog`), the sidebar filter and closed-page screen in
+`(app)/layout.tsx`, `/setup-mode` (the mode picker) and the Preferences lock.
 
 ## 5f. (NDI output was removed in 1.13)
 
@@ -364,7 +370,7 @@ event and the team's location; `staffRows()` turns a plan's staff check-ins into
 
 ## 5v. Mic board & stage display (1.18)
 
-- `shared/board.ts`: settings and `DisplayState` (view, banner, service, tiles, stage plot data).
+- `shared/board.ts`: settings and `DisplayState` (view, banner, service, tiles, Micboard).
 - `server/src/lib/board.ts`: picks the service (`serviceTypeId` or any; the first upcoming plan that
   isn't over), the view (manual, or auto from the plan's rehearsal/service times), and builds tiles
   from the mic setup + this plan's assignments + `micStatuses()` (receivers read at most every 2 s,
@@ -374,10 +380,9 @@ event and the team's location; `staffRows()` turns a plan's staff check-ins into
   photo. The state is shared for 1.5 s however many displays poll it. Uses the access of whoever last
   opened the Mic board.
 - `server/src/routes/board.ts`: `/api/board` (signed in: settings, pictures) and `/api/board-out`
-  (no sign-in: `/state`, `/image/<file>` limited to board pictures and stage-plot backgrounds). The LAN
+  (no sign-in: `/state`, `/image/<file>` limited to board pictures). The LAN
   listener serves `/display` (`displayout.html`) and `/api/board-out` when the network display is on,
   and lets `/api/clock-out` through for the Clock view.
 - Web: `/micboard` (control + preview + settings drawer), `/displayout` (polls every 2 s),
   `components/board/` (`MicBoard` tiles sized with container units, `DisplayView` with the banner,
-  the stage plot through `PlotCanvas` with a sign-in-free background URL, and the clock through
-  `ClockFace`). Desktop: `boardOut.ts` opens the second-display window.
+  Micboard in an iframe, and the clock through `ClockFace`). Desktop: `boardOut.ts` opens the second-display window.
