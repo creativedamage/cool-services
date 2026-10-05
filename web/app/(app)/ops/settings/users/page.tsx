@@ -76,7 +76,7 @@ function AddUser({ data, onDone }: { data: Data; onDone: () => void }) {
   const [f, setF] = useState({ name: "", email: "", title: "", department: "", campusId: data.myCampusId ?? data.campuses[0]?.id ?? "", allCampuses: false, role: "STAFF" as Role, avlLevel: "NONE" as AvlLevel, teamIds: [] as string[] });
   const [busy, setBusy] = useState(false);
   return (
-    <Card title="Add user" eyebrow="They're approved already: when they create their Church Ops account with this email, they're straight in." className="mb-5">
+    <Card title="Add user" eyebrow="They're approved already: when they create their Sundays | Operations account with this email, they're straight in." className="mb-5">
       <form className="grid gap-4 p-4 md:grid-cols-3" onSubmit={async (e) => {
         e.preventDefault(); setBusy(true);
         try {

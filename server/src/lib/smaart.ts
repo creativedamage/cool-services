@@ -44,7 +44,7 @@ const readings = new Map<string, SmaartReading & { t: number }>();
 const status: Omit<SmaartStatus, "measurements" | "readings"> = { state: "off", error: null, at: null, sample: [] };
 
 export const smaartStatus = (): SmaartStatus => {
-  const fresh = Date.now() - 15_000;
+  const fresh = Date.now() - 60_000;
   return {
     ...status,
     readings: [...readings.values()].filter((r) => r.t > fresh).map(({ t: _t, ...r }) => r).sort((a, b) => Number(a.approx ?? 0) - Number(b.approx ?? 0) || a.label.localeCompare(b.label)),
@@ -67,15 +67,33 @@ function set(key: string, label: string, value: number, approx = false) {
   status.at = new Date().toISOString();
 }
 
-/** Walk anything Smaart sends and keep numbers whose names look like SPL readings. */
+const LABEL_KEYS = ["name", "label", "metric", "type", "title", "id", "meter", "description", "displayName"];
+const VALUE_KEYS = ["value", "level", "current", "reading", "val", "db", "dB", "spl", "result", "data", "number"];
+const TEXT_READING = /\b(L[ACZ](?:eq|S|F|peak|max|min)?(?:\s*\d+\s*(?:s|m|min|h))?|dB[ACZ]?(?:\s*(?:slow|fast))?|SPL|Leq)\b[^\d-]{0,12}(\d{2,3}(?:\.\d+)?)/i;
+
+/** Walk anything Smaart sends and keep numbers that look like SPL readings. */
 function harvest(o: unknown, trail: string[], name: string) {
   if (Array.isArray(o)) { o.forEach((x, i) => harvest(x, [...trail, String(i)], name)); return; }
+  if (typeof o === "string") {
+    // "LAeq 1m: 92.4 dB", "dBA Slow 88.1"
+    const m = o.match(TEXT_READING);
+    if (m) { const v = Number(m[2]); if (v > 20 && v < 160) set([...trail, m[1]].join("."), `${name ? `${name} · ` : ""}${m[1]}`, v); }
+    return;
+  }
   if (!o || typeof o !== "object") return;
   const obj = o as Record<string, unknown>;
   const here = typeof obj.name === "string" ? obj.name : typeof obj.measurementName === "string" ? obj.measurementName : name;
+  // { name: "LAeq 10m", value: 92.3 } and the like: the label says SPL, the number sits under "value".
+  const labelKey = LABEL_KEYS.find((k) => typeof obj[k] === "string" && SPL_KEY.test(obj[k] as string));
+  const valueKey = VALUE_KEYS.find((k) => typeof obj[k] === "number" && (obj[k] as number) > 20 && (obj[k] as number) < 160);
+  if (labelKey && valueKey) {
+    const label = String(obj[labelKey]);
+    set([...trail, label].join("."), `${name && name !== label ? `${name} · ` : ""}${label}`, obj[valueKey] as number);
+  }
   for (const [k, v] of Object.entries(obj)) {
     if (typeof v === "number" && SPL_KEY.test(k) && v > 20 && v < 160) set([...trail, k].join("."), `${here ? `${here} · ` : ""}${k}`, v);
     else if (v && typeof v === "object" && !(Array.isArray(v) && typeof v[0] === "number")) harvest(v, [...trail, k], here);
+    else if (typeof v === "string" && v.length < 200) harvest(v, [...trail, k], here);
   }
 }
 
@@ -183,6 +201,23 @@ function onControl(text: string) {
   for (const found of findMeasurements(m)) openStream(found);
 }
 
+/**
+ * Binary frames: Smaart's streams may send raw 32-bit floats (little-endian). A few numbers in the
+ * SPL range are meter values; a long run is a spectrum (dB per band), summed to an overall level.
+ */
+function binary(buf: ArrayBuffer, name: string, key: string, n: number) {
+  if (buf.byteLength < 4 || buf.byteLength % 4) { if (n <= 3) note(`[${name}] binary ${buf.byteLength} bytes`); return; }
+  const f = new Float32Array(buf.slice(0, buf.byteLength - (buf.byteLength % 4)));
+  if (n <= 3) note(`[${name}] binary ${f.length} floats: ${[...f.slice(0, 12)].map((x) => x.toFixed(1)).join(", ")}`);
+  const vals = [...f].filter(Number.isFinite);
+  if (!vals.length) return;
+  if (vals.length <= 8) {
+    vals.forEach((v, i) => { if (v > 20 && v < 160) set(`${key}.bin${i}`, `${name}${vals.length > 1 ? ` · meter ${i + 1}` : ""}`, v); });
+    return;
+  }
+  fromSpectrum({ magnitude: vals }, name, key);
+}
+
 function openStream(found: { name: string; endpoint: string; active: boolean }) {
   const cur = streams.get(found.endpoint);
   if (cur) { cur.active = found.active; cur.name = found.name; return; }
@@ -199,9 +234,20 @@ function connectStream(st: ReturnType<typeof streams.get> & object) {
   try { sock = new WebSocket(`${base()}${path}`); } catch { st.state = "error"; return; }
   st.ws = sock;
   const key = `m:${st.name}`;
-  sock.onopen = () => { st.state = "open"; send(sock, { action: "get" }); };
+  sock.onopen = () => {
+    st.state = "open";
+    send(sock, { action: "get" });
+    // Some Smaart builds only send meter values when asked; ask, and keep asking every second.
+    for (const t of CANDIDATE_TARGETS) send(sock, { action: "get", target: t });
+    const poll = setInterval(() => {
+      if (sock.readyState !== WebSocket.OPEN) { clearInterval(poll); return; }
+      send(sock, { action: "get" });
+    }, 1000);
+  };
+  sock.binaryType = "arraybuffer";
   sock.onmessage = (e) => {
     st.messages++;
+    if (typeof e.data !== "string") { binary(e.data as ArrayBuffer, st.name, key, st.messages); return; }
     const text = toText(e.data);
     let m: Msg;
     try { m = JSON.parse(text); } catch { if (st.messages <= 3) note(`[${st.name}] ${text.slice(0, 300)}`); return; }

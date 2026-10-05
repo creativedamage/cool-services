@@ -1,6 +1,6 @@
 "use client";
 /**
- * Sundays and Church Ops are two apps in one window: each has its own sidebar, look and home.
+ * Sundays and Sundays | Operations (Church Ops) are two apps in one window: each has its own sidebar, look and home.
  * The switcher at the top of the sidebar goes back to where you were in the other one, and Sundays
  * reopens on the side you used last.
  */
@@ -41,7 +41,7 @@ export function AppSwitcher({ side }: { side: AppSide }) {
   return (
     <div className="mx-3 mb-3 flex rounded-lg border border-line p-0.5">
       {tab("sundays", "Sundays", <Logo size={14} />)}
-      {tab("ops", "Church Ops", <Building2 size={13} />)}
+      {tab("ops", "Operations", <Building2 size={13} />)}
     </div>
   );
 }

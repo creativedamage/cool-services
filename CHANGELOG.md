@@ -4,6 +4,16 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.25.2
+Church Ops is now **Sundays | Operations**, and Smaart SPL readings come through.
+- Church Ops is renamed **Sundays | Operations** everywhere: the switcher (Sundays / Operations), the
+  sidebar, sign-in and the email confirmation page.
+- **Smaart SPL**: Sundays now reads the level however Smaart sends it (meter names with their values,
+  text like "LAeq 10m 93.2 dB", or raw meter numbers), asks each measurement for its meters every
+  second, and keeps the last reading on screen for up to a minute instead of falling back to
+  "Waiting for level data". If it still waits, Preferences → Audio → Smaart → "What Smaart is
+  sending" shows exactly what came in.
+
 ## 1.25.1
 Sundays and Church Ops now feel like two apps in one window, and creating a Church Ops account no longer ends on a broken page.
 - A Sundays / Church Ops switcher at the top of the sidebar. Each side has its own sidebar, look

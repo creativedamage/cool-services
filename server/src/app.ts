@@ -74,7 +74,7 @@ export function createApp(webDir?: string) {
   app.use("/api/clock", requireAuth, clockRouter);
   app.use("/api/board", requireAuth, boardRouter);
   app.use("/api/micboard", requireAuth, micboardRouter); // Micboard inside Sundays
-  app.use("/api/cloud", requireAuth, cloudRouter); // Church Ops (Supabase)
+  app.use("/api/cloud", requireAuth, cloudRouter); // Sundays | Operations (Supabase)
   app.use("/api/sync", requireAuth, syncRouter); // settings sync across your Macs
   app.use("/api/weekend", requireAuth, weekendRouter); // the weekend everything works on
   app.use("/api/resi", requireAuth, resiRouter); // Resi live status (read-only)

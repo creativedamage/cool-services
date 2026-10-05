@@ -1,5 +1,5 @@
 "use client";
-/** Sidebar while in Church Ops. */
+/** Sidebar while in Sundays | Operations. */
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Activity, Boxes, Building, Building2, ClipboardList, FileText, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Users, UsersRound } from "lucide-react";
@@ -54,14 +54,14 @@ export function OpsNav() {
         ))}
       </div>
       <div className="mx-2 mb-2 flex items-center gap-2 rounded-lg border border-line px-2.5 py-2 text-[11px] text-ink-muted">
-        <span className="min-w-0 flex-1 truncate">Church Ops · {me.user.name}{n.campusName ? ` · ${n.campusName}` : ""}</span>
-        <button className="rounded p-1 hover:bg-hover hover:text-ink" title="Sign out of Church Ops" onClick={async () => { await opsSignOut(); await qc.invalidateQueries({ queryKey: ["ops"] }); }}><LogOut size={12} /></button>
+        <span className="min-w-0 flex-1 truncate">Operations · {me.user.name}{n.campusName ? ` · ${n.campusName}` : ""}</span>
+        <button className="rounded p-1 hover:bg-hover hover:text-ink" title="Sign out of Sundays | Operations" onClick={async () => { await opsSignOut(); await qc.invalidateQueries({ queryKey: ["ops"] }); }}><LogOut size={12} /></button>
       </div>
     </div>
   );
 }
 
-/** Top of the sidebar in Church Ops: the church's own logo (Settings → Organization), or the Church Ops mark. */
+/** Top of the sidebar in Sundays | Operations: the church's own logo (Settings → Organization), or the Sundays | Operations mark. */
 export function OpsBrand({ fallback }: { fallback: string | null }) {
   const { session } = useOpsSession();
   const me = useOpsMe(Boolean(session)).data;
@@ -72,7 +72,7 @@ export function OpsBrand({ fallback }: { fallback: string | null }) {
       {logo ? <img src={logo} alt="" className="h-[30px] w-[30px] rounded-lg object-contain" />
         : <span className="grid h-[30px] w-[30px] place-items-center rounded-lg bg-violet text-white"><Building2 size={16} /></span>}
       <div className="min-w-0 leading-tight">
-        <div className="text-sm font-semibold">Church Ops</div>
+        <div className="text-sm font-semibold">Sundays <span className="font-normal text-ink-faint">|</span> Operations</div>
         <div className="truncate text-[11px] text-ink-muted">{name ?? "\u00a0"}</div>
       </div>
     </div>

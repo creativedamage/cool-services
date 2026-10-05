@@ -59,7 +59,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     if (path.startsWith("/services") && st && openPlan) void Api.boardOpenPlan(st, openPlan).catch(() => undefined);
   }, [path, st, openPlan]);
 
-  // Sundays and Church Ops are two apps in one window (switcher at the top of the sidebar).
+  // Sundays and Sundays | Operations are two apps in one window (switcher at the top of the sidebar).
   const inOps = path.startsWith("/ops");
   useRememberApp(inOps ? "ops" : "sundays", qs ? `${path}?${qs}` : path);
 

@@ -1,6 +1,6 @@
 "use client";
 /**
- * Church Ops sign-in. Everyone has their own account (email + password, kept by Sundays' cloud).
+ * Sundays | Operations sign-in. Everyone has their own account (email + password, kept by Sundays' cloud).
  * New accounts wait until a manager approves them; the very first account is the System admin.
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -88,7 +88,7 @@ function SignIn({ churchName }: { churchName: string | null }) {
         <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-accent/25 via-violet/15 to-transparent p-8 md:flex">
           <div>
             <div className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-on-accent"><Building2 size={22} /></div>
-            <h2 className="mt-5 text-2xl font-semibold tracking-tight">Church Ops</h2>
+            <h2 className="mt-5 text-2xl font-semibold tracking-tight">Sundays <span className="font-normal text-ink-muted">|</span> Operations</h2>
             <p className="mt-1 text-sm text-ink-soft">{churchName ? `${churchName}'s` : "Your church's"} requests, facilities and AVL quoting, right inside Sundays.</p>
           </div>
           <ul className="space-y-3 text-sm text-ink-soft">
@@ -112,10 +112,10 @@ function SignIn({ churchName }: { churchName: string | null }) {
         ) : (
         <form onSubmit={submit} className="space-y-4 p-8">
           <div>
-            <div className="label">Church Ops</div>
+            <div className="label">Sundays | Operations</div>
             <h1 className="mt-1 text-xl font-semibold">{mode === "in" ? "Sign in" : "Create your account"}</h1>
             <p className="mt-1 text-sm text-ink-muted">
-              {mode === "in" ? "Your Church Ops account (separate from Planning Center)." : "A manager approves new accounts and sets what you can do."}
+              {mode === "in" ? "Your Sundays | Operations account (separate from Planning Center)." : "A manager approves new accounts and sets what you can do."}
             </p>
           </div>
           {mode === "up" && (
@@ -153,7 +153,7 @@ function Waiting({ me, onCheck, checking }: { me: Extract<OpsMe, { status: "pend
         <h1 className="mt-4 text-lg font-semibold">{me.status === "pending" ? "Waiting for approval" : "Your account isn't active"}</h1>
         <p className="mt-1 text-sm text-ink-muted">
           {me.status === "pending"
-            ? <>Thanks, {me.name.split(" ")[0]}. A manager{me.org.name ? ` at ${me.org.name}` : ""} needs to approve <b className="text-ink">{me.email}</b> and choose your campus and access. This page opens Church Ops as soon as they do.</>
+            ? <>Thanks, {me.name.split(" ")[0]}. A manager{me.org.name ? ` at ${me.org.name}` : ""} needs to approve <b className="text-ink">{me.email}</b> and choose your campus and access. This page opens Sundays | Operations as soon as they do.</>
             : <>A manager turned off <b className="text-ink">{me.email}</b>. Ask them if you need access again.</>}
         </p>
         <div className="mt-5 flex justify-center gap-2">

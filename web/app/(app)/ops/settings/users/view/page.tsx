@@ -40,7 +40,7 @@ function Form({ data }: { data: Data }) {
   return (
     <>
       <PageHeader crumb="Settings / Users" title={u.name} description={<span className="flex items-center gap-2">{u.email}{u.pending && <Pill tone="warn">waiting for approval</Pill>}{!u.registered && <Pill tone="muted">hasn't registered yet</Pill>}</span>} />
-      {u.pending && <p className="mb-5 rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">{u.name.split(" ")[0]} created a Church Ops account. Choose their campus, role and teams, then approve, or decline the sign-up.</p>}
+      {u.pending && <p className="mb-5 rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">{u.name.split(" ")[0]} created a Sundays | Operations account. Choose their campus, role and teams, then approve, or decline the sign-up.</p>}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Card title={self ? "Your profile" : u.pending ? "Approve" : "Profile & access"}>
           <form className="grid gap-4 p-4 md:grid-cols-2" onSubmit={(e) => { e.preventDefault(); void save({}, u.pending ? "Approved" : "Saved"); }}>
@@ -57,7 +57,7 @@ function Form({ data }: { data: Data }) {
             <Field label="AVL access"><AvlSelect value={f.avlLevel} onChange={(avlLevel) => setF({ ...f, avlLevel })} /></Field>
             <div className="space-y-3 pt-5">
               {global && !self && <Check label="Global: all campuses" hint="Managers with this act at every campus. Executives and admins always do." checked={f.allCampuses} onChange={(v) => setF({ ...f, allCampuses: v })} />}
-              {!self && !u.pending && <Check label="Active" hint="Inactive people can't use Church Ops." checked={f.active} onChange={(v) => setF({ ...f, active: v })} />}
+              {!self && !u.pending && <Check label="Active" hint="Inactive people can't use Sundays | Operations." checked={f.active} onChange={(v) => setF({ ...f, active: v })} />}
             </div>
             <div className="md:col-span-2"><span className="label mb-1.5 block">Teams</span>
               <div className="grid gap-2 sm:grid-cols-2">

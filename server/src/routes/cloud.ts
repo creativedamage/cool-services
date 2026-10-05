@@ -1,4 +1,4 @@
-/** /api/cloud (signed in): where Sundays' cloud is, for Church Ops (Supabase). */
+/** /api/cloud (signed in): where Sundays' cloud is, for Sundays | Operations (Supabase). */
 import { Router } from "express";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "../../../shared/cloud.js";
 

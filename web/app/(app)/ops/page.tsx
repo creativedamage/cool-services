@@ -1,5 +1,5 @@
 "use client";
-/** Church Ops overview: what's waiting, my requests, AVL numbers and recent activity. */
+/** Sundays | Operations overview: what's waiting, my requests, AVL numbers and recent activity. */
 import { ArrowRight, Boxes, ClipboardList, Inbox, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import type { OverviewData } from "@shared/ops/types";
@@ -17,7 +17,7 @@ export default function OpsOverview() {
   const avl = me.nav.avl;
   return (
     <>
-      <PageHeader crumb={me.org.name ?? "Church Ops"} title={`${hello}, ${first}`}
+      <PageHeader crumb={me.org.name ?? "Sundays | Operations"} title={`${hello}, ${first}`}
         description={avl ? "Requests, sales, margin and purchasing in one place." : "Ask for technology, supplies and building repairs, and follow them through."}
         actions={<>
           <Link href="/ops/requests/new" className={avl ? "btn-outline" : "btn-primary"}><Plus size={15} /> New request</Link>

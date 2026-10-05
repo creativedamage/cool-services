@@ -54,7 +54,7 @@
 }
 
 html,
-/* Church Ops has its own color (violet) so it reads as its own app. */
+/* Sundays | Operations has its own color (violet) so it reads as its own app. */
 [data-theme="dark"] .app-ops { --c-accent: 167 139 250; --c-accent-strong: 192 172 252; --c-on-accent: 22 12 48; }
 [data-theme="light"] .app-ops { --c-accent: 118 84 224; --c-accent-strong: 98 64 200; --c-on-accent: 255 255 255; }
 
@@ -112,7 +112,7 @@ body {
   .print-area { position: fixed; inset: 0; margin: 0; padding: 0; color: #000; max-width: none; }
   .no-print { display: none !important; }
 
-  /* Church Ops proposal: portrait, the whole document, page after page. */
+  /* Sundays | Operations proposal: portrait, the whole document, page after page. */
   body:has(.ops-proposal) * { visibility: visible !important; }
   .ops-proposal { page: proposal; }
 

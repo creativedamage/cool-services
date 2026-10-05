@@ -17,7 +17,7 @@ export default function StartPage() {
         const { mode } = await Api.appMode().catch(() => ({ mode: "full" as const }));
         if (mode === null) return router.replace("/setup-mode");
         if (mode === "companion") return router.replace("/companion");
-        // Church Ops was open last: back to it (Full Mode only).
+        // Sundays | Operations was open last: back to it (Full Mode only).
         if (mode === "full" && lastApp() === "ops") return router.replace("/ops");
         const s = await Api.settings();
         let v = s.startView;

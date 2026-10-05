@@ -1,6 +1,6 @@
 "use client";
 /**
- * Church Ops in Sundays (Full Mode only). People sign in with their own Church Ops account
+ * Sundays | Operations in Sundays (Full Mode only). People sign in with their own Sundays | Operations account
  * (Supabase Auth: register, then a manager approves them); every screen talks to the "ops" Edge
  * Function, which checks their access level each time.
  */
@@ -25,7 +25,7 @@ export async function supabase(): Promise<SupabaseClient> {
   return client;
 }
 
-/** Signed in to Church Ops? (undefined while checking) */
+/** Signed in to Sundays | Operations? (undefined while checking) */
 export function useOpsSession(): { session: Session | null | undefined; test: boolean } {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [test, setTest] = useState(false);
@@ -61,20 +61,20 @@ async function token(): Promise<string | null> {
 export async function ops<T>(path: string, init: { method?: string; json?: unknown } = {}): Promise<T> {
   const c = await cloud();
   const t = await token();
-  if (!t) throw new OpsError("Sign in to Church Ops.", 401);
+  if (!t) throw new OpsError("Sign in to Sundays | Operations.", 401);
   const res = await fetch(`${c.opsUrl}${path}`, {
     method: init.method ?? (init.json !== undefined ? "POST" : "GET"),
     headers: { Authorization: `Bearer ${t}`, apikey: c.publishableKey, ...(init.json !== undefined ? { "Content-Type": "application/json" } : {}) },
     body: init.json !== undefined ? JSON.stringify(init.json) : undefined,
   });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) throw new OpsError(String(body.error ?? `Church Ops error (${res.status})`), res.status, body);
+  if (!res.ok) throw new OpsError(String(body.error ?? `Sundays | Operations error (${res.status})`), res.status, body);
   return body as T;
 }
 
 export const opsKey = (...k: unknown[]) => ["ops", ...k] as const;
 
-/** A Church Ops query (cached under ["ops", …]; cleared on sign-out). */
+/** A Sundays | Operations query (cached under ["ops", …]; cleared on sign-out). */
 export function useOps<T>(path: string | null, opts: Omit<UseQueryOptions<T>, "queryKey" | "queryFn"> = {}) {
   return useQuery<T>({
     queryKey: opsKey(path),
@@ -87,7 +87,7 @@ export function useOps<T>(path: string | null, opts: Omit<UseQueryOptions<T>, "q
 
 export const useOpsMe = (enabled = true) => useOps<OpsMe>("/me", { enabled, staleTime: 30_000, refetchInterval: 60_000 });
 
-/** After a change: refetch every Church Ops screen. */
+/** After a change: refetch every Sundays | Operations screen. */
 export function useOpsRefresh() {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ queryKey: ["ops"] });

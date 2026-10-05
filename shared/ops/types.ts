@@ -1,4 +1,4 @@
-/** What the ops Edge Function sends Sundays (Church Ops screens). Plain data, ISO dates. */
+/** What the ops Edge Function sends Sundays (Sundays | Operations screens). Plain data, ISO dates. */
 import type { AvlLevel, Permission, Role } from "./rbac";
 import type { RequestAction, RequestKind, RequestRole, RequestStatus, RequestWorkflow } from "./workflow";
 import type { QuoteStatus } from "./state-machine";

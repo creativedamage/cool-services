@@ -1,5 +1,5 @@
 "use client";
-/** Church Ops building blocks, in Sundays' look. */
+/** Sundays | Operations building blocks, in Sundays' look. */
 import clsx from "clsx";
 import Link from "next/link";
 import { useEffect, useState } from "react";

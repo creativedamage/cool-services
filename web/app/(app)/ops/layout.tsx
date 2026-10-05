@@ -1,5 +1,5 @@
 "use client";
-/** Church Ops (Full Mode): its own sign-in, then the page. */
+/** Sundays | Operations (Full Mode): its own sign-in, then the page. */
 import { OpsGate } from "@/components/ops/OpsGate";
 import { OpsMeContext } from "@/components/ops/context";
 
