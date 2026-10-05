@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { Api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { pickWeekendService } from "@/lib/weekend";
-import { lastApp } from "@/components/AppSwitcher";
+import { lastApp, lastHref } from "@/components/AppSwitcher";
 import { Logo } from "@/components/Logo";
 
 export default function StartPage() {
@@ -18,7 +18,7 @@ export default function StartPage() {
         if (mode === null) return router.replace("/setup-mode");
         if (mode === "companion") return router.replace("/companion");
         // Sundays | Operations was open last: back to it (Full Mode only).
-        if (mode === "full" && lastApp() === "ops") return router.replace("/ops");
+        if (mode === "full" && lastApp() !== "sundays") return router.replace(lastHref(lastApp()));
         const s = await Api.settings();
         let v = s.startView;
         // Service Mode opens only what it keeps (Services by default).

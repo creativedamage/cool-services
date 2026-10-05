@@ -18,8 +18,8 @@ import { PrefsLink } from "@/components/settings/PrefsLink";
 import { PageRequestsBar } from "@/components/paging/PageRequests";
 import { useCampus } from "@/lib/campus";
 import { WeekendPicker, useWeekend } from "@/lib/weekend";
-import { OpsBrand, OpsNav } from "@/components/ops/OpsNav";
-import { AppSwitcher, useRememberApp } from "@/components/AppSwitcher";
+import { AvlBrand, AvlNav, OpsBrand, OpsNav } from "@/components/ops/OpsNav";
+import { AppSwitcher, sideOf, useRememberApp } from "@/components/AppSwitcher";
 import { APP_MODE_KEY, PinDialog, serviceLocked, serviceModeAllows, useAppMode, useUnlock } from "@/lib/appMode";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -59,9 +59,10 @@ function Shell({ children }: { children: React.ReactNode }) {
     if (path.startsWith("/services") && st && openPlan) void Api.boardOpenPlan(st, openPlan).catch(() => undefined);
   }, [path, st, openPlan]);
 
-  // Sundays and Sundays | Operations are two apps in one window (switcher at the top of the sidebar).
-  const inOps = path.startsWith("/ops");
-  useRememberApp(inOps ? "ops" : "sundays", qs ? `${path}?${qs}` : path);
+  // Sundays, Sundays | Operations and Sundays | AVL are separate apps in one window (switcher at the top of the sidebar).
+  const side = sideOf(path);
+  const inOps = side !== "sundays";
+  useRememberApp(side, qs ? `${path}?${qs}` : path);
 
   const nav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -76,9 +77,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <div className={clsx("flex h-screen overflow-hidden", inOps && "app-ops")}>
-      <aside className={clsx("flex w-[240px] shrink-0 flex-col border-r border-line", inOps ? "bg-gradient-to-b from-violet/10 to-surface/60" : "bg-surface/60")}>
-        {inOps ? <OpsBrand fallback={me.data?.orgName ?? null} /> : (
+    <div className={clsx("flex h-screen overflow-hidden", side === "ops" && "app-ops", side === "avl" && "app-avl")}>
+      <aside className={clsx("flex w-[240px] shrink-0 flex-col border-r border-line", inOps ? "bg-gradient-to-b from-accent/10 to-surface/60" : "bg-surface/60")}>
+        {side === "avl" ? <AvlBrand /> : side === "ops" ? <OpsBrand fallback={me.data?.orgName ?? null} /> : (
           <div className="flex items-center gap-2.5 px-4 py-4">
             <Logo size={30} />
             <div className="leading-tight">
@@ -87,7 +88,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         )}
-        {mode?.mode === "full" && <AppSwitcher side={inOps ? "ops" : "sundays"} />}
+        {mode?.mode === "full" && <AppSwitcher side={side} />}
         {!inOps && <CampusSwitcher />}
         {!inOps && <WeekendPicker />}
 
@@ -107,7 +108,9 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="flex-1" />
         ) : path.startsWith("/services") ? (
           <ServicesNav activeSt={search.get("st")} activePlan={search.get("plan")} tab={path} />
-        ) : inOps ? (
+        ) : side === "avl" ? (
+          <AvlNav />
+        ) : side === "ops" ? (
           <OpsNav />
         ) : path.startsWith("/paging") ? (
           <PagingNav />

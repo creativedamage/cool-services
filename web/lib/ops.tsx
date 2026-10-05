@@ -1,26 +1,39 @@
 "use client";
 /**
- * Sundays | Operations in Sundays (Full Mode only). People sign in with their own Sundays | Operations account
- * (Supabase Auth: register, then a manager approves them); every screen talks to the "ops" Edge
- * Function, which checks their access level each time.
+ * Sundays | Operations and Sundays | AVL — in the Mac app (Full Mode) and on the website (ops-web).
+ * People sign in with their own account (Supabase Auth: register, then a manager approves them);
+ * every screen talks to the "ops" Edge Function, which checks their access each time.
  */
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { useQuery, useQueryClient, type UseQueryOptions } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { OpsMe } from "@shared/ops/types";
 import { Api } from "@/lib/api";
+import { CONFIRMED_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@shared/cloud";
 
 export interface CloudConfig { supabaseUrl: string; publishableKey: string; opsUrl: string; testToken: string | null }
 
+/** The website build (no Sundays server behind it): talks to Sundays' cloud directly. */
+export const STANDALONE = process.env.NEXT_PUBLIC_OPS_STANDALONE === "1";
+
 let cfgP: Promise<CloudConfig> | null = null;
-const cloud = () => (cfgP ??= Api.cloud().catch((e) => { cfgP = null; throw e; }));
+const cloud = () => (cfgP ??= (STANDALONE
+  ? Promise.resolve({
+    supabaseUrl: SUPABASE_URL, publishableKey: SUPABASE_PUBLISHABLE_KEY,
+    // NEXT_PUBLIC_OPS_URL / _TEST_TOKEN: a local copy of the ops function, for testing a website build.
+    opsUrl: process.env.NEXT_PUBLIC_OPS_URL || `${SUPABASE_URL}/functions/v1/ops`, testToken: process.env.NEXT_PUBLIC_OPS_TEST_TOKEN || null,
+  })
+  : Api.cloud()).catch((e) => { cfgP = null; throw e; }));
+
+/** Where the "confirm your email" link lands: the website itself, or (from the Mac app) Sundays' confirmation page. */
+export const confirmRedirect = () => (STANDALONE && typeof window !== "undefined" ? `${window.location.origin}/` : CONFIRMED_URL);
 
 let client: SupabaseClient | null = null;
 export async function supabase(): Promise<SupabaseClient> {
   if (client) return client;
   const c = await cloud();
   client = createClient(c.supabaseUrl, c.publishableKey, {
-    auth: { persistSession: true, autoRefreshToken: true, storageKey: "sundays-ops-auth", detectSessionInUrl: false },
+    auth: { persistSession: true, autoRefreshToken: true, storageKey: "sundays-ops-auth", detectSessionInUrl: STANDALONE },
   });
   return client;
 }

@@ -187,3 +187,38 @@ export function Table({ head, children, min = 760 }: { head: React.ReactNode; ch
     </div>
   );
 }
+
+/** A big link on an overview page. */
+export function Quick({ href, icon: Icon, title, sub }: { href: string; icon: React.ComponentType<{ size?: number }>; title: string; sub: string }) {
+  return (
+    <Link href={href} className="panel group flex items-center gap-3 px-4 py-3 transition hover:border-line-strong hover:bg-hover/40">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent"><Icon size={17} /></span>
+      <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{title}</span><span className="block text-xs text-ink-muted">{sub}</span></span>
+      <span className="text-ink-faint transition group-hover:translate-x-0.5 group-hover:text-accent">→</span>
+    </Link>
+  );
+}
+
+/** Older activity links pointed at /ops for AVL pages. */
+export const activityHref = (h: string | null) => (h ? h.replace(/^\/ops\/(quotes|vendors|catalog)/, "/avl/$1") : null);
+
+export function ActivityList({ rows }: { rows: { id: string; action: string; href: string | null; createdAt: string; actorName: string | null; actorLabel: string | null; detail: string | null }[] }) {
+  if (!rows.length) return <Empty>No activity yet.</Empty>;
+  const when = (d: string) => new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return (
+    <ul className="divide-y divide-line">
+      {rows.map((a) => {
+        const href = activityHref(a.href);
+        return (
+          <li key={a.id} className="px-4 py-2.5 text-[13px]">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-medium">{href ? <Link href={href} className="hover:text-accent">{a.action}</Link> : a.action}</span>
+              <span className="shrink-0 text-[11px] text-ink-faint">{when(a.createdAt)}</span>
+            </div>
+            <div className="truncate text-[11px] text-ink-muted">{a.actorName ?? a.actorLabel ?? "System"}{a.detail && ` · ${a.detail}`}</div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

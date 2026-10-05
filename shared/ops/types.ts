@@ -13,6 +13,7 @@ export interface OpsSessionUser {
   role: Role;
   avlLevel: AvlLevel;
   permissions: Permission[];
+  opsAccess: boolean;
   campusId: string | null;
   allCampuses: boolean;
   teamIds: string[];
@@ -23,7 +24,11 @@ export type OpsMe =
   | { status: "pending" | "inactive"; name: string; email: string; org: OrgBrand };
 
 export interface OrgBrand { name: string | null; logo: string | null; logoDark: string | null }
-export interface OpsNav { handlesRequests: boolean; queueCount: number; pendingUsers: number; avl: boolean; manager: boolean; admin: boolean; campusName: string | null }
+export interface OpsNav {
+  handlesRequests: boolean; queueCount: number; pendingUsers: number; manager: boolean; admin: boolean; campusName: string | null;
+  /** Which apps this person can open. */
+  ops: boolean; avl: boolean; avlManager: boolean; avlPending: number; avlName: string | null;
+}
 
 export interface RequestRow {
   id: string; number: string; title: string; details: string; location: string | null;
@@ -51,7 +56,6 @@ export interface RequestDetail { request: RequestRow; roles: RequestRole[]; acti
 export interface ActivityRow { id: string; actorName: string | null; actorLabel: string | null; action: string; detail: string | null; area: string; href: string | null; createdAt: string }
 
 export interface OverviewData {
-  avl: { pipelineCents: number; acceptedCents: number; profitCents: number; openPurchasingCents: number; recent: QuoteRow[] } | null;
   queue: { approval: number; open: number; urgent: number; doneWeek: number } | null;
   mine: { open: RequestRow[]; awaiting: number; completed30: number };
   activity: ActivityRow[];
@@ -91,7 +95,7 @@ export interface OrgSettings {
   quotePrefix: string; taxExempt: boolean; defaultTaxBps: number; defaultDepositBps: number; defaultMarginBps: number; laborRateCents: number;
   quoteValidDays: number; quoteTerms: string | null;
 }
-export interface PrintData { quote: PublicQuote; org: OrgSettings; logo: string | null }
+export interface PrintData { quote: PublicQuote; org: AvlBusiness; logo: string | null }
 
 export interface CatalogProduct {
   id: string; sku: string; model: string | null; name: string; manufacturer: string | null; category: string | null; description: string | null;
@@ -106,7 +110,7 @@ export interface ImportBatchRow { id: string; fileName: string; status: string; 
 export interface UserRow {
   id: string; email: string; name: string; title: string | null; department: string | null; phone: string | null;
   active: boolean; pending: boolean; registered: boolean; campusId: string | null; campusName: string | null; allCampuses: boolean;
-  role: Role; avlLevel: AvlLevel; effectiveRole: Role; effectiveAvl: AvlLevel; global: boolean; source: string;
+  role: Role; avlLevel: AvlLevel; opsAccess: boolean; effectiveRole: Role; effectiveAvl: AvlLevel; global: boolean; source: string;
   teams: { id: string; name: string; synced: boolean }[]; lastLoginAt: string | null; createdAt: string; editable: boolean;
 }
 export interface CampusRow {
@@ -118,4 +122,28 @@ export interface CategoryRow {
   id: string; name: string; kind: RequestKind; workflow: RequestWorkflow; description: string | null; icon: string | null;
   approvalThresholdCents: number | null; requiresLocation: boolean; allowLineItems: boolean; active: boolean; sortOrder: number;
   supplyItemCount: number; requestCount: number; routing: { campusId: string | null; handlerTeam: string; approverTeam: string | null }[];
+}
+
+/* ── AVL ── */
+export interface AvlOverview {
+  pipelineCents: number; acceptedCents: number; profitCents: number; openPurchasingCents: number;
+  clients: number; recent: QuoteRow[]; activity: ActivityRow[];
+}
+export interface ClientRow {
+  id: string; name: string; contactName: string | null; email: string | null; phone: string | null; city: string | null; state: string | null;
+  active: boolean; taxExempt: boolean; quotes: number; openCents: number; wonCents: number; lastQuoteAt: string | null;
+}
+export interface ClientContact { id: string; name: string; title: string | null; email: string | null; phone: string | null; isPrimary: boolean }
+export interface ClientDetail {
+  id: string; name: string; contactName: string | null; email: string | null; phone: string | null; website: string | null;
+  addressLine1: string | null; addressLine2: string | null; city: string | null; state: string | null; postalCode: string | null;
+  taxExempt: boolean; notes: string | null; active: boolean; createdAt: string;
+}
+export interface ClientPage { client: ClientDetail; contacts: ClientContact[]; quotes: QuoteRow[]; totals: { openCents: number; wonCents: number } }
+export interface AvlPerson { id: string; name: string; email: string; avlLevel: AvlLevel; opsAccess: boolean; role: Role; pending: boolean; active: boolean; lastLoginAt: string | null }
+export interface AvlBusiness {
+  name: string | null; legalName: string | null; addressLine1: string | null; addressLine2: string | null; city: string | null; state: string | null;
+  postalCode: string | null; phone: string | null; email: string | null; website: string | null; ein: string | null; salesTaxId: string | null;
+  quotePrefix: string; defaultTaxBps: number; defaultDepositBps: number; defaultMarginBps: number; laborRateCents: number;
+  quoteValidDays: number; quoteTerms: string | null;
 }

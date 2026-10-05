@@ -7,6 +7,7 @@ import type { RequestKind, RequestWorkflow } from "@shared/ops/workflow";
 import { ops, useOps, useOpsRefresh } from "@/lib/ops";
 import { Card, Check, ErrorBox, Loading, MoneyInput, PageHeader } from "@/components/ops/OpsUi";
 import { CategoryFields, type CategoryForm } from "@/components/ops/CategoryFields";
+import { TypeIcon } from "@/components/ops/TypeIcon";
 
 type Cat = { id: string; name: string; icon: string | null; kind: RequestKind; workflow: RequestWorkflow; description: string | null; approvalThresholdCents: number | null; requiresLocation: boolean; allowLineItems: boolean; sortOrder: number; active: boolean };
 type Item = { id: string; name: string; unit: string; sku: string | null; unitCostCents: number | null; sortOrder: number; active: boolean };
@@ -23,7 +24,7 @@ function TypeView() {
   const c = d.data.category;
   return (
     <>
-      <PageHeader crumb="Settings / Request types" title={`${c.icon ?? ""} ${c.name}`.trim()} />
+      <PageHeader crumb="Settings / Request types" icon={<TypeIcon icon={c.icon} kind={c.kind} />} title={c.name} description={c.description ?? undefined} />
       <div className="space-y-5">
         <Routing key={JSON.stringify(d.data.routings)} data={d.data} />
         {d.data.global && <Details key={c.id + c.name + c.active} c={c} />}
@@ -81,13 +82,13 @@ function Details({ c }: { c: Cat }) {
   const refresh = useOpsRefresh();
   const [f, setF] = useState<CategoryForm>({ ...c, icon: c.icon ?? "", description: c.description ?? "" });
   return (
-    <Card eyebrow="Settings" title="Type details">
-      <form className="grid gap-4 p-4 md:grid-cols-4" onSubmit={async (e) => {
+    <Card eyebrow="Settings" title="Icon, title and handling">
+      <form className="p-4" onSubmit={async (e) => {
         e.preventDefault();
         try { await ops(`/settings/request-types/${c.id}`, { method: "PUT", json: f }); toast.success("Saved"); await refresh(); } catch (err) { toast.error((err as Error).message); }
       }}>
         <CategoryFields f={f} set={setF} />
-        <div className="col-span-full"><button className="btn-primary">Save</button></div>
+        <div className="mt-6"><button className="btn-primary">Save</button></div>
       </form>
     </Card>
   );

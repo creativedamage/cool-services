@@ -21,7 +21,7 @@ export default function Vendors() {
             <Table min={640} head={<tr><th>Vendor</th><th>Rep</th><th>Terms</th><th className="text-right">Products</th></tr>}>
               {d.data.map((v) => (
                 <tr key={v.id}>
-                  <td><Link className="font-medium text-accent hover:underline" href={`/ops/vendors/view?id=${v.id}`}>{v.name}</Link>{!v.active && <span className="ml-2 text-xs text-ink-faint">inactive</span>}</td>
+                  <td><Link className="font-medium text-accent hover:underline" href={`/avl/vendors/view?id=${v.id}`}>{v.name}</Link>{!v.active && <span className="ml-2 text-xs text-ink-faint">inactive</span>}</td>
                   <td>{v.repName}<div className="text-xs text-ink-faint">{v.repEmail}</div></td>
                   <td>{v.terms}</td>
                   <td className="text-right tabular-nums">{v.productCount}</td>

@@ -38,6 +38,14 @@ export async function getOrg(db: Sql | Tx = sql) {
   return n;
 }
 
+/** AVL's own business profile and quote defaults (one row, id 'avl'). */
+export async function getAvl(db: Sql | Tx = sql) {
+  const [a] = await db`select * from ops.avl_business where id = 'avl'`;
+  if (a) return a;
+  const [n] = await db`insert into ops.avl_business (id) values ('avl') on conflict (id) do update set id = excluded.id returning *`;
+  return n;
+}
+
 /** Drop undefined keys (postgres.js won't take them in insert/update helpers). */
 export const defined = <T extends Record<string, unknown>>(o: T) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
 

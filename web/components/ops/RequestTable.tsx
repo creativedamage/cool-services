@@ -1,4 +1,5 @@
 "use client";
+import { TypeIcon } from "./TypeIcon";
 import Link from "next/link";
 import { KIND_LABEL } from "@shared/ops/workflow";
 import type { RequestRow } from "@shared/ops/types";
@@ -21,7 +22,7 @@ export function RequestTable({ rows, show = {}, empty = "No requests." }: { rows
           <td>
             <Link href={`/ops/requests/view?id=${r.id}`} className="font-medium hover:text-accent">{r.title}</Link>
             <div className="text-[11px] text-ink-faint">
-              {r.category.icon && <span className="mr-1">{r.category.icon}</span>}
+              <TypeIcon plain icon={r.category.icon} kind={r.category.kind} size={13} className="mr-1.5 text-ink-muted" />
               {r.category.name} · {KIND_LABEL[r.category.kind]}{r.location && ` · ${r.location}`}
             </div>
           </td>

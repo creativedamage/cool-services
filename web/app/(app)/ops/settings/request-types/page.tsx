@@ -1,27 +1,30 @@
 "use client";
 /** What staff can ask for, how each type flows, and which team handles it at each campus. */
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { KIND_LABEL, type RequestKind } from "@shared/ops/workflow";
 import type { CategoryRow } from "@shared/ops/types";
 import { ops, useOps, useOpsRefresh } from "@/lib/ops";
 import { Card, ErrorBox, Loading, PageHeader, Pill, Table } from "@/components/ops/OpsUi";
 import { CategoryFields, emptyCategory } from "@/components/ops/CategoryFields";
+import { TypeIcon } from "@/components/ops/TypeIcon";
 
 const WF = { APPROVAL: "Approval", FULFILLMENT: "Fulfillment", WORK_ORDER: "Work order" } as const;
 
 export default function RequestTypes() {
   const d = useOps<{ categories: CategoryRow[]; campusCount: number; global: boolean }>("/settings/request-types");
   const [adding, setAdding] = useState(false);
+  // "Add a request type" from the New request page lands here with ?add=1.
+  useEffect(() => { if (new URLSearchParams(window.location.search).has("add")) setAdding(true); }, []);
   const kinds = [...new Set((d.data?.categories ?? []).map((c) => c.kind))] as RequestKind[];
   return (
     <>
       <PageHeader crumb="Settings" title="Request types" description={d.data?.global ? "What staff can request, how each type flows, and which team handles it at each campus." : "Choose which team handles each request type at your campus."}
-        actions={d.data?.global && <button className="btn-primary" onClick={() => setAdding(!adding)}><Plus size={15} /> Add request type</button>} />
-      {adding && <NewType />}
+        actions={d.data?.global && <button className="btn-primary" onClick={() => setAdding(true)} disabled={adding}><Plus size={15} /> Add request type</button>} />
+      {adding && d.data?.global && <NewType onClose={() => setAdding(false)} />}
       <ErrorBox error={d.error} />
       {!d.data ? (!d.error && <Loading />) : (
         <div className="space-y-5">
@@ -34,7 +37,7 @@ export default function RequestTypes() {
                   const unrouted = !fallback && specific < d.data!.campusCount;
                   return (
                     <tr key={c.id}>
-                      <td><span className="mr-2">{c.icon}</span><span className="font-medium">{c.name}</span>{!c.active && <Pill tone="muted">inactive</Pill>}</td>
+                      <td><span className="flex items-center gap-3"><TypeIcon icon={c.icon} kind={c.kind} className="h-8 w-8" size={15} /><span className="min-w-0"><span className="flex items-center gap-2 font-medium">{c.name}{!c.active && <Pill tone="muted">inactive</Pill>}</span>{c.description && <span className="block truncate text-xs text-ink-muted">{c.description}</span>}</span></span></td>
                       <td className="text-ink-soft">{WF[c.workflow]}{c.allowLineItems && ` · ${c.supplyItemCount} items`}</td>
                       <td className="text-xs">{unrouted ? <span className="text-warn">Not routed at every campus</span> : <span className="text-ink-soft">{fallback?.handlerTeam ?? ""}{specific ? `${fallback ? " + " : ""}${specific} campus route${specific === 1 ? "" : "s"}` : ""}</span>}</td>
                       <td className="text-right font-mono text-ink-soft">{c.requestCount}</td>
@@ -51,19 +54,19 @@ export default function RequestTypes() {
   );
 }
 
-function NewType() {
+function NewType({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const refresh = useOpsRefresh();
   const [f, setF] = useState(emptyCategory());
   return (
-    <Card title="New request type" className="mb-5">
-      <form className="grid gap-4 p-4 md:grid-cols-4" onSubmit={async (e) => {
+    <Card eyebrow="Add" title="New request type" className="mb-5" action={<button className="btn-ghost" onClick={onClose} aria-label="Close"><X size={15} /></button>}>
+      <form className="p-4" onSubmit={async (e) => {
         e.preventDefault();
         try { const r = await ops<{ id: string }>("/settings/request-types", { json: f }); await refresh(); router.push(`/ops/settings/request-types/view?id=${r.id}`); }
         catch (err) { toast.error((err as Error).message); }
       }}>
         <CategoryFields f={f} set={setF} />
-        <div className="col-span-full"><button className="btn-primary">Create</button></div>
+        <div className="mt-6 flex gap-2"><button className="btn-primary" disabled={!f.name.trim()}><Plus size={15} /> Add request type</button><button type="button" className="btn-ghost" onClick={onClose}>Cancel</button></div>
       </form>
     </Card>
   );

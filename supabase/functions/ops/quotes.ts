@@ -6,7 +6,7 @@
 import { computeTotals } from "./lib/math.ts";
 import { isEditable, transition, type Actor, type QuoteEventType, type QuoteGuardContext, type QuoteStatus } from "./lib/state-machine.ts";
 import type { PublicQuote, QuoteDTO } from "./lib/types.ts";
-import { getOrg, HttpError, nextNumber, sql, type Tx } from "./db.ts";
+import { getAvl, HttpError, nextNumber, sql, type Tx } from "./db.ts";
 
 type Db = typeof sql | Tx;
 
@@ -66,7 +66,7 @@ export async function applyEvent(opts: { quoteId: string; event: QuoteEventType;
     switch (opts.event) {
       case "SEND": {
         const t = liveTotals(q);
-        const org = await getOrg(tx);
+        const org = await getAvl(tx);
         Object.assign(data, {
           sentAt: now, sentSubtotalCents: t.subtotalCents, sentTaxCents: t.taxCents, sentTotalCents: t.totalCents, sentDepositCents: t.depositCents,
           validUntil: q.validUntil ?? new Date(now.getTime() + org.quoteValidDays * 86_400_000), declinedAt: null,
@@ -89,11 +89,11 @@ export async function applyEvent(opts: { quoteId: string; event: QuoteEventType;
 }
 
 export async function createQuote(input: { title: string; customerId: string; createdById: string; campusId?: string | null }) {
-  const org = await getOrg();
+  const org = await getAvl();
   return sql.begin(async (tx) => {
     const [q] = await tx`insert into ops.quotes ${tx({
       number: await nextNumber(tx, "Q", org.quotePrefix), title: input.title, customerId: input.customerId, createdById: input.createdById,
-      campusId: input.campusId ?? null, taxBps: org.taxExempt ? 0 : org.defaultTaxBps, depositBps: org.defaultDepositBps, terms: org.quoteTerms,
+      campusId: input.campusId ?? null, taxBps: org.defaultTaxBps, depositBps: org.defaultDepositBps, terms: org.quoteTerms,
       publicToken: newPublicToken(),
     })} returning *`;
     await tx`insert into ops.quote_events ${tx({ quoteId: q.id, type: "CREATE", toStatus: "DRAFT", actorId: input.createdById })}`;

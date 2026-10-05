@@ -15,3 +15,15 @@ Supabase's newer signing keys) and `supabase functions deploy sundays-sync --no-
 Testing locally: run the function under Node against a local Postgres with `OPS_DB_URL=… OPS_TEST_AUTH=1`
 (test sign-ins look like `test:<user id>:<email>`), and start Sundays with
 `COOL_OPS_URL=http://127.0.0.1:<port>/ops COOL_OPS_TEST_TOKEN=test:…`.
+
+## Deploying the ops function
+
+The deployed `ops` function is one bundled file built from this folder (same code, fewer files to
+upload):
+
+    node supabase/build-ops.mjs
+    npx esbuild supabase/functions/ops/app.ts --bundle --format=esm --platform=neutral --target=es2022 \
+      --external:postgres --external:zod --minify-whitespace --minify-syntax --legal-comments=none --outfile=/tmp/ops.js
+
+then deploy `index.ts` = `import "jsr:@supabase/functions-js/edge-runtime.d.ts";` + that file with its
+`export{handle}` replaced by `Deno.serve(handle);`, plus `deno.json`, with JWT verification off.

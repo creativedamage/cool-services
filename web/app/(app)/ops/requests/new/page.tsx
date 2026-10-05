@@ -1,17 +1,18 @@
 "use client";
 /** New request: pick a type, then the details. */
 import clsx from "clsx";
-import { ArrowRight, Box, Laptop, Minus, Plus, Tag, Wrench } from "lucide-react";
+import { ArrowRight, Minus, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { KIND_LABEL, type RequestKind, type RequestWorkflow } from "@shared/ops/workflow";
 import type { CategoryOption } from "@shared/ops/types";
-import { fmtMoney, ops, useOps, useOpsRefresh } from "@/lib/ops";
+import { fmtMoney, ops, useOps, useOpsMe, useOpsRefresh } from "@/lib/ops";
 import { ErrorBox, Field, Loading, MoneyInput, PageHeader } from "@/components/ops/OpsUi";
 import { Spinner } from "@/components/ui";
+import { TypeIcon } from "@/components/ops/TypeIcon";
+import Link from "next/link";
 
-const KIND_ICON: Record<RequestKind, typeof Box> = { TECHNOLOGY: Laptop, SUPPLY: Box, MAINTENANCE: Wrench, OTHER: Tag };
 const KIND_BLURB: Record<RequestKind, string> = {
   TECHNOLOGY: "Laptops, iPads, phones, software and accessories",
   SUPPLY: "Restroom, janitorial, kitchen and office supplies",
@@ -21,6 +22,8 @@ const KIND_BLURB: Record<RequestKind, string> = {
 const WORKFLOW_HINT: Record<RequestWorkflow, string> = { APPROVAL: "Needs approval", FULFILLMENT: "Goes straight to the team", WORK_ORDER: "Creates a work order" };
 
 export default function NewRequest() {
+  const me = useOpsMe();
+  const canAdd = me.data?.status === "ok" && me.data.nav.manager && me.data.user.allCampuses;
   const data = useOps<{ categories: CategoryOption[]; campuses: { id: string; name: string }[]; defaultCampusId: string | null }>("/requests/new");
   const [catId, setCatId] = useState<string | null>(null);
   if (!data.data) return <><PageHeader crumb="Requests / New" title="New request" /><ErrorBox error={data.error} />{!data.error && <Loading />}</>;
@@ -33,14 +36,13 @@ export default function NewRequest() {
       {!cat ? (
         <div className="space-y-7">
           {kinds.map((k) => {
-            const Icon = KIND_ICON[k];
             return (
               <section key={k}>
                 <div className="mb-2.5 flex items-baseline gap-3"><h2 className="text-[15px] font-semibold">{KIND_LABEL[k]}</h2><span className="text-xs text-ink-muted">{KIND_BLURB[k]}</span></div>
                 <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
                   {categories.filter((c) => c.kind === k).map((c) => (
                     <button key={c.id} onClick={() => setCatId(c.id)} className="panel group flex items-start gap-3 p-3.5 text-left transition hover:border-accent/50 hover:bg-hover/40">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-hover text-[17px] text-accent">{c.icon || <Icon size={16} />}</span>
+                      <TypeIcon icon={c.icon} kind={c.kind} />
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-medium">{c.name}</span>
                         {c.description && <span className="mt-0.5 block text-xs text-ink-muted">{c.description}</span>}
@@ -53,6 +55,11 @@ export default function NewRequest() {
               </section>
             );
           })}
+          {canAdd && (
+            <Link href="/ops/settings/request-types?add=1" className="flex items-center gap-3 rounded-xl border border-dashed border-line-strong p-3.5 text-sm text-ink-muted transition hover:border-accent/60 hover:text-accent">
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-hover"><Plus size={16} /></span>Add a request type
+            </Link>
+          )}
           {!categories.length && <p className="text-sm text-ink-muted">No request types are set up yet. A manager can add them under Settings → Request types.</p>}
           {!campuses.length && <p className="rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">No campuses yet. A manager needs to add one under Settings → Campuses before requests can be made.</p>}
         </div>
@@ -98,7 +105,7 @@ function RequestForm({ cat, campuses, defaultCampusId, onBack }: { cat: Category
     <form onSubmit={submit} className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
       <section className="panel">
         <header className="flex items-center justify-between border-b border-line px-4 py-3">
-          <div><div className="label">{KIND_LABEL[cat.kind]}</div><div className="text-[15px] font-semibold">{cat.icon && <span className="mr-2">{cat.icon}</span>}{cat.name}</div></div>
+          <div><div className="label">{KIND_LABEL[cat.kind]}</div><div className="text-[15px] font-semibold"><span className="flex items-center gap-2"><TypeIcon plain icon={cat.icon} kind={cat.kind} className="text-accent" />{cat.name}</span></div></div>
           <button type="button" className="btn-ghost text-xs" onClick={onBack}>Change type</button>
         </header>
         <div className="grid gap-4 p-4 sm:grid-cols-2">

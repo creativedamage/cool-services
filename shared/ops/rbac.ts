@@ -1,8 +1,10 @@
 /**
  * Access model
  * ────────────
- * Main role:  STAFF < MANAGER < EXECUTIVE,  plus ADMIN (system admin — everything).
- * AVL add-on: NONE | TECH | MANAGER (independent of the main role).
+ * Two apps on one sign-in:
+ *  Operations  (church business) — `opsAccess`, then the main role STAFF < MANAGER < EXECUTIVE, plus ADMIN.
+ *  AVL         (quoting other churches) — avlLevel NONE | TECH | MANAGER, independent of Operations.
+ * System admins can open both.
  * Scope:      campus (home campus only) or global (`allCampuses`). Executives/Admins are always global.
  *
  *  Staff             make & track own requests
@@ -25,13 +27,13 @@ export const AVL_RANK: Record<AvlLevel, number> = { NONE: 0, TECH: 1, MANAGER: 2
 export const ROLES: { key: Role; label: string; help: string }[] = [
   { key: "STAFF", label: "Staff", help: "Make and track their own requests" },
   { key: "MANAGER", label: "Manager", help: "Approve & handle requests, manage users, teams and routing — at their campus, or everywhere if global" },
-  { key: "EXECUTIVE", label: "Executive", help: "Sees everything, including AVL. Makes and approves any request" },
-  { key: "ADMIN", label: "System admin", help: "Everything, plus directory sync and organization settings" },
+  { key: "EXECUTIVE", label: "Executive", help: "Sees every campus. Makes and approves any request" },
+  { key: "ADMIN", label: "System admin", help: "Everything in Operations and AVL, plus organization settings" },
 ];
 export const AVL_LEVELS: { key: AvlLevel; label: string; help: string }[] = [
   { key: "NONE", label: "None", help: "No AVL access" },
-  { key: "TECH", label: "AVL Tech", help: "Quotes, product pricing, vendors" },
-  { key: "MANAGER", label: "AVL Manager", help: "AVL Tech + purchasing and converting quotes" },
+  { key: "TECH", label: "AVL Tech", help: "Clients, quotes, product pricing, vendors" },
+  { key: "MANAGER", label: "AVL Manager", help: "AVL Tech + approving quotes, AVL people and business settings" },
 ];
 export const roleLabel = (r: Role) => ROLES.find((x) => x.key === r)!.label;
 export const avlLabel = (a: AvlLevel) => AVL_LEVELS.find((x) => x.key === a)!.label;
@@ -49,7 +51,7 @@ export function effectiveAccess(u: { role: Role; avlLevel: AvlLevel; syncedRole?
 export function capabilities(role: Role, avl: AvlLevel): Permission[] {
   const r = ROLE_RANK[role];
   const caps = new Set<Permission>();
-  if (AVL_RANK[avl] >= 1 || r >= ROLE_RANK.EXECUTIVE) caps.add("AVL_ACCESS");
+  if (AVL_RANK[avl] >= 1 || role === "ADMIN") caps.add("AVL_ACCESS");
   if (AVL_RANK[avl] >= 2 || role === "ADMIN") {
     caps.add("AVL_PURCHASING");
     caps.add("QUOTE_APPROVE");
@@ -69,6 +71,8 @@ export interface SessionUser {
   role: Role;
   avlLevel: AvlLevel;
   permissions: Permission[];
+  /** Uses Sundays | Operations (admins always do). */
+  opsAccess: boolean;
   campusId: string | null;
   /** true for global managers, executives and admins */
   allCampuses: boolean;
@@ -81,6 +85,9 @@ export const can = (u: U, p: Permission) => !!u && (u.permissions.includes(p) ||
 export const isAdmin = (u: U) => !!u && u.role === "ADMIN";
 export const atLeast = (u: U, r: Role) => !!u && ROLE_RANK[u.role] >= ROLE_RANK[r];
 export const hasAvlAccess = (u: U) => can(u, "AVL_ACCESS");
+export const hasOpsAccess = (u: U) => !!u && (u.opsAccess || u.role === "ADMIN");
+/** AVL Managers and admins: approve quotes, manage AVL people and AVL's business settings. */
+export const isAvlManager = (u: U) => can(u, "QUOTE_APPROVE");
 export const canSeeCost = hasAvlAccess;
 
 export const seesAllCampuses = (u: U) => !!u && (u.allCampuses || atLeast(u, "EXECUTIVE"));

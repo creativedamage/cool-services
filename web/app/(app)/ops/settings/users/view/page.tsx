@@ -9,7 +9,7 @@ import { fmtDateTime, ops, useOps, useOpsRefresh } from "@/lib/ops";
 import { AvlSelect, Card, Check, ErrorBox, Field, Loading, PageHeader, Pill, RolePicker } from "@/components/ops/OpsUi";
 import { Spinner } from "@/components/ui";
 
-type Data = { user: UserRow; campuses: Ref[]; self: boolean; global: boolean; grantableRoles: Role[]; teams: (Ref & { campusName: string | null; manageable: boolean })[] };
+type Data = { user: UserRow; campuses: Ref[]; self: boolean; global: boolean; grantableRoles: Role[]; grantsAvl: boolean; teams: (Ref & { campusName: string | null; manageable: boolean })[] };
 export default function Page() { return <Suspense><EditUser /></Suspense>; }
 
 function EditUser() {
@@ -25,7 +25,7 @@ function Form({ data }: { data: Data }) {
   const refresh = useOpsRefresh();
   const [f, setF] = useState({
     name: u.name, email: u.email, title: u.title ?? "", department: u.department ?? "", phone: u.phone ?? "",
-    campusId: u.campusId ?? (data.campuses.length === 1 ? data.campuses[0].id : ""), allCampuses: u.allCampuses, role: u.role as Role, avlLevel: u.avlLevel as AvlLevel,
+    campusId: u.campusId ?? (data.campuses.length === 1 ? data.campuses[0].id : ""), allCampuses: u.allCampuses, role: u.role as Role, avlLevel: u.avlLevel as AvlLevel, opsAccess: u.pending ? true : u.opsAccess,
     teamIds: u.teams.filter((t) => !t.synced).map((t) => t.id), active: u.pending ? true : u.active,
   });
   const [busy, setBusy] = useState<string | null>(null);
@@ -40,7 +40,7 @@ function Form({ data }: { data: Data }) {
   return (
     <>
       <PageHeader crumb="Settings / Users" title={u.name} description={<span className="flex items-center gap-2">{u.email}{u.pending && <Pill tone="warn">waiting for approval</Pill>}{!u.registered && <Pill tone="muted">hasn't registered yet</Pill>}</span>} />
-      {u.pending && <p className="mb-5 rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">{u.name.split(" ")[0]} created a Sundays | Operations account. Choose their campus, role and teams, then approve, or decline the sign-up.</p>}
+      {u.pending && <p className="mb-5 rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">{u.name.split(" ")[0]} created a Sundays account. Approving here gives them Operations (and AVL if you choose it). Choose their campus, role and teams, then approve, or decline the sign-up.</p>}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Card title={self ? "Your profile" : u.pending ? "Approve" : "Profile & access"}>
           <form className="grid gap-4 p-4 md:grid-cols-2" onSubmit={(e) => { e.preventDefault(); void save({}, u.pending ? "Approved" : "Saved"); }}>
@@ -54,10 +54,16 @@ function Form({ data }: { data: Data }) {
               <Field label="Home campus"><select className="input" value={f.campusId} onChange={(e) => setF({ ...f, campusId: e.target.value })}><option value="">—</option>{data.campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
             ) : <Field label="Campus"><input className="input" readOnly value={u.campusName ?? data.campuses.find((c) => c.id === f.campusId)?.name ?? "Your campus"} /></Field>}
             <div className="md:col-span-2"><span className="label mb-1.5 block">Role</span><RolePicker allowed={data.grantableRoles} value={f.role} onChange={(role) => setF({ ...f, role })} /></div>
-            <Field label="AVL access"><AvlSelect value={f.avlLevel} onChange={(avlLevel) => setF({ ...f, avlLevel })} /></Field>
-            <div className="space-y-3 pt-5">
+            <div className="space-y-3 md:col-span-2 rounded-lg border border-line p-3">
+              <span className="label block">Apps</span>
+              <Check label="Sundays | Operations" hint="The church's requests, teams and campuses." checked={f.opsAccess} disabled={self} onChange={(v) => setF({ ...f, opsAccess: v })} />
+              {data.grantsAvl ? (
+                <Field label="Sundays | AVL"><AvlSelect value={f.avlLevel} onChange={(avlLevel) => setF({ ...f, avlLevel })} /></Field>
+              ) : <p className="text-xs text-ink-muted">Sundays | AVL: {u.effectiveAvl === "NONE" ? "no access" : avlLabel(u.effectiveAvl)} <span className="text-ink-faint">(an AVL Manager changes this)</span></p>}
+            </div>
+            <div className="space-y-3">
               {global && !self && <Check label="Global: all campuses" hint="Managers with this act at every campus. Executives and admins always do." checked={f.allCampuses} onChange={(v) => setF({ ...f, allCampuses: v })} />}
-              {!self && !u.pending && <Check label="Active" hint="Inactive people can't use Sundays | Operations." checked={f.active} onChange={(v) => setF({ ...f, active: v })} />}
+              {!self && !u.pending && <Check label="Active" hint="Inactive people can't sign in to Operations or AVL." checked={f.active} onChange={(v) => setF({ ...f, active: v })} />}
             </div>
             <div className="md:col-span-2"><span className="label mb-1.5 block">Teams</span>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -79,7 +85,7 @@ function Form({ data }: { data: Data }) {
         <aside className="space-y-5">
           <Card eyebrow="Effective access">
             <dl className="divide-y divide-line text-sm">
-              {[["Role", `${roleLabel(u.effectiveRole)}${u.global ? " · all campuses" : ""}`], ["AVL", u.effectiveAvl === "NONE" ? "None" : avlLabel(u.effectiveAvl)], ["Account", u.registered ? "Registered" : "Not yet"],
+              {[["Operations", u.opsAccess || u.effectiveRole === "ADMIN" ? `${roleLabel(u.effectiveRole)}${u.global ? " · all campuses" : ""}` : "No access"], ["AVL", u.effectiveAvl === "NONE" ? "None" : avlLabel(u.effectiveAvl)], ["Account", u.registered ? "Registered" : "Not yet"],
                 ["Last sign-in", u.lastLoginAt ? fmtDateTime(u.lastLoginAt) : "Never"], ["Joined", fmtDateTime(u.createdAt)]].map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-4 px-4 py-2.5"><dt className="text-ink-muted">{k}</dt><dd className="text-right">{v}</dd></div>
               ))}

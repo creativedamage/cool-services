@@ -1,5 +1,6 @@
 "use client";
 /** One request: details, the timeline, and the next steps you can take. */
+import { TypeIcon } from "@/components/ops/TypeIcon";
 import clsx from "clsx";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -34,7 +35,7 @@ function RequestView() {
     <>
       <PageHeader crumb={`Requests / ${r.number}`} title={r.title}
         actions={<Link href={staffSide ? "/ops/work" : "/ops/requests"} className="btn-ghost"><ArrowLeft size={15} /> {staffSide ? "Work queue" : "My requests"}</Link>}
-        description={<span className="flex flex-wrap items-center gap-3"><RequestStatusBadge status={r.status} /><PriorityBadge priority={r.priority} /><span className="text-ink-muted">{r.category.icon} {r.category.name} · {KIND_LABEL[r.category.kind]}</span></span>} />
+        description={<span className="flex flex-wrap items-center gap-3"><RequestStatusBadge status={r.status} /><PriorityBadge priority={r.priority} /><span className="inline-flex items-center gap-1.5 text-ink-muted"><TypeIcon plain icon={r.category.icon} kind={r.category.kind} size={14} />{r.category.name} · {KIND_LABEL[r.category.kind]}</span></span>} />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
           <Card eyebrow="Request" title="Details">

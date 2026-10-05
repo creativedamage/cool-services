@@ -28,7 +28,7 @@ function QuoteView() {
 function Builder({ page }: { page: QuotePage }) {
   const router = useRouter();
   const refresh = useOpsRefresh();
-  const { customers, vendors, campuses, defaultMarginBps, laborRateCents, canApprove } = page;
+  const { customers, vendors, defaultMarginBps, laborRateCents, canApprove } = page;
   const [q, setQ] = useState<QuoteDTO>(page.quote);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -89,12 +89,12 @@ function Builder({ page }: { page: QuotePage }) {
   }
   async function remove() {
     if (!window.confirm(`Delete quote ${q.number}? This can't be undone.`)) return;
-    try { await ops(`/quotes/${q.id}`, { method: "DELETE" }); void refresh(); router.push("/ops/quotes"); } catch (e) { setError((e as Error).message); }
+    try { await ops(`/quotes/${q.id}`, { method: "DELETE" }); void refresh(); router.push("/avl/quotes"); } catch (e) { setError((e as Error).message); }
   }
 
   return (
     <div className="space-y-5">
-      <Link href="/ops/quotes" className="inline-flex items-center gap-1 text-xs text-ink-muted hover:text-ink"><ArrowLeft size={13} /> Quotes</Link>
+      <Link href="/avl/quotes" className="inline-flex items-center gap-1 text-xs text-ink-muted hover:text-ink"><ArrowLeft size={13} /> Quotes</Link>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3 text-sm text-ink-muted"><span className="font-mono">{q.number}</span><QuoteStatusBadge status={q.status} />{dirty && <span className="text-warn">● Unsaved changes</span>}</div>
@@ -120,15 +120,13 @@ function Builder({ page }: { page: QuotePage }) {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
           <div className="panel grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Field label="Customer" hint={customer?.taxExempt ? "Tax exempt" : undefined}>
+            <Field label="Client" hint={customer?.taxExempt ? "Tax exempt" : undefined}>
               <select className="input" disabled={!editable} value={q.customerId} onChange={(e) => patch({ customerId: e.target.value })}>
                 {customers.map((c) => <option key={c.id} value={c.id}>{c.name}{c.taxExempt ? " (tax exempt)" : ""}</option>)}
               </select>
             </Field>
-            <Field label="Campus">
-              <select className="input" disabled={!editable} value={q.campusId ?? ""} onChange={(e) => patch({ campusId: e.target.value || null })}>
-                <option value="">—</option>{campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+            <Field label="Client record">
+              <Link href={`/avl/clients/view?id=${q.customerId}`} className="btn-outline w-full justify-center">Open {customer?.name ?? "client"} →</Link>
             </Field>
             <Field label="Valid until"><input type="date" className="input" disabled={!editable} value={q.validUntil?.slice(0, 10) ?? ""} onChange={(e) => patch({ validUntil: e.target.value || null })} /></Field>
             <Field label="Deposit to approve"><PercentInput bps={q.depositBps} disabled={!editable} onChange={(depositBps) => patch({ depositBps })} /></Field>

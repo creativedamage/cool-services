@@ -1,25 +1,26 @@
 /**
- * Church Ops API for Sundays (Edge Function "ops"). Ported from coolchurch-ops: the request hub
- * (technology, supplies, facilities work orders), AVL quoting, vendors and price lists, and the
- * people, teams, campuses and request types behind them.
+ * API for Sundays | Operations and Sundays | AVL (Edge Function "ops"). Two apps on one sign-in:
+ *  · Operations — the church's business: requests (technology, supplies, facilities work orders),
+ *    and the people, teams, campuses and request types behind them.
+ *  · AVL — quoting other churches: clients, quotes, vendors and price lists.
  *
  * Sign-in is Sundays' own (Supabase Auth: register, then a manager approves you). Every call checks
  * the person's role, AVL level and campus scope from the database (see lib/rbac.ts).
  *
  *   /ops/me · /ops/overview
  *   /ops/requests… · /ops/work
- *   /ops/quotes… · /ops/customers · /ops/catalog · /ops/vendors…
+ *   /ops/avl/overview · /ops/clients… · /ops/quotes… · /ops/catalog · /ops/vendors… · /ops/avl/{people,business}…
  *   /ops/settings/{users,teams,request-types,supply-items,campuses,activity,organization}…
  */
 import { z, ZodError } from "zod";
 import {
   atLeast, can, canAccessCampus, canEditUser, canManageCampus, canViewActivity, checkUserGrant, effectiveAccess, grantableRoles,
-  hasAvlAccess, isAdmin, isGlobalManager, roleLabel, seesAllCampuses,
+  hasAvlAccess, hasOpsAccess, isAdmin, isAvlManager, isGlobalManager, roleLabel, seesAllCampuses,
 } from "./lib/rbac.ts";
 import { OPEN_STATUSES, type RequestKind } from "./lib/workflow.ts";
 import { isDeletable, QUOTE_STATUSES, type QuoteStatus } from "./lib/state-machine.ts";
-import type { OpsSessionUser, OverviewData, QuoteRow, UserRow } from "./lib/types.ts";
-import { defined, getOrg, HttpError, logActivity, sql } from "./db.ts";
+import type { AvlOverview, OpsSessionUser, OverviewData, QuoteRow, UserRow } from "./lib/types.ts";
+import { defined, getAvl, getOrg, HttpError, logActivity, sql } from "./db.ts";
 import { caller, requireUser } from "./auth.ts";
 import { addRequestComment, handlesRequests, performRequestAction, requestDetail, requestRows, submitRequest, workQueueWhere } from "./requests.ts";
 import { applyEvent, createQuote, effectiveTotals, liveTotals, loadQuote, quoteDTO, saveQuote, toPublicQuote, type FullQuote } from "./quotes.ts";
@@ -80,9 +81,20 @@ const avl = async (req: Request, perm?: "QUOTE_APPROVE" | "AVL_PURCHASING") => {
   if (perm && !can(u, perm)) throw new HttpError(403, "An AVL Manager has to do that.");
   return u;
 };
-const manager = async (req: Request) => {
+/** Someone who uses Sundays | Operations. */
+const opsUser = async (req: Request) => {
   const u = await requireUser(req);
+  if (!hasOpsAccess(u)) throw new HttpError(403, "You don't have Sundays | Operations access.");
+  return u;
+};
+const manager = async (req: Request) => {
+  const u = await opsUser(req);
   if (!atLeast(u, "MANAGER")) throw new HttpError(403, "Manager access required");
+  return u;
+};
+const avlManager = async (req: Request) => {
+  const u = await requireUser(req);
+  if (!isAvlManager(u)) throw new HttpError(403, "An AVL Manager has to do that.");
   return u;
 };
 const admin = async (req: Request) => {
@@ -99,10 +111,15 @@ const id = z.string().min(1);
 
 async function brand() {
   const org = await getOrg();
-  const assets = await sql`select key, mime, data_b64 from ops.org_assets`;
+  const assets = await sql`select key, mime, data_b64 from ops.org_assets where key in ('logo', 'logo-dark')`;
   const a = (k: string) => assets.find((x) => x.key === k);
-  const url = (x?: Record<string, any>) => (x ? `data:${x.mime};base64,${x.dataB64}` : null);
-  return { name: org.name as string | null, logo: url(a("logo")), logoDark: url(a("logo-dark") ?? a("logo")) };
+  return { name: org.name as string | null, logo: dataUrl(a("logo")), logoDark: dataUrl(a("logo-dark") ?? a("logo")) };
+}
+const dataUrl = (x?: Record<string, any>) => (x ? `data:${x.mime};base64,${x.dataB64}` : null);
+/** AVL's letterhead: its own logo, else the church's. */
+async function avlLogo() {
+  const assets = await sql`select key, mime, data_b64 from ops.org_assets where key in ('avl-logo', 'logo')`;
+  return dataUrl(assets.find((x) => x.key === "avl-logo") ?? assets.find((x) => x.key === "logo"));
 }
 
 route("GET", "/me", async ({ req }) => {
@@ -110,17 +127,23 @@ route("GET", "/me", async ({ req }) => {
   const org = await brand();
   if (!c.row.active) return { status: c.row.pending ? "pending" : "inactive", name: c.row.name, email: c.row.email, org };
   const u = await requireUser(req);
-  const handles = await handlesRequests(u);
-  const [[{ n: queueCount }], [{ n: pendingUsers }], [campus]] = await Promise.all([
+  const ops = hasOpsAccess(u);
+  const handles = ops && (await handlesRequests(u));
+  const [[{ n: queueCount }], [{ n: pendingUsers }], [campus], [{ n: avlPending }], avl] = await Promise.all([
     handles ? sql`select count(*)::int as n from ops.requests r where ${workQueueWhere(u, { openOnly: true })}` : [{ n: 0 }],
-    atLeast(u, "MANAGER")
+    ops && atLeast(u, "MANAGER")
       ? sql`select count(*)::int as n from ops.users where pending ${seesAllCampuses(u) ? sql`` : sql`and (campus_id = ${u.campusId} or campus_id is null)`}`
       : [{ n: 0 }],
     u.campusId ? sql`select name from ops.campuses where id = ${u.campusId}` : [],
+    isAvlManager(u) ? sql`select count(*)::int as n from ops.users where pending` : [{ n: 0 }],
+    hasAvlAccess(u) ? getAvl() : null,
   ]);
   return {
     status: "ok", user: u, org,
-    nav: { handlesRequests: handles, queueCount, pendingUsers, avl: hasAvlAccess(u), manager: atLeast(u, "MANAGER"), admin: isAdmin(u), campusName: campus?.name ?? null },
+    nav: {
+      handlesRequests: handles, queueCount, pendingUsers, manager: ops && atLeast(u, "MANAGER"), admin: isAdmin(u), campusName: campus?.name ?? null,
+      ops, avl: hasAvlAccess(u), avlManager: isAvlManager(u), avlPending, avlName: avl?.name ?? null,
+    },
   };
 });
 
@@ -161,28 +184,10 @@ async function quotesWith(where: unknown, opts: { limit?: number; order?: unknow
 }
 
 route("GET", "/overview", async ({ req }) => {
-  const u = await requireUser(req);
-  const isAvl = hasAvlAccess(u);
+  const u = await opsUser(req);
   const handles = await handlesRequests(u);
   const seesAll = atLeast(u, "MANAGER") && seesAllCampuses(u);
-  const yearStart = new Date(new Date().getFullYear(), 0, 1);
   const weekAgo = new Date(Date.now() - 7 * 86_400_000);
-
-  let avlData: OverviewData["avl"] = null;
-  if (isAvl) {
-    const [active, accepted, [{ open }], recent] = await Promise.all([
-      quotesWith(sql`q.status in ('DRAFT','SENT','CHANGES_REQUESTED')`, { limit: 1000 }),
-      quotesWith(sql`q.status in ('ACCEPTED','CONVERTED') and q.accepted_at >= ${yearStart}`, { limit: 1000 }),
-      sql`select coalesce(sum(i.quantity * i.unit_cost_cents), 0)::bigint as open from ops.purchase_order_items i join ops.purchase_orders p on p.id = i.po_id where p.status in ('DRAFT','ORDERED','PARTIAL')`,
-      quotesWith(sql`true`, { limit: 5 }),
-    ]);
-    avlData = {
-      pipelineCents: active.reduce((s, q) => s + effectiveTotals(q).totalCents, 0),
-      acceptedCents: accepted.reduce((s, q) => s + effectiveTotals(q).totalCents, 0),
-      profitCents: accepted.reduce((s, q) => s + liveTotals(q).grossProfitCents, 0),
-      openPurchasingCents: Number(open), recent: recent.map(quoteRow),
-    };
-  }
   let queue: OverviewData["queue"] = null;
   if (handles) {
     const base = workQueueWhere(u);
@@ -199,26 +204,26 @@ route("GET", "/overview", async ({ req }) => {
     requestRows(sql`r.requester_id = ${u.id} and r.status = any(${OPEN_STATUSES})`, sql`r.created_at desc`, 5),
     sql`select count(*)::int as n from ops.requests where requester_id = ${u.id} and status = 'COMPLETED' and completed_at >= ${new Date(Date.now() - 30 * 86_400_000)}`,
   ]);
-  const scope = seesAll ? sql`true` : sql`(a.actor_id = ${u.id}
-    ${isAvl ? sql`or a.area = 'AVL'` : sql``}
+  // Operations' activity only (AVL keeps its own).
+  const scope = seesAll ? sql`a.area <> 'AVL'` : sql`a.area <> 'AVL' and (a.actor_id = ${u.id}
     ${atLeast(u, "MANAGER") && u.campusId ? sql`or a.campus_id = ${u.campusId}` : sql``})`;
   const activity = await sql`select a.id, a.actor_label, a.action, a.detail, a.area, a.href, a.created_at, x.name as actor_name
     from ops.activity_log a left join ops.users x on x.id = a.actor_id where ${scope} order by a.created_at desc limit 8`;
   const [{ n: awaiting }] = await sql`select count(*)::int as n from ops.requests where requester_id = ${u.id} and status = 'PENDING_APPROVAL'`;
   return {
-    avl: avlData, queue, mine: { open: mineOpen, awaiting, completed30 }, activity, canViewActivity: canViewActivity(u),
+    queue, mine: { open: mineOpen, awaiting, completed30 }, activity, canViewActivity: canViewActivity(u),
   } satisfies Record<keyof OverviewData, unknown>;
 });
 
 /* ───────────── Requests ───────────── */
 
 route("GET", "/requests/mine", async ({ req }) => {
-  const u = await requireUser(req);
+  const u = await opsUser(req);
   return requestRows(sql`r.requester_id = ${u.id}`, sql`r.created_at desc`, 200);
 });
 
 route("GET", "/requests/new", async ({ req }) => {
-  const u = await requireUser(req);
+  const u = await opsUser(req);
   const [cats, items, campuses] = await Promise.all([
     sql`select id, name, kind, workflow, description, icon, requires_location, allow_line_items, approval_threshold_cents
         from ops.request_categories where active order by sort_order, name`,
@@ -232,7 +237,7 @@ route("GET", "/requests/new", async ({ req }) => {
 });
 
 route("POST", "/requests", async ({ req, body }) => {
-  const u = await requireUser(req);
+  const u = await opsUser(req);
   const input = z.object({
     categoryId: id, campusId: id, title: z.string().min(1).max(200), details: z.string().max(5000).default(""),
     location: z.string().max(200).nullish(), quantity: z.number().int().min(1).max(1000).default(1),
@@ -244,10 +249,10 @@ route("POST", "/requests", async ({ req, body }) => {
   return { id: r.id, number: r.number, status: r.status };
 });
 
-route("GET", "/requests/:id", async ({ req, params }) => requestDetail(await requireUser(req), params.id));
+route("GET", "/requests/:id", async ({ req, params }) => requestDetail(await opsUser(req), params.id));
 
 route("POST", "/requests/:id/actions", async ({ req, params, body }) => {
-  const u = await requireUser(req);
+  const u = await opsUser(req);
   const input = z.object({
     action: z.enum(["APPROVE", "DENY", "ASSIGN", "START", "HOLD", "ORDER", "COMPLETE", "CANCEL", "REOPEN"]),
     note: z.string().max(5000).optional(), assigneeId: z.string().optional(),
@@ -257,14 +262,14 @@ route("POST", "/requests/:id/actions", async ({ req, params, body }) => {
 });
 
 route("POST", "/requests/:id/comments", async ({ req, params, body }) => {
-  const u = await requireUser(req);
+  const u = await opsUser(req);
   const { body: text, internal } = z.object({ body: z.string().min(1).max(5000), internal: z.boolean().default(false) }).parse(await body());
   return addRequestComment(u, params.id, text, internal);
 });
 
 const WORK_TABS = ["open", "approval", "mine", "done"] as const;
 route("GET", "/work", async ({ req, url }) => {
-  const u = await requireUser(req);
+  const u = await opsUser(req);
   if (!(await handlesRequests(u))) throw new HttpError(403, "Nothing is routed to your teams.");
   const tab = WORK_TABS.find((t) => t === url.searchParams.get("tab")) ?? "open";
   const kind = (["TECHNOLOGY", "SUPPLY", "MAINTENANCE", "OTHER"] as RequestKind[]).find((k) => k === url.searchParams.get("kind"));
@@ -298,13 +303,14 @@ route("GET", "/quotes", async ({ req, url }) => {
   const u = await avl(req);
   const status = QUOTE_STATUSES.find((s) => s === url.searchParams.get("status")) as QuoteStatus | undefined;
   const campus = url.searchParams.get("campus") || null;
+  const client = url.searchParams.get("client") || null;
   const q = url.searchParams.get("q")?.trim();
   const like = q ? `%${q}%` : null;
   const [quotes, counts, customers, campuses] = await Promise.all([
-    quotesWith(sql`true ${status ? sql`and q.status = ${status}` : sql``} ${campus ? sql`and q.campus_id = ${campus}` : sql``}
+    quotesWith(sql`true ${status ? sql`and q.status = ${status}` : sql``} ${campus ? sql`and q.campus_id = ${campus}` : sql``} ${client ? sql`and q.customer_id = ${client}` : sql``}
       ${like ? sql`and (q.number ilike ${like} or q.title ilike ${like} or q.customer_id in (select id from ops.customers where name ilike ${like}))` : sql``}`),
     sql`select status, count(*)::int as n from ops.quotes group by status`,
-    sql`select id, name from ops.customers order by name`,
+    sql`select id, name from ops.customers where active order by name`,
     sql`select id, name from ops.campuses where active order by sort_order, name`,
   ]);
   return { quotes: quotes.map(quoteRow), counts: Object.fromEntries(counts.map((c) => [c.status, c.n])), customers, campuses, defaultCampusId: u.campusId };
@@ -314,7 +320,7 @@ route("POST", "/quotes", async ({ req, body }) => {
   const u = await avl(req);
   const input = z.object({ title: z.string().min(1).max(200), customerId: id, campusId: z.string().nullish() }).parse(await body());
   const q = await createQuote({ ...input, createdById: u.id });
-  await logActivity({ actorId: u.id, action: "Created quote", detail: `${q.number} · ${q.title}`, area: "AVL", entityType: "Quote", entityId: q.id, href: `/ops/quotes/view?id=${q.id}`, campusId: q.campusId });
+  await logActivity({ actorId: u.id, action: "Created quote", detail: `${q.number} · ${q.title}`, area: "AVL", entityType: "Quote", entityId: q.id, href: `/avl/quotes/view?id=${q.id}`, campusId: q.campusId });
   return { id: q.id, number: q.number };
 });
 
@@ -322,10 +328,10 @@ route("GET", "/quotes/:id", async ({ req, params }) => {
   const u = await avl(req);
   const [quote, customers, vendors, campuses, org] = await Promise.all([
     quoteDTO(params.id),
-    sql`select id, name, email, tax_exempt from ops.customers order by name`,
+    sql`select id, name, email, tax_exempt from ops.customers where active or id = (select customer_id from ops.quotes where id = ${params.id}) order by name`,
     sql`select id, name from ops.vendors where active order by name`,
     sql`select id, name from ops.campuses where active order by sort_order, name`,
-    getOrg(),
+    getAvl(),
   ]);
   return { quote, customers, vendors, campuses, defaultMarginBps: org.defaultMarginBps, laborRateCents: org.laborRateCents, canApprove: can(u, "QUOTE_APPROVE") };
 });
@@ -363,16 +369,17 @@ route("POST", "/quotes/:id/events", async ({ req, params, body }) => {
   const u = await avl(req, event === "CONVERT" || event === "MARK_ACCEPTED" ? "QUOTE_APPROVE" : undefined);
   const q = await applyEvent({ quoteId: params.id, event, actor: "staff", actorId: u.id, note: note ?? (event === "SEND" ? "Pricing locked for the customer" : null) });
   const verb = { SEND: "Sent quote", REVISE: "Revised quote", REOPEN: "Reopened quote", CONVERT: "Converted quote", MARK_ACCEPTED: "Recorded acceptance", MARK_CHANGES: "Recorded change request", MARK_DECLINED: "Recorded decline" }[event];
-  await logActivity({ actorId: u.id, action: verb, detail: q.number, area: "AVL", entityType: "Quote", entityId: q.id, href: `/ops/quotes/view?id=${q.id}`, campusId: q.campusId });
+  await logActivity({ actorId: u.id, action: verb, detail: q.number, area: "AVL", entityType: "Quote", entityId: q.id, href: `/avl/quotes/view?id=${q.id}`, campusId: q.campusId });
   return quoteDTO(params.id);
 });
 
 /** Print preview / PDF: exactly what the customer gets (no cost, margin or internal notes). */
 route("GET", "/quotes/:id/print", async ({ req, params }) => {
   await avl(req);
-  const [q, org, b] = await Promise.all([loadQuote(params.id), getOrg(), brand()]);
-  const { id: _i, updatedAt: _u, ...settings } = org;
-  return { quote: toPublicQuote(q), org: settings, logo: b.logo };
+  const [q, biz, org, logo] = await Promise.all([loadQuote(params.id), getAvl(), getOrg(), avlLogo()]);
+  const { id: _i, updatedAt: _u, ...settings } = biz;
+  // AVL's letterhead; until it has its own name, the church's.
+  return { quote: toPublicQuote(q), org: { ...settings, name: settings.name ?? org.name, taxExempt: false }, logo };
 });
 
 route("POST", "/customers", async ({ req, body }) => {
@@ -382,7 +389,205 @@ route("POST", "/customers", async ({ req, body }) => {
     phone: z.string().max(50).nullish(), taxExempt: z.boolean().default(false),
   }).parse(await body());
   const [c] = await sql`insert into ops.customers ${sql(defined(input))} returning id, name, email, tax_exempt`;
+  if (input.contactName) await sql`insert into ops.customer_contacts ${sql({ customerId: c.id, name: input.contactName, email: input.email, phone: input.phone ?? null, isPrimary: true })}`;
   return c;
+});
+
+/* ───────────── AVL: overview ───────────── */
+
+route("GET", "/avl/overview", async ({ req }) => {
+  await avl(req);
+  const yearStart = new Date(new Date().getFullYear(), 0, 1);
+  const [active, accepted, [{ open }], recent, [{ n: clients }], activity] = await Promise.all([
+    quotesWith(sql`q.status in ('DRAFT','SENT','CHANGES_REQUESTED')`, { limit: 1000 }),
+    quotesWith(sql`q.status in ('ACCEPTED','CONVERTED') and q.accepted_at >= ${yearStart}`, { limit: 1000 }),
+    sql`select coalesce(sum(i.quantity * i.unit_cost_cents), 0)::bigint as open from ops.purchase_order_items i join ops.purchase_orders p on p.id = i.po_id where p.status in ('DRAFT','ORDERED','PARTIAL')`,
+    quotesWith(sql`true`, { limit: 6 }),
+    sql`select count(*)::int as n from ops.customers where active`,
+    sql`select a.id, a.actor_label, a.action, a.detail, a.area, a.href, a.created_at, x.name as actor_name
+      from ops.activity_log a left join ops.users x on x.id = a.actor_id where a.area = 'AVL' order by a.created_at desc limit 8`,
+  ]);
+  return {
+    pipelineCents: active.reduce((s, q) => s + effectiveTotals(q).totalCents, 0),
+    acceptedCents: accepted.reduce((s, q) => s + effectiveTotals(q).totalCents, 0),
+    profitCents: accepted.reduce((s, q) => s + liveTotals(q).grossProfitCents, 0),
+    openPurchasingCents: Number(open), clients, recent: recent.map(quoteRow), activity,
+  } satisfies Record<keyof AvlOverview, unknown>;
+});
+
+/* ───────────── AVL: clients (the churches AVL works for) ───────────── */
+
+const ClientSchema = z.object({
+  name: z.string().min(1).max(200), website: optStr(300), phone: optStr(50),
+  email: z.string().email().nullish().or(z.literal("")).transform((v) => v || null),
+  addressLine1: optStr(), addressLine2: optStr(), city: optStr(100), state: optStr(50), postalCode: optStr(20),
+  taxExempt: z.boolean().default(false), notes: optStr(10_000), active: z.boolean().default(true),
+});
+const ContactSchema = z.object({
+  name: z.string().min(1).max(200), title: optStr(), email: z.string().email().nullish().or(z.literal("")).transform((v) => v || null),
+  phone: optStr(50), isPrimary: z.boolean().default(false),
+});
+
+/** Keep customers.contact_name / email (used on proposals) in step with the primary contact. */
+async function syncPrimary(customerId: string) {
+  const [p] = await sql`select name, email, phone from ops.customer_contacts where customer_id = ${customerId} order by is_primary desc, created_at limit 1`;
+  await sql`update ops.customers set contact_name = ${p?.name ?? null}, email = coalesce(${p?.email ?? null}, email), updated_at = now() where id = ${customerId}`;
+}
+
+route("GET", "/clients", async ({ req, url }) => {
+  await avl(req);
+  const q = url.searchParams.get("q")?.trim();
+  const show = url.searchParams.get("show") ?? "active";
+  const like = q ? `%${q}%` : null;
+  const [rows, quotes] = await Promise.all([
+    sql`select c.id, c.name, c.contact_name, c.email, c.phone, c.city, c.state, c.active, c.tax_exempt from ops.customers c
+      where ${show === "all" ? sql`true` : show === "inactive" ? sql`not c.active` : sql`c.active`}
+      ${like ? sql`and (c.name ilike ${like} or c.contact_name ilike ${like} or c.email ilike ${like} or c.city ilike ${like}
+        or c.id in (select customer_id from ops.customer_contacts where name ilike ${like} or email ilike ${like}))` : sql``}
+      order by c.name limit 500`,
+    quotesWith(sql`true`, { limit: 5000 }),
+  ]);
+  return rows.map((c) => {
+    const mine = quotes.filter((q) => q.customerId === c.id);
+    const open = mine.filter((q) => ["DRAFT", "SENT", "CHANGES_REQUESTED"].includes(q.status));
+    const won = mine.filter((q) => ["ACCEPTED", "CONVERTED"].includes(q.status));
+    return {
+      ...c, quotes: mine.length, openCents: open.reduce((s, q) => s + effectiveTotals(q).totalCents, 0),
+      wonCents: won.reduce((s, q) => s + effectiveTotals(q).totalCents, 0),
+      lastQuoteAt: mine.length ? new Date(Math.max(...mine.map((q) => new Date(q.updatedAt).getTime()))).toISOString() : null,
+    };
+  });
+});
+
+route("GET", "/clients/:id", async ({ req, params }) => {
+  await avl(req);
+  const [c] = await sql`select * from ops.customers where id = ${params.id}`;
+  if (!c) throw new HttpError(404, "Client not found");
+  const [contacts, quotes] = await Promise.all([
+    sql`select id, name, title, email, phone, is_primary from ops.customer_contacts where customer_id = ${c.id} order by is_primary desc, name`,
+    quotesWith(sql`q.customer_id = ${c.id}`, { limit: 500 }),
+  ]);
+  const { updatedAt: _u, ...client } = c;
+  return {
+    client, contacts, quotes: quotes.map(quoteRow),
+    totals: {
+      openCents: quotes.filter((q) => ["DRAFT", "SENT", "CHANGES_REQUESTED"].includes(q.status)).reduce((s, q) => s + effectiveTotals(q).totalCents, 0),
+      wonCents: quotes.filter((q) => ["ACCEPTED", "CONVERTED"].includes(q.status)).reduce((s, q) => s + effectiveTotals(q).totalCents, 0),
+    },
+  };
+});
+
+route("POST", "/clients", async ({ req, body }) => {
+  const u = await avl(req);
+  const raw = await body();
+  const data = ClientSchema.parse(raw);
+  const contact = raw?.contact ? ContactSchema.parse({ ...raw.contact, isPrimary: true }) : null;
+  const c = await sql.begin(async (tx) => {
+    const [row] = await tx`insert into ops.customers ${tx({ ...data, contactName: contact?.name ?? null, email: contact?.email ?? data.email })} returning *`;
+    if (contact) await tx`insert into ops.customer_contacts ${tx({ ...contact, customerId: row.id })}`;
+    return row;
+  });
+  await logActivity({ actorId: u.id, action: "Added client", detail: c.name, area: "AVL", entityType: "Customer", entityId: c.id, href: `/avl/clients/view?id=${c.id}` });
+  return { id: c.id, name: c.name, email: c.email, taxExempt: c.taxExempt };
+});
+
+route("PUT", "/clients/:id", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const data = ClientSchema.parse(await body());
+  const [c] = await sql`update ops.customers set ${sql({ ...data, updatedAt: new Date() })} where id = ${params.id} returning *`;
+  if (!c) throw new HttpError(404, "Client not found");
+  await logActivity({ actorId: u.id, action: "Updated client", detail: c.name, area: "AVL", entityType: "Customer", entityId: c.id, href: `/avl/clients/view?id=${c.id}` });
+});
+
+route("POST", "/clients/:id/contacts", async ({ req, params, body }) => {
+  await avl(req);
+  const data = ContactSchema.parse(await body());
+  const [{ n }] = await sql`select count(*)::int as n from ops.customer_contacts where customer_id = ${params.id}`;
+  if (data.isPrimary || n === 0) { data.isPrimary = true; await sql`update ops.customer_contacts set is_primary = false where customer_id = ${params.id}`; }
+  const [ct] = await sql`insert into ops.customer_contacts ${sql({ ...data, customerId: params.id })} returning id`;
+  await syncPrimary(params.id);
+  return ct;
+});
+route("PUT", "/contacts/:id", async ({ req, params, body }) => {
+  await avl(req);
+  const data = ContactSchema.parse(await body());
+  const [cur] = await sql`select customer_id from ops.customer_contacts where id = ${params.id}`;
+  if (!cur) throw new HttpError(404, "Contact not found");
+  if (data.isPrimary) await sql`update ops.customer_contacts set is_primary = false where customer_id = ${cur.customerId}`;
+  await sql`update ops.customer_contacts set ${sql(data)} where id = ${params.id}`;
+  await syncPrimary(cur.customerId);
+});
+route("DELETE", "/contacts/:id", async ({ req, params }) => {
+  await avl(req);
+  const [cur] = await sql`delete from ops.customer_contacts where id = ${params.id} returning customer_id`;
+  if (cur) await syncPrimary(cur.customerId);
+});
+
+/* ───────────── AVL: people & business settings ───────────── */
+
+route("GET", "/avl/people", async ({ req }) => {
+  const me = await avlManager(req);
+  const rows = await sql`select id, name, email, avl_level, synced_avl_level, ops_access, role, pending, active, last_login_at from ops.users
+    where pending or avl_level <> 'NONE' or synced_avl_level in ('TECH','MANAGER') or role = 'ADMIN' order by pending desc, name`;
+  const others = await sql`select id, name, email from ops.users where active and not pending and avl_level = 'NONE' and role <> 'ADMIN' order by name`;
+  return {
+    people: rows.map((r) => ({ id: r.id, name: r.name, email: r.email, avlLevel: effectiveAccess(r as never).avlLevel, opsAccess: r.opsAccess, role: r.role, pending: r.pending, active: r.active, lastLoginAt: r.lastLoginAt })),
+    others, me: me.id,
+  };
+});
+
+/** Give someone AVL access (or take it away). Approving a sign-up here makes them AVL-only. */
+route("PUT", "/avl/people/:id", async ({ req, params, body }) => {
+  const me = await avlManager(req);
+  const { avlLevel, active } = z.object({ avlLevel: z.enum(["NONE", "TECH", "MANAGER"]), active: z.boolean().optional() }).parse(await body());
+  const [u] = await sql`select * from ops.users where id = ${params.id}`;
+  if (!u) throw new HttpError(404, "Person not found");
+  if (u.id === me.id) throw new HttpError(403, "Someone else has to change your own access.");
+  if (u.role === "ADMIN" && !isAdmin(me)) throw new HttpError(403, "Only a system admin can change another admin.");
+  const patch: Record<string, unknown> = { avlLevel, updatedAt: new Date() };
+  if (u.pending) {
+    if (active === false) Object.assign(patch, { pending: false, active: false, deactivatedBy: "ADMIN" });
+    else Object.assign(patch, { pending: false, active: true, opsAccess: false, approvedBy: me.id, approvedAt: new Date() });
+  }
+  await sql`update ops.users set ${sql(patch)} where id = ${u.id}`;
+  await logActivity({
+    actorId: me.id, area: "AVL", entityType: "User", entityId: u.id, href: "/avl/people",
+    action: u.pending ? (active === false ? "Declined sign-up" : "Approved AVL sign-up") : "Changed AVL access",
+    detail: `${u.name} · ${avlLevel === "NONE" ? "no AVL access" : `AVL ${avlLevel.toLowerCase()}`}`,
+  });
+});
+
+const BusinessSchema = z.object({
+  name: optStr(), legalName: optStr(), addressLine1: optStr(), addressLine2: optStr(), city: optStr(), state: optStr(), postalCode: optStr(),
+  phone: optStr(), email: optStr(), website: optStr(), ein: optStr(), salesTaxId: optStr(),
+  quotePrefix: z.string().max(10).nullish().transform((v) => v?.toUpperCase().replace(/[^A-Z0-9]/g, "") || "AV"),
+  defaultTaxBps: z.number().int().min(0).max(5000), defaultDepositBps: z.number().int().min(0).max(10_000),
+  defaultMarginBps: z.number().int().min(0).max(9900), laborRateCents: z.number().int().min(0).max(1_000_000_000),
+  quoteValidDays: z.number().int().min(1).max(365), quoteTerms: optStr(20_000),
+});
+route("GET", "/avl/business", async ({ req }) => {
+  const me = await avl(req);
+  const { id: _i, updatedAt: _u, ...business } = await getAvl();
+  const [logo] = await sql`select mime, data_b64 from ops.org_assets where key = 'avl-logo'`;
+  return { business, logo: dataUrl(logo), canEdit: isAvlManager(me) };
+});
+route("PUT", "/avl/business", async ({ req, body }) => {
+  const me = await avlManager(req);
+  const input = BusinessSchema.parse(await body());
+  await getAvl();
+  await sql`update ops.avl_business set ${sql({ ...input, updatedAt: new Date() })} where id = 'avl'`;
+  await logActivity({ actorId: me.id, action: "Updated AVL business settings", area: "AVL", href: "/avl/settings" });
+});
+route("POST", "/avl/business/logo", async ({ req, body }) => {
+  const me = await avlManager(req);
+  const { mime, dataB64 } = z.object({ mime: z.enum(["image/png", "image/jpeg", "image/svg+xml", "image/webp"]), dataB64: z.string().min(1).max(1_400_000) }).parse(await body());
+  await sql`insert into ops.org_assets ${sql({ key: "avl-logo", mime, dataB64, updatedAt: new Date() })}
+    on conflict (key) do update set mime = excluded.mime, data_b64 = excluded.data_b64, updated_at = now()`;
+  await logActivity({ actorId: me.id, action: "Updated AVL logo", area: "AVL", href: "/avl/settings" });
+});
+route("DELETE", "/avl/business/logo", async ({ req }) => {
+  await avlManager(req);
+  await sql`delete from ops.org_assets where key = 'avl-logo'`;
 });
 
 /* ───────────── Catalog & vendors ───────────── */
@@ -425,7 +630,7 @@ route("POST", "/vendors", async ({ req, body }) => {
   const u = await avl(req);
   const data = VendorSchema.parse(await body());
   const [v] = await sql`insert into ops.vendors ${sql(defined(data))} returning *`;
-  await logActivity({ actorId: u.id, action: "Created vendor", detail: v.name, area: "AVL", entityType: "Vendor", entityId: v.id, href: `/ops/vendors/view?id=${v.id}` });
+  await logActivity({ actorId: u.id, action: "Created vendor", detail: v.name, area: "AVL", entityType: "Vendor", entityId: v.id, href: `/avl/vendors/view?id=${v.id}` });
   return v;
 });
 route("PUT", "/vendors/:id", async ({ req, params, body }) => {
@@ -434,6 +639,43 @@ route("PUT", "/vendors/:id", async ({ req, params, body }) => {
   const [v] = await sql`update ops.vendors set ${sql({ ...defined(data), updatedAt: new Date() })} where id = ${params.id} returning *`;
   if (!v) throw new HttpError(404, "Vendor not found");
   return v;
+});
+
+/** One product by hand (no spreadsheet). Same SKU at the same vendor = that product. */
+const ProductSchema = z.object({
+  sku: z.string().trim().min(1).max(120), name: z.string().trim().min(1).max(300), model: optStr(120), manufacturer: optStr(120), category: optStr(120),
+  description: optStr(5000), costCents: cents, msrpCents: cents.nullish().transform((v) => v ?? null), mapCents: cents.nullish().transform((v) => v ?? null),
+});
+route("POST", "/vendors/:id/products", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const data = ProductSchema.parse(await body());
+  const [vendor] = await sql`select id, name from ops.vendors where id = ${params.id}`;
+  if (!vendor) throw new HttpError(404, "Vendor not found");
+  const [dupe] = await sql`select active from ops.products where vendor_id = ${vendor.id} and sku = ${data.sku}`;
+  if (dupe?.active) throw new HttpError(409, `${vendor.name} already has a product with SKU ${data.sku}.`);
+  const [p] = await sql`insert into ops.products ${sql({ ...data, vendorId: vendor.id, active: true, updatedAt: new Date() })}
+    on conflict (vendor_id, sku) do update set name = excluded.name, model = excluded.model, manufacturer = excluded.manufacturer, category = excluded.category,
+      description = excluded.description, cost_cents = excluded.cost_cents, msrp_cents = excluded.msrp_cents, map_cents = excluded.map_cents, active = true, updated_at = now()
+    returning id`;
+  await logActivity({ actorId: u.id, action: "Added product", detail: `${vendor.name} · ${data.sku} · ${data.name}`, area: "AVL", entityType: "Product", entityId: p.id, href: `/avl/catalog?vendorId=${vendor.id}&q=${encodeURIComponent(data.sku)}` });
+  return { id: p.id };
+});
+route("PUT", "/products/:id", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const data = ProductSchema.parse(await body());
+  const [cur] = await sql`select vendor_id, sku from ops.products where id = ${params.id}`;
+  if (!cur) throw new HttpError(404, "Product not found");
+  if (data.sku !== cur.sku && (await sql`select 1 from ops.products where vendor_id = ${cur.vendorId} and sku = ${data.sku} and id <> ${params.id}`).length) {
+    throw new HttpError(409, `This vendor already has a product with SKU ${data.sku}.`);
+  }
+  await sql`update ops.products set ${sql({ ...data, updatedAt: new Date() })} where id = ${params.id}`;
+  await logActivity({ actorId: u.id, action: "Updated product", detail: `${data.sku} · ${data.name}`, area: "AVL", entityType: "Product", entityId: params.id });
+});
+/** Removed from pricing (quotes that used it keep their own copy of the line). */
+route("DELETE", "/products/:id", async ({ req, params }) => {
+  const u = await avl(req);
+  const [p] = await sql`update ops.products set active = false, updated_at = now() where id = ${params.id} returning sku, name`;
+  if (p) await logActivity({ actorId: u.id, action: "Removed product", detail: `${p.sku} · ${p.name}`, area: "AVL", entityType: "Product", entityId: params.id });
 });
 
 /**
@@ -470,7 +712,7 @@ route("POST", "/vendors/:id/import", async ({ req, params, body }) => {
     const [done] = await tx`update ops.import_batches set ${tx({ status: "COMMITTED", created: toCreate, updated: toUpdate, skipped: input.errors.length, errors: input.errors.slice(0, 500) })} where id = ${b.id} returning *`;
     return done;
   });
-  await logActivity({ actorId: u.id, action: "Imported price list", detail: `${vendor.name} · ${input.fileName} · +${toCreate} / ~${toUpdate}`, area: "AVL", entityType: "Vendor", entityId: vendor.id, href: `/ops/vendors/view?id=${vendor.id}` });
+  await logActivity({ actorId: u.id, action: "Imported price list", detail: `${vendor.name} · ${input.fileName} · +${toCreate} / ~${toUpdate}`, area: "AVL", entityType: "Vendor", entityId: vendor.id, href: `/avl/vendors/view?id=${vendor.id}` });
   return { committed: true, batch };
 });
 
@@ -480,8 +722,13 @@ const UserSchema = z.object({
   name: z.string().min(1).max(200), email: z.string().email().transform((e) => e.toLowerCase()),
   title: optStr(), department: optStr(), phone: optStr(50), campusId: id.nullish().transform((v) => v ?? null),
   allCampuses: z.boolean().default(false), role: z.enum(["STAFF", "MANAGER", "EXECUTIVE", "ADMIN"]).default("STAFF"),
-  avlLevel: z.enum(["NONE", "TECH", "MANAGER"]).default("NONE"), teamIds: z.array(id).default([]), active: z.boolean().default(true),
+  avlLevel: z.enum(["NONE", "TECH", "MANAGER"]).default("NONE"), opsAccess: z.boolean().default(true),
+  teamIds: z.array(id).default([]), active: z.boolean().default(true),
 });
+/** Only AVL Managers and admins hand out AVL access; everyone else keeps what's there. */
+const keepAvl = (actor: U, data: { avlLevel: "NONE" | "TECH" | "MANAGER" }, existing: "NONE" | "TECH" | "MANAGER") => {
+  if (!isAvlManager(actor)) data.avlLevel = existing;
+};
 
 async function assertTeamsInScope(actor: U, teamIds: string[]) {
   if (!teamIds.length || seesAllCampuses(actor)) return;
@@ -499,7 +746,7 @@ async function userRows(me: U, where: unknown): Promise<UserRow[]> {
     const a = effectiveAccess(u as never);
     return {
       id: u.id, email: u.email, name: u.name, title: u.title, department: u.department, phone: u.phone, active: u.active, pending: u.pending,
-      registered: u.registered, campusId: u.campusId, campusName: u.campusName, allCampuses: u.allCampuses, role: u.role, avlLevel: u.avlLevel,
+      registered: u.registered, campusId: u.campusId, campusName: u.campusName, allCampuses: u.allCampuses, role: u.role, avlLevel: u.avlLevel, opsAccess: u.opsAccess,
       effectiveRole: a.role, effectiveAvl: a.avlLevel, global: a.global, source: u.source, teams: u.teams, lastLoginAt: u.lastLoginAt, createdAt: u.createdAt,
       // A pending sign-up at no campus can be approved by any manager (they choose the campus).
       editable: canEditUser(me, { id: u.id, role: a.role, allCampuses: u.allCampuses, campusId: u.campusId }) || (u.pending && !u.campusId && atLeast(me, "MANAGER")),
@@ -520,7 +767,8 @@ route("GET", "/settings/users", async ({ req, url }) => {
     ${global ? (campus ? (campus === "ALL" ? sql`and u.all_campuses` : sql`and u.campus_id = ${campus}`) : sql``)
       : sql`and (u.campus_id = ${me.campusId ?? "__none__"} ${status === "pending" ? sql`or u.campus_id is null` : sql``})`}
     ${role ? sql`and (u.role = ${role} or u.synced_role = ${role})` : sql``}
-    ${status === "pending" ? sql`and u.pending` : status === "inactive" ? sql`and not u.active and not u.pending` : sql`and u.active`}`;
+    ${status === "pending" ? sql`and u.pending` : status === "inactive" ? sql`and not u.active and not u.pending` : sql`and u.active`}
+    ${status === "pending" ? sql`` : status === "avl" ? sql`and not u.ops_access` : sql`and u.ops_access`}`;
   const [users, campuses, teams, [{ n: pending }]] = await Promise.all([
     userRows(me, where),
     sql`select id, name from ops.campuses where active order by sort_order, name`,
@@ -528,7 +776,7 @@ route("GET", "/settings/users", async ({ req, url }) => {
     sql`select count(*)::int as n from ops.users u where u.pending ${global ? sql`` : sql`and (u.campus_id = ${me.campusId ?? "__none__"} or u.campus_id is null)`}`,
   ]);
   return {
-    users, campuses, pending, global, grantableRoles: grantableRoles(me), myCampusId: me.campusId,
+    users, campuses, pending, global, grantableRoles: grantableRoles(me), myCampusId: me.campusId, grantsAvl: isAvlManager(me),
     teams: teams.filter((t) => canManageCampus(me, t.campusId)).map((t) => ({ id: t.id, name: t.name })),
   };
 });
@@ -542,7 +790,7 @@ route("GET", "/settings/users/:id", async ({ req, params }) => {
     sql`select t.id, t.name, t.campus_id, c.name as campus_name from ops.teams t left join ops.campuses c on c.id = t.campus_id where t.active order by t.name`,
   ]);
   return {
-    user: u, campuses, self: me.id === u.id, global: seesAllCampuses(me), grantableRoles: me.id === u.id ? [] : grantableRoles(me),
+    user: u, campuses, self: me.id === u.id, global: seesAllCampuses(me), grantableRoles: me.id === u.id ? [] : grantableRoles(me), grantsAvl: isAvlManager(me),
     teams: teams.map((t) => ({ id: t.id, name: t.name, campusName: t.campusName, manageable: canManageCampus(me, t.campusId) })),
   };
 });
@@ -551,6 +799,7 @@ route("POST", "/settings/users", async ({ req, body }) => {
   const actor = await manager(req);
   const { teamIds, ...data } = UserSchema.parse(await body());
   if (!seesAllCampuses(actor)) data.campusId = actor.campusId;
+  keepAvl(actor, data, "NONE");
   const err = checkUserGrant(actor, data);
   if (err) throw new HttpError(403, err);
   await assertTeamsInScope(actor, teamIds);
@@ -576,9 +825,10 @@ route("PUT", "/settings/users/:id", async ({ req, params, body }) => {
       && !(approving && !existing.campusId)) throw new HttpError(403, "You can't edit this user.");
   const { teamIds, ...data } = UserSchema.parse(await body());
   if (!seesAllCampuses(actor)) { data.campusId = actor.campusId; data.allCampuses = false; }
+  keepAvl(actor, data, existing.avlLevel);
   if (existing.id === actor.id) {
     // Your own role, scope and status are changed by someone else.
-    data.role = existing.role; data.allCampuses = existing.allCampuses; data.active = true;
+    data.role = existing.role; data.allCampuses = existing.allCampuses; data.active = true; data.opsAccess = existing.opsAccess; data.avlLevel = existing.avlLevel;
   } else {
     const err = checkUserGrant(actor, data);
     if (err) throw new HttpError(403, err);
@@ -640,7 +890,7 @@ route("GET", "/settings/teams/:id", async ({ req, params }) => {
       from ops.category_routings r join ops.request_categories c on c.id = r.category_id left join ops.campuses ca on ca.id = r.campus_id
       where r.handler_team_id = ${team.id} or r.approver_team_id = ${team.id} order by c.name`,
     sql`select id, name from ops.campuses where active order by sort_order, name`,
-    sql`select id, name from ops.users where active and id not in (select user_id from ops.team_members where team_id = ${team.id})
+    sql`select id, name from ops.users where active and ops_access and id not in (select user_id from ops.team_members where team_id = ${team.id})
       ${global ? sql`` : sql`and campus_id = ${me.campusId ?? "__none__"} and not all_campuses`} order by name`,
   ]);
   return { team, members, routing, campuses, users, global };
@@ -854,11 +1104,10 @@ route("PUT", "/settings/organization", async ({ req, body }) => {
     name: optStr(), legalName: optStr(), addressLine1: optStr(), addressLine2: optStr(), city: optStr(), state: optStr(), postalCode: optStr(),
     phone: optStr(), email: optStr(), website: optStr(), ein: optStr(), salesTaxId: optStr(),
     quotePrefix: z.string().max(10).nullish().transform((v) => v?.toUpperCase().replace(/[^A-Z0-9]/g, "") || "CC"),
-    taxExempt: z.boolean(), defaultTaxBps: z.number().int().min(0).max(5000), defaultDepositBps: z.number().int().min(0).max(10_000),
-    defaultMarginBps: z.number().int().min(0).max(9900), laborRateCents: cents, quoteValidDays: z.number().int().min(1).max(365), quoteTerms: optStr(20_000),
+    taxExempt: z.boolean().optional(),
   }).parse(await body());
   await getOrg();
-  await sql`update ops.organization set ${sql({ ...input, updatedAt: new Date() })} where id = 'org'`;
+  await sql`update ops.organization set ${sql({ ...defined(input), updatedAt: new Date() })} where id = 'org'`;
   await logActivity({ actorId: me.id, action: "Updated organization settings", area: "ADMIN", href: "/ops/settings/organization" });
 });
 route("POST", "/settings/organization/logo", async ({ req, body }) => {

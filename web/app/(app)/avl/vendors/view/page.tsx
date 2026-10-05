@@ -1,6 +1,6 @@
 "use client";
 /** A vendor: details, price-list import (CSV / Excel, read on this Mac) and import history. */
-import { FileSpreadsheet } from "lucide-react";
+import { FileSpreadsheet, Plus } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -10,6 +10,7 @@ import type { ImportBatchRow, VendorRow } from "@shared/ops/types";
 import { fmtMoney, ops, useOps, useOpsRefresh } from "@/lib/ops";
 import { Card, ErrorBox, Loading, PageHeader } from "@/components/ops/OpsUi";
 import { VendorForm } from "@/components/ops/VendorForm";
+import { ProductDialog } from "@/components/ops/ProductForm";
 import { Spinner } from "@/components/ui";
 
 export default function Page() { return <Suspense><Vendor /></Suspense>; }
@@ -18,10 +19,18 @@ function Vendor() {
   const id = useSearchParams().get("id") ?? "";
   const d = useOps<{ vendor: VendorRow; imports: ImportBatchRow[] }>(id ? `/vendors/${id}` : null);
   if (!d.data) return <><ErrorBox error={d.error} />{!d.error && <Loading />}</>;
-  const { vendor: v, imports } = d.data;
+  return <VendorBody vendor={d.data.vendor} imports={d.data.imports} />;
+}
+
+function VendorBody({ vendor: v, imports }: { vendor: VendorRow; imports: ImportBatchRow[] }) {
+  const [adding, setAdding] = useState(false);
   return (
     <>
-      <PageHeader crumb="AVL / Vendors" title={v.name} actions={<Link className="btn-outline" href={`/ops/catalog?vendorId=${v.id}`}>View {v.productCount} products →</Link>} />
+      <PageHeader crumb="AVL / Vendors" title={v.name} actions={<>
+        <Link className="btn-outline" href={`/avl/catalog?vendorId=${v.id}`}>View {v.productCount} products →</Link>
+        <button className="btn-primary" onClick={() => setAdding(true)}><Plus size={15} /> Add product</button>
+      </>} />
+      <ProductDialog open={adding} onClose={() => setAdding(false)} vendors={[{ id: v.id, name: v.name }]} vendorId={v.id} />
       <div className="space-y-5">
         <Card title="Details"><VendorForm key={v.id} vendor={v} /></Card>
         <ImportWizard vendorId={v.id} />
@@ -97,7 +106,7 @@ function ImportWizard({ vendorId }: { vendorId: string }) {
   }
 
   return (
-    <Card title="Import a price list" action={busy ? <Spinner /> : undefined}>
+    <Card title="Import a price list" eyebrow="Or many at once" action={busy ? <Spinner /> : undefined}>
       <div className="space-y-4 p-4">
         <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-line-strong px-4 py-5 text-sm text-ink-muted transition hover:border-accent/60 hover:bg-hover/40">
           <FileSpreadsheet size={22} className="text-accent" />

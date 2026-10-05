@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { ActivityRow } from "@shared/ops/types";
 import { fmtDateTime, useOps } from "@/lib/ops";
-import { Card, Empty, ErrorBox, Loading, PageHeader, Pill, Tabs } from "@/components/ops/OpsUi";
+import { activityHref, Card, Empty, ErrorBox, Loading, PageHeader, Pill, Tabs } from "@/components/ops/OpsUi";
 
 const LABEL = { "": "All", AUTH: "Sign-ins", REQUESTS: "Requests", AVL: "AVL", ADMIN: "Admin" } as const;
 type A = keyof typeof LABEL;
@@ -26,7 +26,7 @@ export default function Activity() {
                 <li key={a.id} className="grid gap-1 px-4 py-2.5 text-[13px] lg:grid-cols-[170px_90px_240px_1fr] lg:gap-4">
                   <span className="text-ink-muted">{a.actorName ?? a.actorLabel ?? "System"}</span>
                   <span><Pill tone="muted">{LABEL[a.area as A] ?? a.area}</Pill></span>
-                  <span className="font-medium">{a.href ? <Link href={a.href} className="hover:text-accent">{a.action}</Link> : a.action}</span>
+                  <span className="font-medium">{a.href ? <Link href={activityHref(a.href)!} className="hover:text-accent">{a.action}</Link> : a.action}</span>
                   <span className="text-ink-faint">{fmtDateTime(a.createdAt)}{a.detail && ` · ${a.detail}`}</span>
                 </li>
               ))}

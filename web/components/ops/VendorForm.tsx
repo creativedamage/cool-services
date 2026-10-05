@@ -24,7 +24,7 @@ export function VendorForm({ vendor, onDone }: { vendor?: VendorRow; onDone?: ()
         const res = await ops<{ id: string }>(vendor ? `/vendors/${vendor.id}` : "/vendors", { method: vendor ? "PUT" : "POST", json: v });
         toast.success(vendor ? "Vendor saved" : "Vendor added");
         await refresh();
-        if (!vendor) router.push(`/ops/vendors/view?id=${res.id}`);
+        if (!vendor) router.push(`/avl/vendors/view?id=${res.id}`);
         onDone?.();
       } catch (err) { toast.error((err as Error).message); } finally { setBusy(false); }
     }}>

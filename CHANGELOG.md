@@ -4,6 +4,28 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.26.0
+Sundays | AVL is its own app with a client list, Sundays | Operations and AVL are on the web for your team, and request types get icons.
+- **Sundays | AVL** is now separate from Operations, with its own sidebar and teal look. Operations is
+  just the church's business (requests, work queue, teams, campuses, request types). AVL is where you
+  handle the other churches you work with.
+- **Clients** in AVL: each church you quote for, with its address, notes, tax-exempt status, contacts
+  (one marked as the main contact) and every quote it has had. Quotes are filtered by client instead
+  of campus.
+- **Separate access, one sign-in.** Each person has Operations access and an AVL level, set
+  separately. AVL Managers approve AVL sign-ups and give access under AVL → People, and only AVL
+  Managers and admins hand out AVL access. Executives no longer see AVL automatically.
+- **AVL → Business**: AVL's own name, address, logo, quote prefix and quoting defaults for proposals.
+  It starts from the church's details, so nothing changes until you edit it.
+- **Add products by hand.** On a vendor or in Product pricing, add a single product (SKU, name, cost,
+  MSRP, MAP and more) without a spreadsheet. Click any product to change or remove it.
+- **New request types** have an icon picker (or any emoji), a title and a line of subtext, with a live
+  preview of the tile staff will see. Managers can also add a type straight from New request.
+- **On the web**: a website version of Operations and AVL (in `ops-web`, ready for Vercel), so your team
+  can use it from any browser or phone without installing Sundays. Same accounts and data as the
+  Mac app; each person sees only the apps they have access to.
+- The Mac app's switcher now has three tabs (Sundays, Operations, AVL) and reopens the one you used last.
+
 ## 1.25.2
 Church Ops is now **Sundays | Operations**, and Smaart SPL readings come through.
 - Church Ops is renamed **Sundays | Operations** everywhere: the switcher (Sundays / Operations), the

@@ -1,4 +1,5 @@
 "use client";
+import { TypeIcon } from "@/components/ops/TypeIcon";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
@@ -46,7 +47,7 @@ function TeamView() {
           <Card eyebrow="Routing" title="Request types">
             {routing.length ? (
               <ul className="divide-y divide-line text-sm">
-                {routing.map((r) => <li key={r.id + r.handles} className="px-4 py-2.5">{r.handles ? "Handles" : "Approves"} <b>{r.icon} {r.category}</b> <span className="text-ink-muted">· {r.campus ?? "all other campuses"}</span></li>)}
+                {routing.map((r) => <li key={r.id + r.handles} className="px-4 py-2.5">{r.handles ? "Handles" : "Approves"} <b className="inline-flex items-center gap-1.5"><TypeIcon plain icon={r.icon} size={13} />{r.category}</b> <span className="text-ink-muted">· {r.campus ?? "all other campuses"}</span></li>)}
               </ul>
             ) : <Empty>Not routed to any request type yet.</Empty>}
           </Card>

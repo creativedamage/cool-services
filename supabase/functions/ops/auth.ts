@@ -33,9 +33,9 @@ export interface Caller { auth: { id: string; email: string; name: string | null
 /** The signed-in person (registered or not yet approved). */
 export async function caller(req: Request): Promise<Caller> {
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!token) throw new HttpError(401, "Sign in to Church Ops.");
+  if (!token) throw new HttpError(401, "Sign in to Sundays.");
   const a = await authUser(token);
-  if (!a) throw new HttpError(401, "Your Church Ops sign-in has expired. Sign in again.");
+  if (!a) throw new HttpError(401, "Your Sundays sign-in has expired. Sign in again.");
   let [row] = await sql`select * from ops.users where id = ${a.id}`;
   if (!row) {
     // Registered before the trigger existed, or the trigger missed: same rules as the trigger.
@@ -57,7 +57,7 @@ export async function sessionUser(row: Record<string, any>): Promise<OpsSessionU
   const access = effectiveAccess({ role: row.role, avlLevel: row.avlLevel, syncedRole: row.syncedRole, syncedAvlLevel: row.syncedAvlLevel, allCampuses: row.allCampuses });
   return {
     id: row.id, email: row.email, name: row.name,
-    role: access.role, avlLevel: access.avlLevel, permissions: capabilities(access.role, access.avlLevel),
+    role: access.role, avlLevel: access.avlLevel, permissions: capabilities(access.role, access.avlLevel), opsAccess: row.opsAccess !== false,
     campusId: row.campusId, allCampuses: access.global, teamIds: teams.map((t) => t.teamId as string),
   };
 }

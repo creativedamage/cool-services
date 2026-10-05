@@ -12,7 +12,7 @@ import { fmtDate, ops, useOps, useOpsRefresh } from "@/lib/ops";
 import { AvlSelect, Card, Check, Empty, ErrorBox, Field, Loading, PageHeader, Pill, RolePicker, Table, Tabs } from "@/components/ops/OpsUi";
 import { Spinner } from "@/components/ui";
 
-type Data = { users: UserRow[]; campuses: Ref[]; teams: Ref[]; pending: number; global: boolean; grantableRoles: Role[]; myCampusId: string | null };
+type Data = { users: UserRow[]; campuses: Ref[]; teams: Ref[]; pending: number; global: boolean; grantableRoles: Role[]; myCampusId: string | null; grantsAvl: boolean };
 export default function Page() { return <Suspense><Users /></Suspense>; }
 
 function Users() {
@@ -33,6 +33,7 @@ function Users() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Tabs value={status} onChange={(s) => router.replace(`/ops/settings/users?status=${s}`)} items={[
           { key: "pending", label: "Waiting for approval", count: d.data?.pending ?? null }, { key: "active", label: "Active" }, { key: "inactive", label: "Inactive" },
+          ...(d.data?.global ? [{ key: "avl", label: "AVL only" }] : []),
         ]} />
         <form className="ml-auto flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); router.replace(`/ops/settings/users?${new URLSearchParams({ status, ...(q ? { q } : {}) })}`); }}>
           <input className="input w-60" placeholder="Search name, email, department…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -63,7 +64,7 @@ function Users() {
                 </tr>
               ))}
             </Table>
-          ) : <Empty>{status === "pending" ? "Nobody is waiting. New sign-ups show up here." : "No users match."}</Empty>}
+          ) : <Empty>{status === "pending" ? "Nobody is waiting. New sign-ups show up here." : status === "avl" ? "Nobody uses only AVL." : "No users match."}</Empty>}
         </Card>
       )}
     </>
@@ -76,7 +77,7 @@ function AddUser({ data, onDone }: { data: Data; onDone: () => void }) {
   const [f, setF] = useState({ name: "", email: "", title: "", department: "", campusId: data.myCampusId ?? data.campuses[0]?.id ?? "", allCampuses: false, role: "STAFF" as Role, avlLevel: "NONE" as AvlLevel, teamIds: [] as string[] });
   const [busy, setBusy] = useState(false);
   return (
-    <Card title="Add user" eyebrow="They're approved already: when they create their Sundays | Operations account with this email, they're straight in." className="mb-5">
+    <Card title="Add user" eyebrow="They're approved already: when they create their Sundays | Operations account with this email, they're straight into Operations." className="mb-5">
       <form className="grid gap-4 p-4 md:grid-cols-3" onSubmit={async (e) => {
         e.preventDefault(); setBusy(true);
         try {
@@ -93,7 +94,7 @@ function AddUser({ data, onDone }: { data: Data; onDone: () => void }) {
             <div className="flex items-end pb-2"><Check label="Global: all campuses" hint="Managers with this can act at every campus." checked={f.allCampuses} onChange={(v) => setF({ ...f, allCampuses: v })} /></div>
           </>
         ) : <Field label="Campus"><input className="input" readOnly value={data.campuses.find((c) => c.id === data.myCampusId)?.name ?? ""} /></Field>}
-        <Field label="AVL access"><AvlSelect value={f.avlLevel} onChange={(avlLevel) => setF({ ...f, avlLevel })} /></Field>
+        {data.grantsAvl && <Field label="AVL access" hint="Separate app; only AVL Managers set this."><AvlSelect value={f.avlLevel} onChange={(avlLevel) => setF({ ...f, avlLevel })} /></Field>}
         <div className="md:col-span-2"><span className="label mb-1.5 block">Role</span><RolePicker allowed={data.grantableRoles} value={f.role} onChange={(role) => setF({ ...f, role })} /></div>
         <div><span className="label mb-1.5 block">Teams</span>
           <div className="max-h-44 space-y-2 overflow-y-auto">{data.teams.map((t) => <Check key={t.id} label={t.name} checked={f.teamIds.includes(t.id)} onChange={(v) => setF({ ...f, teamIds: v ? [...f.teamIds, t.id] : f.teamIds.filter((x) => x !== t.id) })} />)}

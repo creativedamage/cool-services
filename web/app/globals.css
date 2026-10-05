@@ -57,6 +57,9 @@ html,
 /* Sundays | Operations has its own color (violet) so it reads as its own app. */
 [data-theme="dark"] .app-ops { --c-accent: 167 139 250; --c-accent-strong: 192 172 252; --c-on-accent: 22 12 48; }
 [data-theme="light"] .app-ops { --c-accent: 118 84 224; --c-accent-strong: 98 64 200; --c-on-accent: 255 255 255; }
+/* Sundays | AVL is teal. */
+[data-theme="dark"] .app-avl { --c-accent: 45 212 191; --c-accent-strong: 94 234 212; --c-on-accent: 4 32 28; }
+[data-theme="light"] .app-avl { --c-accent: 13 148 136; --c-accent-strong: 15 118 110; --c-on-accent: 255 255 255; }
 
 body {
   @apply bg-canvas text-ink antialiased;

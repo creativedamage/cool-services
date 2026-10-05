@@ -1,23 +1,70 @@
 "use client";
 /**
- * Sundays | Operations sign-in. Everyone has their own account (email + password, kept by Sundays' cloud).
- * New accounts wait until a manager approves them; the very first account is the System admin.
+ * Sign-in for Sundays | Operations and Sundays | AVL (one account opens whichever apps you're given).
+ * Everyone has their own account (email + password, kept by Sundays' cloud). New accounts wait until
+ * a manager approves them; the very first account is the System admin.
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { Building2, Clock3, KeyRound, LogOut, RefreshCw, ShieldCheck, UserPlus } from "lucide-react";
+import { ArrowRight, AudioLines, Building2, Clock3, KeyRound, LogOut, RefreshCw, ShieldCheck, UserPlus } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { OpsMe } from "@shared/ops/types";
 import { Api, qk } from "@/lib/api";
-import { ops, opsSignOut, supabase, useOpsMe, useOpsSession } from "@/lib/ops";
+import { confirmRedirect, ops, opsSignOut, STANDALONE, supabase, useOpsMe, useOpsSession } from "@/lib/ops";
+import { OpsMeContext } from "./context";
 import { Spinner } from "@/components/ui";
-import { CONFIRMED_URL } from "@shared/cloud";
 
-export function OpsGate({ children }: { children: (me: Extract<OpsMe, { status: "ok" }>) => React.ReactNode }) {
+export type OpsApp = "ops" | "avl";
+const APP_NAME: Record<OpsApp, string> = { ops: "Operations", avl: "AVL" };
+
+/** An Operations or AVL page: sign-in, approval, then access to this app, then the page. */
+export function OpsAppBody({ app, children }: { app: OpsApp; children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <OpsGate app={app}>
+        {(me) => {
+          const allowed = app === "ops" ? me.nav.ops : me.nav.avl;
+          return (
+            <OpsMeContext.Provider value={me}>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {allowed ? <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">{children}</div> : <NoAccess app={app} me={me} />}
+              </div>
+            </OpsMeContext.Provider>
+          );
+        }}
+      </OpsGate>
+    </div>
+  );
+}
+
+function NoAccess({ app, me }: { app: OpsApp; me: Extract<OpsMe, { status: "ok" }> }) {
+  const other: OpsApp = app === "ops" ? "avl" : "ops";
+  const hasOther = other === "ops" ? me.nav.ops : me.nav.avl;
+  const router = useRouter();
+  // Only has the other app: go straight there.
+  useEffect(() => { if (hasOther) router.replace(`/${other}`); }, [hasOther, other, router]);
+  return (
+    <Center>
+      <div className="panel max-w-md p-8 text-center">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-hover text-ink-muted">{app === "ops" ? <Building2 size={22} /> : <AudioLines size={22} />}</div>
+        <h1 className="mt-4 text-lg font-semibold">You don&apos;t have {APP_NAME[app]} access</h1>
+        <p className="mt-1 text-sm text-ink-muted">
+          {app === "ops" ? "Sundays | Operations is for the church's own staff. A manager can turn it on for you." : "Sundays | AVL is for the AVL team. An AVL Manager can give you access."}
+        </p>
+        {hasOther && <Link href={`/${other}`} className="btn-primary mt-5 inline-flex">Open {APP_NAME[other]} <ArrowRight size={14} /></Link>}
+      </div>
+    </Center>
+  );
+}
+
+export function OpsGate({ app = "ops", children }: { app?: OpsApp; children: (me: Extract<OpsMe, { status: "ok" }>) => React.ReactNode }) {
   const { session } = useOpsSession();
   const me = useOpsMe(Boolean(session));
   const qc = useQueryClient();
-  const sundaysMe = useQuery({ queryKey: qk.me, queryFn: Api.me, staleTime: Infinity });
+  // In the Mac app, the church's name comes from Planning Center; the website doesn't have it.
+  const sundaysMe = useQuery({ queryKey: qk.me, queryFn: Api.me, staleTime: Infinity, enabled: !STANDALONE });
 
   // First time: the church's name from Planning Center (it's never typed into the code).
   const m = me.data;
@@ -28,7 +75,7 @@ export function OpsGate({ children }: { children: (me: Extract<OpsMe, { status: 
   }, [m, sundaysMe.data?.orgName, qc]);
 
   if (session === undefined || (session && me.isLoading)) return <Center><Spinner size={18} /></Center>;
-  if (!session || (me.error && (me.error as { status?: number }).status === 401)) return <SignIn churchName={sundaysMe.data?.orgName ?? null} />;
+  if (!session || (me.error && (me.error as { status?: number }).status === 401)) return <SignIn app={app} churchName={sundaysMe.data?.orgName ?? null} />;
   if (me.error) return <Center><p className="max-w-sm text-center text-sm text-bad">{(me.error as Error).message}</p><Retry onClick={() => void me.refetch()} /></Center>;
   if (!m) return null;
   if (m.status !== "ok") return <Waiting me={m} onCheck={() => void me.refetch()} checking={me.isFetching} />;
@@ -38,7 +85,27 @@ export function OpsGate({ children }: { children: (me: Extract<OpsMe, { status: 
 const Center = ({ children }: { children: React.ReactNode }) => <div className="grid flex-1 place-items-center p-8"><div className="flex flex-col items-center gap-3">{children}</div></div>;
 const Retry = ({ onClick }: { onClick: () => void }) => <button className="btn-outline" onClick={onClick}><RefreshCw size={14} /> Try again</button>;
 
-function SignIn({ churchName }: { churchName: string | null }) {
+const PITCH: Record<OpsApp, { icon: typeof Building2; blurb: (church: string) => string; points: [string, string][] }> = {
+  ops: {
+    icon: Building2, blurb: (c) => `${c} requests, facilities and teams, in one place.`,
+    points: [
+      ["Ask for anything", "Technology, supplies and building repairs, routed to the right team at your campus."],
+      ["Work the queue", "Approve, assign, start, hold and finish, with every step on the record."],
+      ["Run the church's business", "People, teams, campuses and request types, with access for each person."],
+    ],
+  },
+  avl: {
+    icon: AudioLines, blurb: () => "Audio, video and lighting quoting for the churches you work with.",
+    points: [
+      ["Keep your clients", "Every church you work with, its contacts and its history."],
+      ["Quote with confidence", "Vendor price lists, your own products, margins and proposals they can print."],
+      ["Know your numbers", "Pipeline, accepted sales and projected profit at a glance."],
+    ],
+  },
+};
+
+function SignIn({ app, churchName }: { app: OpsApp; churchName: string | null }) {
+  const pitch = PITCH[app];
   const qc = useQueryClient();
   const [mode, setMode] = useState<"in" | "up">("in");
   const [f, setF] = useState({ name: "", email: "", password: "" });
@@ -72,7 +139,7 @@ function SignIn({ churchName }: { churchName: string | null }) {
         await qc.invalidateQueries({ queryKey: ["ops"] });
       } else {
         if (f.password.length < 8) throw new Error("Use at least 8 characters for your password.");
-        const { data, error } = await sb.auth.signUp({ email: f.email.trim(), password: f.password, options: { data: { name: f.name.trim() }, emailRedirectTo: CONFIRMED_URL } });
+        const { data, error } = await sb.auth.signUp({ email: f.email.trim(), password: f.password, options: { data: { name: f.name.trim() }, emailRedirectTo: confirmRedirect() } });
         if (error) throw error;
         if (!data.session) setWaiting({ email: f.email.trim(), password: f.password });
         else await qc.invalidateQueries({ queryKey: ["ops"] });
@@ -83,20 +150,16 @@ function SignIn({ churchName }: { churchName: string | null }) {
   }
 
   return (
-    <div className="grid flex-1 place-items-center overflow-y-auto p-8">
+    <div className="grid flex-1 place-items-center overflow-y-auto p-4 sm:p-8">
       <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-line bg-surface shadow-lift md:grid-cols-[1.1fr_1fr]">
         <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-accent/25 via-violet/15 to-transparent p-8 md:flex">
           <div>
-            <div className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-on-accent"><Building2 size={22} /></div>
-            <h2 className="mt-5 text-2xl font-semibold tracking-tight">Sundays <span className="font-normal text-ink-muted">|</span> Operations</h2>
-            <p className="mt-1 text-sm text-ink-soft">{churchName ? `${churchName}'s` : "Your church's"} requests, facilities and AVL quoting, right inside Sundays.</p>
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-on-accent"><pitch.icon size={22} /></div>
+            <h2 className="mt-5 text-2xl font-semibold tracking-tight">Sundays <span className="font-normal text-ink-muted">|</span> {APP_NAME[app]}</h2>
+            <p className="mt-1 text-sm text-ink-soft">{pitch.blurb(churchName ? `${churchName}'s` : "Your church's")}</p>
           </div>
           <ul className="space-y-3 text-sm text-ink-soft">
-            {[
-              ["Ask for anything", "Technology, supplies and building repairs, routed to the right team at your campus."],
-              ["Work the queue", "Approve, assign, start, hold and finish, with every step on the record."],
-              ["Quote AVL projects", "Vendor price lists, margins and proposals your customers can print."],
-            ].map(([t, d]) => (
+            {pitch.points.map(([t, d]) => (
               <li key={t} className="flex gap-3"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" /><span><b className="text-ink">{t}.</b> {d}</span></li>
             ))}
           </ul>
@@ -112,10 +175,10 @@ function SignIn({ churchName }: { churchName: string | null }) {
         ) : (
         <form onSubmit={submit} className="space-y-4 p-8">
           <div>
-            <div className="label">Sundays | Operations</div>
+            <div className="label">Sundays | {APP_NAME[app]}</div>
             <h1 className="mt-1 text-xl font-semibold">{mode === "in" ? "Sign in" : "Create your account"}</h1>
             <p className="mt-1 text-sm text-ink-muted">
-              {mode === "in" ? "Your Sundays | Operations account (separate from Planning Center)." : "A manager approves new accounts and sets what you can do."}
+              {mode === "in" ? "Your Sundays account for Operations and AVL (separate from Planning Center)." : "A manager approves new accounts and sets what you can do."}
             </p>
           </div>
           {mode === "up" && (
@@ -153,7 +216,7 @@ function Waiting({ me, onCheck, checking }: { me: Extract<OpsMe, { status: "pend
         <h1 className="mt-4 text-lg font-semibold">{me.status === "pending" ? "Waiting for approval" : "Your account isn't active"}</h1>
         <p className="mt-1 text-sm text-ink-muted">
           {me.status === "pending"
-            ? <>Thanks, {me.name.split(" ")[0]}. A manager{me.org.name ? ` at ${me.org.name}` : ""} needs to approve <b className="text-ink">{me.email}</b> and choose your campus and access. This page opens Sundays | Operations as soon as they do.</>
+            ? <>Thanks, {me.name.split(" ")[0]}. A manager{me.org.name ? ` at ${me.org.name}` : ""} needs to approve <b className="text-ink">{me.email}</b> and choose your campus and access. This page opens as soon as they do.</>
             : <>A manager turned off <b className="text-ink">{me.email}</b>. Ask them if you need access again.</>}
         </p>
         <div className="mt-5 flex justify-center gap-2">
