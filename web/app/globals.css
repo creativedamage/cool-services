@@ -54,6 +54,10 @@
 }
 
 html,
+/* Church Ops has its own color (violet) so it reads as its own app. */
+[data-theme="dark"] .app-ops { --c-accent: 167 139 250; --c-accent-strong: 192 172 252; --c-on-accent: 22 12 48; }
+[data-theme="light"] .app-ops { --c-accent: 118 84 224; --c-accent-strong: 98 64 200; --c-on-accent: 255 255 255; }
+
 body {
   @apply bg-canvas text-ink antialiased;
   font-feature-settings: "cv11", "ss01";

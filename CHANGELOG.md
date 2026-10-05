@@ -4,6 +4,17 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.25.1
+Sundays and Church Ops now feel like two apps in one window, and creating a Church Ops account no longer ends on a broken page.
+- A Sundays / Church Ops switcher at the top of the sidebar. Each side has its own sidebar, look
+  (Church Ops is violet, with your church's logo once you add it) and home, and the switcher goes back
+  to where you were on the other side. Sundays reopens on the side you used last.
+- Church Ops is gone from the Sundays menu, and the Weekend picker and campus switcher stay on the
+  Sundays side.
+- After you create a Church Ops account, Sundays waits for you to click the confirmation link in the
+  email and signs you in by itself. The link now opens a short "Your email is confirmed" page instead
+  of a broken localhost page.
+
 ## 1.25.0
 Church Ops inside Sundays (requests, facilities, AVL quoting, with your own accounts), one Weekend everywhere, and settings that follow you to every Mac.
 - **Church Ops** (Full Mode only, sidebar → Church Ops): ask for technology, supplies and building

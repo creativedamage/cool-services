@@ -2,7 +2,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Building2, BellRing, CalendarDays, UsersRound, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, Lock, LockOpen, LogOut, Settings, Timer, MicVocal } from "lucide-react";
+import { BellRing, CalendarDays, UsersRound, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, Lock, LockOpen, LogOut, Settings, Timer, MicVocal } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -18,7 +18,8 @@ import { PrefsLink } from "@/components/settings/PrefsLink";
 import { PageRequestsBar } from "@/components/paging/PageRequests";
 import { useCampus } from "@/lib/campus";
 import { WeekendPicker, useWeekend } from "@/lib/weekend";
-import { OpsNav } from "@/components/ops/OpsNav";
+import { OpsBrand, OpsNav } from "@/components/ops/OpsNav";
+import { AppSwitcher, useRememberApp } from "@/components/AppSwitcher";
 import { APP_MODE_KEY, PinDialog, serviceLocked, serviceModeAllows, useAppMode, useUnlock } from "@/lib/appMode";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -58,10 +59,13 @@ function Shell({ children }: { children: React.ReactNode }) {
     if (path.startsWith("/services") && st && openPlan) void Api.boardOpenPlan(st, openPlan).catch(() => undefined);
   }, [path, st, openPlan]);
 
+  // Sundays and Church Ops are two apps in one window (switcher at the top of the sidebar).
+  const inOps = path.startsWith("/ops");
+  useRememberApp(inOps ? "ops" : "sundays", qs ? `${path}?${qs}` : path);
+
   const nav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/workflows", label: "Workflows", icon: KanbanSquare },
-    { href: "/ops", label: "Church Ops", icon: Building2 },
     { href: "/services", to: servicesHref, label: "Services", icon: CalendarDays },
     { href: "/team-checkins", label: "Team check-ins", icon: UsersRound },
     { href: "/propresenter", label: "ProPresenter", icon: MonitorUp },
@@ -72,19 +76,22 @@ function Shell({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className="flex w-[240px] shrink-0 flex-col border-r border-line bg-surface/60">
-        <div className="flex items-center gap-2.5 px-4 py-4">
-          <Logo size={30} />
-          <div className="leading-tight">
-            <div className="text-sm font-semibold">Sundays</div>
-            <div className="truncate text-[11px] text-ink-muted">{me.data?.orgName ?? "\u00a0"}</div>
+    <div className={clsx("flex h-screen overflow-hidden", inOps && "app-ops")}>
+      <aside className={clsx("flex w-[240px] shrink-0 flex-col border-r border-line", inOps ? "bg-gradient-to-b from-violet/10 to-surface/60" : "bg-surface/60")}>
+        {inOps ? <OpsBrand fallback={me.data?.orgName ?? null} /> : (
+          <div className="flex items-center gap-2.5 px-4 py-4">
+            <Logo size={30} />
+            <div className="leading-tight">
+              <div className="text-sm font-semibold">Sundays</div>
+              <div className="truncate text-[11px] text-ink-muted">{me.data?.orgName ?? "\u00a0"}</div>
+            </div>
           </div>
-        </div>
-        <CampusSwitcher />
-        <WeekendPicker />
+        )}
+        {mode?.mode === "full" && <AppSwitcher side={inOps ? "ops" : "sundays"} />}
+        {!inOps && <CampusSwitcher />}
+        {!inOps && <WeekendPicker />}
 
-        <nav className="space-y-0.5 px-2">
+        {!inOps && <nav className="space-y-0.5 px-2">
           {(locked ? nav.filter((n) => serviceModeAllows(n.href)) : nav).map(({ href, to, label, icon: Icon }: { href: string; to?: string; label: string; icon: typeof CalendarDays }) => (
             <Link key={href} href={to ?? href}
               className={clsx("flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition",
@@ -92,7 +99,7 @@ function Shell({ children }: { children: React.ReactNode }) {
               <Icon size={16} /> {label}
             </Link>
           ))}
-        </nav>
+        </nav>}
 
         {mode?.mode === "service" && <ServiceModeBox locked={locked} unlockedUntil={mode.unlockedUntil} />}
 
@@ -100,7 +107,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="flex-1" />
         ) : path.startsWith("/services") ? (
           <ServicesNav activeSt={search.get("st")} activePlan={search.get("plan")} tab={path} />
-        ) : path.startsWith("/ops") ? (
+        ) : inOps ? (
           <OpsNav />
         ) : path.startsWith("/paging") ? (
           <PagingNav />

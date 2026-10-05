@@ -11,6 +11,7 @@ import type { OpsMe } from "@shared/ops/types";
 import { Api, qk } from "@/lib/api";
 import { ops, opsSignOut, supabase, useOpsMe, useOpsSession } from "@/lib/ops";
 import { Spinner } from "@/components/ui";
+import { CONFIRMED_URL } from "@shared/cloud";
 
 export function OpsGate({ children }: { children: (me: Extract<OpsMe, { status: "ok" }>) => React.ReactNode }) {
   const { session } = useOpsSession();
@@ -43,6 +44,22 @@ function SignIn({ churchName }: { churchName: string | null }) {
   const [f, setF] = useState({ name: "", email: "", password: "" });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // After creating an account: wait for the email link, then sign in by ourselves.
+  const [waiting, setWaiting] = useState<{ email: string; password: string } | null>(null);
+  useEffect(() => {
+    if (!waiting) return;
+    let stop = false;
+    const started = Date.now();
+    const tick = async () => {
+      if (stop) return;
+      const sb = await supabase();
+      const { error } = await sb.auth.signInWithPassword(waiting);
+      if (!error) { await qc.invalidateQueries({ queryKey: ["ops"] }); return; }
+      if (Date.now() - started < 30 * 60_000) setTimeout(tick, 4000);
+    };
+    const t = setTimeout(tick, 4000);
+    return () => { stop = true; clearTimeout(t); };
+  }, [waiting, qc]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,16 +68,14 @@ function SignIn({ churchName }: { churchName: string | null }) {
       const sb = await supabase();
       if (mode === "in") {
         const { error } = await sb.auth.signInWithPassword({ email: f.email.trim(), password: f.password });
-        if (error) throw error;
+        if (error) throw new Error(/confirm/i.test(error.message) ? "Confirm your email first: open the link we emailed you, then sign in." : error.message);
         await qc.invalidateQueries({ queryKey: ["ops"] });
       } else {
         if (f.password.length < 8) throw new Error("Use at least 8 characters for your password.");
-        const { data, error } = await sb.auth.signUp({ email: f.email.trim(), password: f.password, options: { data: { name: f.name.trim() } } });
+        const { data, error } = await sb.auth.signUp({ email: f.email.trim(), password: f.password, options: { data: { name: f.name.trim() }, emailRedirectTo: CONFIRMED_URL } });
         if (error) throw error;
-        if (!data.session) {
-          setMode("in");
-          setMsg({ ok: true, text: "Check your email and click the link to confirm your address, then sign in here." });
-        } else await qc.invalidateQueries({ queryKey: ["ops"] });
+        if (!data.session) setWaiting({ email: f.email.trim(), password: f.password });
+        else await qc.invalidateQueries({ queryKey: ["ops"] });
       }
     } catch (err) {
       setMsg({ ok: false, text: (err as Error).message });
@@ -86,6 +101,15 @@ function SignIn({ churchName }: { churchName: string | null }) {
             ))}
           </ul>
         </div>
+        {waiting ? (
+          <div className="flex flex-col justify-center gap-4 p-8 text-center">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-accent-soft text-accent"><Spinner size={18} /></div>
+            <h1 className="text-xl font-semibold">Check your email</h1>
+            <p className="text-sm text-ink-muted">We sent a link to <b className="text-ink">{waiting.email}</b>. Open it to confirm your address; this screen carries on by itself as soon as you do.</p>
+            <p className="text-xs text-ink-faint">Nothing in your inbox after a minute? Check spam, or go back and try again.</p>
+            <button className="btn-ghost mx-auto" onClick={() => { setWaiting(null); setMode("in"); }}>Back to sign in</button>
+          </div>
+        ) : (
         <form onSubmit={submit} className="space-y-4 p-8">
           <div>
             <div className="label">Church Ops</div>
@@ -112,6 +136,7 @@ function SignIn({ churchName }: { churchName: string | null }) {
               : <>Have an account? <button type="button" className="text-accent hover:underline" onClick={() => { setMode("in"); setMsg(null); }}>Sign in</button></>}
           </p>
         </form>
+        )}
       </div>
     </div>
   );

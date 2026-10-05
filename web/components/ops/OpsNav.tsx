@@ -2,7 +2,7 @@
 /** Sidebar while in Church Ops. */
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { Activity, Boxes, Building, ClipboardList, FileText, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Users, UsersRound } from "lucide-react";
+import { Activity, Boxes, Building, Building2, ClipboardList, FileText, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Users, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { opsSignOut, useOpsMe, useOpsSession } from "@/lib/ops";
@@ -44,9 +44,9 @@ export function OpsNav() {
             {g.title && <div className="label px-2.5 pb-1.5">{g.title}</div>}
             <div className="space-y-0.5">
               {g.items.map((it) => (
-                <Link key={it.href} href={it.href} className={clsx("flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition", active(it.href) ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-hover/60")}>
+                <Link key={it.href} href={it.href} className={clsx("flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition", active(it.href) ? "bg-violet-soft text-violet" : "text-ink-soft hover:bg-hover/60")}>
                   <it.icon size={14} /><span className="flex-1">{it.label}</span>
-                  {!!it.badge && <span className={clsx("rounded-full px-1.5 text-[10px] font-semibold tabular-nums", it.tone === "warn" ? "bg-warn-soft text-warn" : "bg-accent-soft text-accent")}>{it.badge}</span>}
+                  {!!it.badge && <span className={clsx("rounded-full px-1.5 text-[10px] font-semibold tabular-nums", it.tone === "warn" ? "bg-warn-soft text-warn" : "bg-violet-soft text-violet")}>{it.badge}</span>}
                 </Link>
               ))}
             </div>
@@ -56,6 +56,24 @@ export function OpsNav() {
       <div className="mx-2 mb-2 flex items-center gap-2 rounded-lg border border-line px-2.5 py-2 text-[11px] text-ink-muted">
         <span className="min-w-0 flex-1 truncate">Church Ops · {me.user.name}{n.campusName ? ` · ${n.campusName}` : ""}</span>
         <button className="rounded p-1 hover:bg-hover hover:text-ink" title="Sign out of Church Ops" onClick={async () => { await opsSignOut(); await qc.invalidateQueries({ queryKey: ["ops"] }); }}><LogOut size={12} /></button>
+      </div>
+    </div>
+  );
+}
+
+/** Top of the sidebar in Church Ops: the church's own logo (Settings → Organization), or the Church Ops mark. */
+export function OpsBrand({ fallback }: { fallback: string | null }) {
+  const { session } = useOpsSession();
+  const me = useOpsMe(Boolean(session)).data;
+  const logo = me?.org.logoDark ?? null;
+  const name = me?.org.name ?? fallback;
+  return (
+    <div className="flex items-center gap-2.5 px-4 py-4">
+      {logo ? <img src={logo} alt="" className="h-[30px] w-[30px] rounded-lg object-contain" />
+        : <span className="grid h-[30px] w-[30px] place-items-center rounded-lg bg-violet text-white"><Building2 size={16} /></span>}
+      <div className="min-w-0 leading-tight">
+        <div className="text-sm font-semibold">Church Ops</div>
+        <div className="truncate text-[11px] text-ink-muted">{name ?? "\u00a0"}</div>
       </div>
     </div>
   );
