@@ -4,6 +4,15 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.23.0
+Resi: a "Resi live" badge on Services and a Resi widget on the Dashboard showing when you're streaming.
+- Connect Resi in Preferences → Video → Resi with an API Client ID and Secret from Resi Studio.
+- Services shows a red **Resi live** badge (with the time live) while you're streaming, amber while
+  it's starting.
+- New Dashboard widget, **Resi live stream**: time live, each encoder's state, the title, and every
+  destination (Web, YouTube, Facebook, RTMP) with its state; when you were last live.
+- Read-only: Cool Services never starts or stops a stream.
+
 ## 1.22.0
 Three modes after signing in: Full Mode, Service Mode for a shared computer (PIN to leave it), and FOH Companion; stage plots are removed.
 - **Service Mode**: only Services, ProPresenter, Clock, Mic board and Parent paging. Workflows,

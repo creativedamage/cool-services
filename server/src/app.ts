@@ -34,6 +34,8 @@ import { setAttentionBridge, setCompanionWindowBridge, startCompanion } from "./
 import { micboardRouter, setFolderOpener } from "./routes/micboard.js";
 import { serviceModeGuard } from "./lib/appMode.js";
 import { wavesRelayRouter } from "./routes/wavesRelay.js";
+import { resiRouter } from "./routes/resi.js";
+import { startResi } from "./lib/resi.js";
 import { initMicboard } from "./lib/micboard.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
 import { PcoError, SignedOutError } from "./pco/client.js";
@@ -68,6 +70,7 @@ export function createApp(webDir?: string) {
   app.use("/api/clock", requireAuth, clockRouter);
   app.use("/api/board", requireAuth, boardRouter);
   app.use("/api/micboard", requireAuth, micboardRouter); // Micboard inside Cool Services
+  app.use("/api/resi", requireAuth, resiRouter); // Resi live status (read-only)
   app.use("/api/waves", requireAuth, wavesRelayRouter); // Tuning keys from FOH companions, sent to Waves from this Mac
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
   app.use("/api/app-mode", appModeRouter); // Full Mode, Service Mode or FOH Companion (this Mac only)
@@ -127,6 +130,7 @@ export function startServer(opts: { port: number; webDir?: string }): Promise<Se
       initKiosk(opts.webDir);
       startCompanion(); // if this Mac is an FOH companion, start watching the main computer
       initMicboard(); // Micboard (not on an FOH companion)
+      startResi(); // Resi live status, if it's set up
       startSmaart();
       startClock();
       resolve(server);

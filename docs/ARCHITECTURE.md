@@ -129,6 +129,14 @@ the `check_ins` OAuth scope; older sign-ins get a "Sign in again" prompt.
 
 ## 5d. (Stage plots were removed in 1.22)
 
+## 5r. Resi (1.23)
+
+`lib/resi.ts`: Resi's public API (`https://api.resi.io/v1`, override with `COOL_RESI_API`), OAuth
+client credentials (`/oauth/token`), `GET /encoders` and `GET /schedules` every 10 s. Live = a
+schedule destination STARTING/STARTED (or, if the account can't list schedules, the encoder's own
+status). The secret is stored with `crypto.ts`. `/api/resi` (status), `/api/resi/settings`,
+`/api/resi/test`. Web: `components/resi/Resi.tsx` (`ResiBadge`, `ResiWidget`), Preferences → Video.
+
 ## 5e. Modes (1.22)
 
 `lib/appMode.ts`: `appMode` in the data file is `full`, `service` or `companion`. Service Mode keeps

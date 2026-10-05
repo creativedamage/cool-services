@@ -6,7 +6,7 @@ import { extras } from "../lib/db.js";
 export const dashboardRouter = Router();
 const Widget = z.object({
   id: z.string().max(40),
-  type: z.enum(["tuning", "spl", "wireless", "live", "clock", "pro", "prodclock"]),
+  type: z.enum(["tuning", "spl", "wireless", "live", "clock", "pro", "prodclock", "resi"]),
   size: z.enum(["s", "m", "l"]),
   options: z.record(z.string().max(40), z.union([z.string().max(300), z.number(), z.boolean(), z.null()])).default({}),
 });

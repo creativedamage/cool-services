@@ -784,11 +784,40 @@ export interface SmaartStatusView {
 /** The service the dashboard follows: a service type (your campus), optionally pinned to one plan. */
 export interface HomeService { serviceTypeId: string | null; planId: string | null }
 
-export type WidgetType = "tuning" | "spl" | "wireless" | "live" | "clock" | "pro" | "prodclock";
+export type WidgetType = "tuning" | "spl" | "wireless" | "live" | "clock" | "pro" | "prodclock" | "resi";
 export interface DashboardWidget {
   id: string;
   type: WidgetType;
   /** s = 1 column, m = 2, l = full width. */
   size: "s" | "m" | "l";
   options: Record<string, string | number | boolean | null>;
+}
+
+/* ───────────── Resi (resi.io) live status ───────────── */
+
+export interface ResiSettingsView { enabled: boolean; clientId: string; hasSecret: boolean; encoderIds: string[] }
+export interface ResiEncoder {
+  id: string;
+  name: string;
+  live: boolean;
+  /** "live", "starting", "setting-up" (destinations being set up), "error" or "off". */
+  state: "live" | "starting" | "setting-up" | "error" | "off";
+  liveSince: string | null;
+  /** The title of what's streaming, when Resi has one. */
+  title: string | null;
+  /** Where it's going (Web/Embed, YouTube, Facebook, RTMP) and each one's state. */
+  destinations: { name: string; type: string | null; status: string }[];
+  error: string | null;
+}
+export interface ResiStatus {
+  configured: boolean;
+  connected: boolean;
+  error: string | null;
+  live: boolean;
+  liveSince: string | null;
+  lastLive: { from: string; to: string } | null;
+  encoders: ResiEncoder[];
+  checkedAt: string | null;
+  /** Where "live" came from: Resi's live schedules, or the encoders' own status. */
+  source: "schedules" | "encoders" | "none";
 }

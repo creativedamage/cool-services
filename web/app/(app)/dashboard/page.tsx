@@ -1,7 +1,7 @@
 "use client";
 /**
  * Dashboard: widgets for running a service. Tuning keys, ProPresenter control, SPL from
- * Smaart, Shure wireless, Planning Center Live, a clock, and ProPresenter control. Arrange them with
+ * Smaart, Shure wireless, Planning Center Live, a clock, ProPresenter control, and Resi. Arrange them with
  * Edit; the layout is saved on this Mac.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,11 +14,13 @@ import { Api, qk } from "@/lib/api";
 import { usePlans } from "@/lib/plans";
 import { Modal } from "@/components/ui";
 import { ProdClockWidget } from "@/components/clock/ClockWidget";
+import { ResiWidget } from "@/components/resi/Resi";
 import { ClockWidget, LiveWidget, ProWidget, SplWidget, TuningWidget, WirelessWidget, useHome, useNextService } from "@/components/dashboard/Widgets";
 
 const NAMES: Record<WidgetType, string> = {
   tuning: "Tuning keys", spl: "SPL (Smaart)", wireless: "Shure wireless",
   live: "Planning Center Live", clock: "Clock & countdown", pro: "ProPresenter control", prodclock: "Production clock",
+  resi: "Resi live stream",
 };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const DEFAULT: DashboardWidget[] = [
@@ -83,7 +85,7 @@ export default function DashboardPage() {
           <div className="grid gap-1.5 p-4">
             {(Object.keys(NAMES) as WidgetType[]).map((t) => (
               <button key={t} className="rounded-lg border border-line px-3 py-2 text-left text-sm hover:border-accent/50"
-                onClick={() => { const w: DashboardWidget = { id: uid(), type: t, size: t === "tuning" || t === "wireless" ? "l" : t === "live" || t === "pro" ? "m" : "s", options: {} }; update([...list, w]); setAdding(false); }}>
+                onClick={() => { const w: DashboardWidget = { id: uid(), type: t, size: t === "tuning" || t === "wireless" ? "l" : t === "live" || t === "pro" || t === "resi" ? "m" : "s", options: {} }; update([...list, w]); setAdding(false); }}>
                 {NAMES[t]}
               </button>
             ))}
@@ -104,6 +106,7 @@ function Widget({ w }: { w: DashboardWidget }) {
     case "wireless": return <WirelessWidget />;
     case "pro": return <ProWidget o={w.options} />;
     case "prodclock": return <ProdClockWidget />;
+    case "resi": return <ResiWidget />;
   }
 }
 

@@ -7,6 +7,7 @@ import type { PlanSummary } from "@shared/types";
 import { Api, planQuery, qk } from "@/lib/api";
 import { usePlans } from "@/lib/plans";
 import { Skeleton } from "@/components/ui";
+import { ResiBadge } from "@/components/resi/Resi";
 import { routes } from "@/lib/routes";
 import { useCampus } from "@/lib/campus";
 
@@ -19,7 +20,7 @@ export default function ServicesPage() {
 
   return (
     <div className="overflow-y-auto p-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Upcoming services{campus ? <span className="text-ink-muted"> · {campus.name}</span> : null}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Upcoming services{campus ? <span className="text-ink-muted"> · {campus.name}</span> : null} <ResiBadge className="ml-1 align-middle" /></h1>
       <p className="mt-1 text-sm text-ink-muted">Every plan at a glance. Open one to fill slots and handle responses.</p>
 
       <div className="mt-5 flex flex-wrap gap-1.5">

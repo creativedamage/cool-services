@@ -1,7 +1,7 @@
 import type {
   AppSettings, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, PlanSummary, RosterStatus, ScheduleRequest,
   ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary, WorkflowShare, WorkflowShareGroup, WorkflowAccessRequest, Person,
-  DashboardWidget, HomeService, TeamCheckIns, TeamPhonesView, TeamPhoneRole, VolunteerCheckInConfig, VolunteerCheckInSetup, TeamGroup, AppMode, AppModeView, CompanionState, CompanionStrip, CompanionTuning, DisplayInfo, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
+  DashboardWidget, HomeService, TeamCheckIns, TeamPhonesView, TeamPhoneRole, VolunteerCheckInConfig, VolunteerCheckInSetup, TeamGroup, AppMode, AppModeView, ResiSettingsView, ResiStatus, CompanionState, CompanionStrip, CompanionTuning, DisplayInfo, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
 import type { ClockOutputSettings, ClockPreset, ClockState, ClockView } from "@shared/clock";
@@ -146,6 +146,11 @@ export const Api = {
   companionLink: (host: string, port: number, code: string) => api<CompanionState>("/companion-client/link", { method: "POST", json: { host, port, code } }),
   companionUnlink: () => api<CompanionState>("/companion-client/unlink", { method: "POST" }),
   companionAct: (id: string, action: "accept" | "hold" | "deny") => api<CompanionState>("/companion-client/act", { method: "POST", json: { id, action } }),
+  resi: () => api<ResiStatus>("/resi"),
+  resiSettings: () => api<ResiSettingsView>("/resi/settings"),
+  saveResiSettings: (p: { enabled?: boolean; clientId?: string; clientSecret?: string; encoderIds?: string[] }) =>
+    api<{ settings: ResiSettingsView; status: ResiStatus }>("/resi/settings", { method: "PUT", json: p }),
+  testResi: () => api<{ status: ResiStatus; encoders: { id: string; name: string }[] }>("/resi/test", { method: "POST" }),
   micboard: () => api<MicboardView>("/micboard"),
   saveMicboard: (p: Partial<MicboardView["settings"]>) => api<MicboardView["settings"]>("/micboard/settings", { method: "PUT", json: p }),
   restartMicboard: () => api<{ ok: true }>("/micboard/restart", { method: "POST" }),
@@ -228,6 +233,7 @@ export const Api = {
 };
 
 export const qk = {
+  resi: ["resi"] as const,
   me: ["me"] as const,
   settings: ["settings"] as const,
   workflows: ["workflows"] as const,

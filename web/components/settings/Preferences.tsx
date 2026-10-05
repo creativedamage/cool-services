@@ -27,6 +27,7 @@ import { CampusSettings } from "@/components/settings/CampusSettings";
 import { ClockOutputsSettings } from "@/components/settings/ClockOutputsSettings";
 import { VolunteerCheckInSettings } from "@/components/settings/VolunteerCheckInSettings";
 import { MicboardSettings } from "@/components/settings/MicboardSettings";
+import { ResiSettings } from "@/components/settings/ResiSettings";
 
 const TABS: { id: PrefsTab; label: string; icon: typeof Info; blurb: string }[] = [
   { id: "about", label: "About", icon: Info, blurb: "Version and updates." },
@@ -37,7 +38,7 @@ const TABS: { id: PrefsTab; label: string; icon: typeof Info; blurb: string }[] 
   { id: "audio", label: "Audio", icon: AudioLines, blurb: "Allen & Heath, Waves SuperRack and Smaart." },
   { id: "network", label: "Network Connections", icon: Network, blurb: "Kids & Nursery paging and iPads, team check-ins on phones, FOH companions." },
   { id: "micboard", label: "Micboard", icon: MicVocal, blurb: "Micboard on the network, names and photos from Planning Center, and your backgrounds." },
-  { id: "video", label: "Video", icon: MonitorPlay, blurb: "Clock outputs (NDI, network, second display) and ProPresenter computers." },
+  { id: "video", label: "Video", icon: MonitorPlay, blurb: "Clock outputs (NDI, network, second display), ProPresenter computers and Resi." },
 ];
 
 function useHashTab(): [PrefsTab, (t: PrefsTab) => void] {
@@ -123,7 +124,7 @@ function PreferencesOpen({ standalone }: { standalone?: boolean }) {
               {tab === "audio" && <><ConsoleSettings /><WavesSettings w={s.waves} onChange={(waves) => save.mutate({ waves })} /><SmaartSettings /></>}
               {tab === "network" && <PagingSettings />}
               {tab === "micboard" && <MicboardSettings />}
-              {tab === "video" && <><ClockOutputsSettings /><ProComputersSettings /></>}
+              {tab === "video" && <><ClockOutputsSettings /><ProComputersSettings /><ResiSettings /></>}
             </div>
           )}
         </div>

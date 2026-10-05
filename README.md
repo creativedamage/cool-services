@@ -115,6 +115,9 @@ Screenshots use the built-in sample data (Sign in → "Or explore with sample da
 - **Check-ins**: a Check-ins tab on every service shows who's checked in (Planning Center
   Check-Ins) for that service, grouped by room, with regulars, guests, volunteers and check-outs.
   It refreshes every 10 seconds and highlights new arrivals.
+- **Resi** (Preferences → Video → Resi): shows when your Resi stream is live: a **Resi live** badge
+  on Services (with how long it's been live) and a **Resi** widget on the Dashboard (each encoder,
+  where it's going, how long). Read-only. See [Resi](#resi).
 - **Modes** (after signing in, or Preferences → Default Startup → This computer): **Full Mode**
   (everything), **Service Mode** for a shared computer (Services, ProPresenter, Clock, Mic board and
   Parent paging only, no Workflows or Check-Ins; a PIN to leave it or open Preferences), or **FOH
@@ -223,6 +226,25 @@ Preferences → **Campuses**: add campuses, choose the campus each service type 
 default campus**. Cool Services opens on your default campus; the switcher at the top of the sidebar
 shows another campus (or all) for now. The Services list, the sidebar and Schedule in Services
 follow it (Schedule has an "All campuses" link). Campuses are kept on this Mac; the default is per person.
+
+## Resi
+
+Preferences → **Video → Resi**: paste an API **Client ID** and **Client Secret** from Resi Studio
+(your account's API settings; ask Resi support to turn on API access if you don't see them) and
+press **Connect**. Cool Services checks Resi every 10 seconds through its public API
+(`api.resi.io`): your encoders and their live schedules, with each destination's state (Web/Embed,
+YouTube, Facebook, RTMP: setting up, starting, started, stopped, error). An encoder is **live**
+while any of its destinations is starting or started.
+
+- **Services**: a red **Resi live 12:34** badge next to the service's name (and on the Services
+  overview) while you're streaming; amber **Resi starting** while it's getting going.
+- **Dashboard → Add widget → Resi live stream**: how long you've been live and since when, each
+  encoder (live, starting, setting up, error, off air) with the title and every destination's state,
+  when you were last live, and a link to Resi Studio.
+- Choose which encoders to watch (all of them by default). Cool Services never starts or stops a
+  stream. The Client Secret is saved encrypted on this Mac.
+
+<img src="docs/screenshots/resi.png" alt="Resi on the Dashboard" width="70%">
 
 ## Modes
 
