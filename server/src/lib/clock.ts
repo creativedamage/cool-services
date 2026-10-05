@@ -45,6 +45,20 @@ let stored = load();
 let state: ClockState = { ...blankState(), ...(stored.state ?? {}) };
 const persist = () => extras.set(KEY, { ...stored, state });
 
+/** Settings sync: the presets and the clock's wording, not this Mac's outputs (NDI, screen, network). */
+export function clockSyncValue() {
+  const { title, infoHeading, showTimeOfDay } = stored.settings;
+  return { presets: stored.presets, settings: { title, infoHeading, showTimeOfDay } };
+}
+export function applyClockSync(v: unknown) {
+  const x = v as { presets?: ClockPreset[]; settings?: Partial<ClockOutputSettings> } | null;
+  if (!x || !Array.isArray(x.presets)) return;
+  const { title, infoHeading, showTimeOfDay } = { ...stored.settings, ...x.settings };
+  stored = { ...stored, presets: x.presets, settings: { ...stored.settings, title, infoHeading, showTimeOfDay } };
+  persist();
+  changed();
+}
+
 /* ───────────── Change notifications ───────────── */
 
 type Listener = (s: ClockState) => void;

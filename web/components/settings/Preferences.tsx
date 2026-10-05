@@ -4,6 +4,7 @@
  * In the Mac app they open in their own window (Sundays → Preferences…, ⌘,); in a browser
  * at /preferences. A hash picks the tab (and section): /preferences#smaart opens Audio at Smaart.
  */
+import { SyncSettings } from "@/components/settings/SyncSettings";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { AudioLines, Building2, Info, Laptop, MicVocal, MonitorPlay, Moon, Network, Palette, Power, Sun, Trash2, Upload, UserCheck } from "lucide-react";
@@ -30,7 +31,7 @@ import { MicboardSettings } from "@/components/settings/MicboardSettings";
 import { ResiSettings } from "@/components/settings/ResiSettings";
 
 const TABS: { id: PrefsTab; label: string; icon: typeof Info; blurb: string }[] = [
-  { id: "about", label: "About", icon: Info, blurb: "Version and updates." },
+  { id: "about", label: "About", icon: Info, blurb: "Version, sync across your Macs, and updates." },
   { id: "appearance", label: "Appearance", icon: Palette, blurb: "Theme and your logo." },
   { id: "startup", label: "Default Startup", icon: Power, blurb: "What opens first." },
   { id: "campuses", label: "Campuses", icon: Building2, blurb: "Sort service types by campus, and choose yours." },
@@ -116,7 +117,7 @@ function PreferencesOpen({ standalone }: { standalone?: boolean }) {
           <p className="mt-0.5 text-sm text-ink-muted">{cur.blurb}</p>
           {!s ? <div className="mt-8"><Spinner /></div> : (
             <div className="mt-6 space-y-6">
-              {tab === "about" && <><AboutSection /><UpdatesSettings /></>}
+              {tab === "about" && <><AboutSection /><SyncSettings /><UpdatesSettings /></>}
               {tab === "appearance" && <AppearanceSection s={s} save={save.mutate} />}
               {tab === "startup" && <><StartupSection s={s} save={save.mutate} /><AppModeSection /></>}
               {tab === "campuses" && <CampusSettings />}

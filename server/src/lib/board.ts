@@ -38,6 +38,20 @@ let stored = load();
 const persist = () => extras.set(KEY, stored);
 onWeekendChange(() => { memo = null; planMemo = null; });
 
+/** Settings sync (every Mac you sign in on): the display settings, without this Mac's screen and network choices. */
+export function boardSyncValue() {
+  const { screen: _s, lan: _l, ...rest } = stored.settings;
+  return rest;
+}
+export function applyBoardSync(v: unknown) {
+  if (!v || typeof v !== "object") return;
+  const cur = stored.settings;
+  extras.set(KEY, { ...stored, settings: { ...cur, ...(v as Partial<BoardSettings>), screen: cur.screen, lan: cur.lan } });
+  stored = load();
+  memo = null; planMemo = null;
+  for (const fn of listeners) fn(stored.settings);
+}
+
 export const boardSettings = () => stored.settings;
 const listeners = new Set<(s: BoardSettings) => void>();
 export function saveBoardSettings(patch: Partial<BoardSettings>) {

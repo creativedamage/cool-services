@@ -187,6 +187,13 @@ export class PcoClient {
     }
   }
 
+  /** A current access token (refreshed first if it's about to expire). Null for a Personal Access Token. */
+  async bearer(): Promise<string | null> {
+    if (this.basicAuth) return null;
+    await this.ensureFresh();
+    return this.tokens.accessToken;
+  }
+
   async raw(method: string, path: string, body?: unknown, attempt = 0): Promise<JsonApiDoc | null> {
     await this.ensureFresh();
     await this.bucket.take();

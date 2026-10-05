@@ -849,3 +849,15 @@ export interface WeekendView {
   /** Couldn't read Planning Center just now. */
   error: string | null;
 }
+
+/** Settings sync across your Macs (Preferences → About → Sync). */
+export interface SyncStatus {
+  enabled: boolean;
+  state: "idle" | "syncing" | "ok" | "error" | "signed-out";
+  /** Whose settings (the Planning Center person this Mac syncs as). */
+  who: string | null;
+  lastSync: string | null;
+  error: string | null;
+  /** How many kinds of settings sync. */
+  keys: number;
+}

@@ -135,6 +135,11 @@ authRouter.get("/callback", h(async (req, res) => {
     if (!patClient) await saveTokens(user.id, tokens); // shared-token mode doesn't need personal tokens
     logEvent(`sign-in: ${me.name} signed in; Planning Center allowed: ${tokens.scope || "(not stated)"}`);
     await startSession(res, user.id);
+    // Settings from your other Macs first, so a new Mac opens already set up (a few seconds at most).
+    if (!patClient) {
+      const { syncNow } = await import("../lib/sync.js");
+      await Promise.race([syncNow({ pull: true }).catch(() => null), new Promise((r) => setTimeout(r, 8000))]);
+    }
     const back = safeReturn(req.cookies?.[RETURN]);
     res.clearCookie(RETURN, cookieOpts);
     res.redirect(web(back ?? "/start"));
@@ -199,7 +204,16 @@ export function pcoForUser(userId: string, demo: boolean): PcoApi | null {
     // Planning Center refused the sign-in: forget it so the app asks to sign in (instead of bouncing).
     signedOut: (why) => { logEvent(`sign-in: signed out ${u.name} (${why})`); tokenStore.remove(u.id); },
   });
+  clients.set(u.id, client);
   return new LivePco(client, u.pcoOrgId, undefined, u.pcoPersonId);
+}
+const clients = new Map<string, PcoClient>();
+
+/** A current Planning Center access token for someone's own sign-in (settings sync). Null without one. */
+export async function accessTokenFor(userId: string): Promise<string | null> {
+  if (patClient) return null;
+  if (!clients.has(userId) && !pcoForUser(userId, false)) return null;
+  return clients.get(userId)?.bearer() ?? null;
 }
 
 /** Resolve session → user → per-request Planning Center API (live or demo). */

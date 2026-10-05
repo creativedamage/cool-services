@@ -146,6 +146,7 @@ export function flush() {
 
 export const users = {
   get: (id: string) => load().users.find((u) => u.id === id) ?? null,
+  list: (): StaffUser[] => [...load().users],
   /** Create or refresh the record for a Planning Center person. */
   upsert(p: Omit<StaffUser, "id" | "createdAt" | "lastLoginAt">): StaffUser {
     const d = load();
@@ -275,6 +276,13 @@ export const runSheetViews = {
     d.runSheetViews = (d.runSheetViews ?? []).filter((x) => x.id !== id);
     save();
   },
+};
+
+/** Settings sync (lib/sync.ts) reads and replaces these sections whole. */
+type SyncField = "micSetup" | "planMics" | "micUsual" | "runSheetViews";
+export const syncRaw = {
+  get: (k: SyncField): unknown => load()[k] ?? null,
+  set(k: SyncField, v: unknown) { (load() as unknown as Record<string, unknown>)[k] = v; save(); },
 };
 
 /** Small keyed settings that don't need their own model (ProPresenter computers, dashboard, Smaart). */

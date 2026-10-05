@@ -36,6 +36,8 @@ import { serviceModeGuard } from "./lib/appMode.js";
 import { wavesRelayRouter } from "./routes/wavesRelay.js";
 import { resiRouter } from "./routes/resi.js";
 import { weekendRouter } from "./routes/weekend.js";
+import { syncRouter } from "./routes/sync.js";
+import { startSync } from "./lib/sync.js";
 import { startResi } from "./lib/resi.js";
 import { initMicboard } from "./lib/micboard.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
@@ -71,6 +73,7 @@ export function createApp(webDir?: string) {
   app.use("/api/clock", requireAuth, clockRouter);
   app.use("/api/board", requireAuth, boardRouter);
   app.use("/api/micboard", requireAuth, micboardRouter); // Micboard inside Sundays
+  app.use("/api/sync", requireAuth, syncRouter); // settings sync across your Macs
   app.use("/api/weekend", requireAuth, weekendRouter); // the weekend everything works on
   app.use("/api/resi", requireAuth, resiRouter); // Resi live status (read-only)
   app.use("/api/waves", requireAuth, wavesRelayRouter); // Tuning keys from FOH companions, sent to Waves from this Mac
@@ -135,6 +138,7 @@ export function startServer(opts: { port: number; webDir?: string }): Promise<Se
       startResi(); // Resi live status, if it's set up
       startSmaart();
       startClock();
+      startSync(); // settings from/to your other Macs
       resolve(server);
     });
     server.on("error", reject);
