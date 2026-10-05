@@ -224,12 +224,12 @@ function StartupSection({ s, save }: { s: AppSettings; save: Save }) {
     <section id="startup" className="panel scroll-mt-6 p-5">
       <h2 className="font-semibold">When Sundays opens</h2>
       <p className="mt-0.5 text-sm text-ink-muted">
-        The first screen after opening the app or signing in. “Your service” is the one chosen at the top of the Dashboard (or the next service of any type if none is chosen).
+        The first screen after opening the app or signing in. Service views open the weekend picked in the sidebar; “your service” is the service type chosen at the top of the Dashboard.
       </p>
       <select className="input mt-4" value={key(s.startView)} onChange={(e) => set(e.target.value)}>
         <option value="dashboard">Dashboard</option>
         <option value="services">Services (upcoming)</option>
-        {nextGroup("next-service", "Next service")}
+        {nextGroup("next-service", "The weekend’s service")}
         {nextGroup("next-runsheet", "Run sheet")}
         {nextGroup("next-checkins", "Check-ins")}
         <option value="workflows">Workflows overview</option>

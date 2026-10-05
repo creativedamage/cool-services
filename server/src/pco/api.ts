@@ -31,6 +31,8 @@ export interface PcoApi {
   // Services
   listServiceTypes(): Promise<ServiceType[]>;
   listUpcomingPlans(serviceTypeId?: string): Promise<PlanSummary[]>;
+  /** Plans from a date on (YYYY-MM-DD, the church's day), in date order: up to `count` of each service type. For the Weekend picker. */
+  listPlansFrom(from: string, count: number, serviceTypeId?: string): Promise<PlanSummary[]>;
   getPlan(serviceTypeId: string, planId: string): Promise<PlanDetail>;
   getPlanCounts(serviceTypeId: string, planId: string): Promise<PlanCounts>;
   /** Several weeks of one service type, for the Matrix: `weeks` upcoming plans and `past` recent ones. */

@@ -13,9 +13,9 @@ export interface BoardSettings {
   mode: DisplayMode;
   /** In auto, outside rehearsal and service times. */
   autoIdle: DisplayView;
-  /** "open": the service you have open in Sundays (else the next one); "next": always the next service. */
-  follow: "open" | "next";
-  /** For "next" (and before any service is opened): which service type (null = any). */
+  /** "open": the service you have open in Sundays (else the weekend's); "weekend": the picked weekend's service. */
+  follow: "open" | "weekend";
+  /** Which service type's service in the weekend (null = the weekend's first of any type). */
   serviceTypeId: string | null;
   banner: { enabled: boolean; text: string; scroll: boolean; size: "s" | "m" | "l"; background: string; color: string; showService: boolean; showClock: boolean };
   /** Tile backgrounds: your own picture first (if there is one), else the Planning Center photo; or none. */
@@ -88,7 +88,7 @@ export interface DisplayState {
 }
 
 export const DEFAULT_BOARD: BoardSettings = {
-  mode: "auto", autoIdle: "micboard", follow: "open", serviceTypeId: null,
+  mode: "auto", autoIdle: "micboard", follow: "weekend", serviceTypeId: null,
   banner: { enabled: true, text: "", scroll: false, size: "m", background: "#0B1220", color: "#FFFFFF", showService: true, showClock: true },
   images: "custom-then-pco", imageStyle: "background", customImages: {}, kinds: ["vocal", "pack", "other"], hideUnassigned: false, hidden: [], stack: true, columns: 0,
   micboard: { group: 0, view: "elinfo11", backgrounds: "IMG" },

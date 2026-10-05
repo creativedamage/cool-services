@@ -821,3 +821,31 @@ export interface ResiStatus {
   /** Where "live" came from: Resi's live schedules, or the encoders' own status. */
   source: "schedules" | "encoders" | "none";
 }
+
+/**
+ * The Weekend picker: the one weekend Sundays works on everywhere (Dashboard, Mic board, Clock,
+ * Tuning strip, FOH companion, start view). Nothing moves on to the next weekend by itself.
+ * A weekend is the week ending on its Sunday (Monday through Sunday), so a midweek service of
+ * that week counts too.
+ */
+export interface WeekendOption {
+  /** The Sunday, YYYY-MM-DD (the church's local date). */
+  sunday: string;
+  /** How many plans that week, and of which service types. */
+  count: number;
+  serviceTypeIds: string[];
+}
+export interface WeekendView {
+  sunday: string | null;
+  /** Monday 00:00 → the next Monday 00:00, local time (ISO), when one is picked. */
+  from: string | null;
+  to: string | null;
+  /** The picked weekend is in the past. */
+  over: boolean;
+  /** Every plan in the picked weekend, all service types, in date order. */
+  plans: PlanSummary[];
+  /** This weekend and the ones after it (plus the picked one, if it's older). */
+  options: WeekendOption[];
+  /** Couldn't read Planning Center just now. */
+  error: string | null;
+}

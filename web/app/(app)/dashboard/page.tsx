@@ -15,7 +15,8 @@ import { usePlans } from "@/lib/plans";
 import { Modal } from "@/components/ui";
 import { ProdClockWidget } from "@/components/clock/ClockWidget";
 import { ResiWidget } from "@/components/resi/Resi";
-import { ClockWidget, LiveWidget, ProWidget, SplWidget, TuningWidget, WirelessWidget, useHome, useNextService } from "@/components/dashboard/Widgets";
+import { useWeekend } from "@/lib/weekend";
+import { ClockWidget, LiveWidget, ProWidget, SplWidget, TuningWidget, WirelessWidget, useHome, useWeekendService } from "@/components/dashboard/Widgets";
 
 const NAMES: Record<WidgetType, string> = {
   tuning: "Tuning keys", spl: "SPL (Smaart)", wireless: "Shure wireless",
@@ -159,18 +160,17 @@ function OptionsModal({ w, onClose, onSave }: { w: DashboardWidget; onClose: () 
 }
 
 /**
- * Your service: which campus (service type) the dashboard follows, and optionally one plan.
- * Widgets, the clock and the Live widget's Run sheet link all use it.
+ * Your service: which campus (service type) the dashboard follows, in the weekend picked in the
+ * sidebar. Widgets, the clock and the Live widget's Run sheet link all use it.
  */
 function HomePicker() {
   const qc = useQueryClient();
   const home = useHome();
   const plans = usePlans();
-  const next = useNextService();
+  const w = useWeekend().data;
+  const next = useWeekendService();
   const types = [...new Map((plans.data ?? []).map((p) => [p.serviceTypeId, p.serviceTypeName])).entries()];
   const st = home.data?.serviceTypeId ?? "";
-  const cutoff = Date.now() - 6 * 3600e3;
-  const upcoming = (plans.data ?? []).filter((p) => (!st || p.serviceTypeId === st) && Date.parse(p.sortDate) > cutoff).slice(0, 12);
   const save = useMutation({
     mutationFn: Api.saveHome,
     onMutate: (h) => qc.setQueryData(qk.home, h),
@@ -178,22 +178,18 @@ function HomePicker() {
     onError: (e) => { toast.error("Couldn’t save", { description: (e as Error).message }); void home.refetch(); },
   });
   if (!home.data) return null;
-  const pinned = home.data.planId;
   const day = (p: { sortDate: string }) => new Date(p.sortDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   return (
     <div className="ml-3 flex min-w-0 items-center gap-1.5 text-xs">
       <span className="text-ink-muted">Your service</span>
-      <select className={clsx("input w-auto max-w-[14rem] py-1 text-xs", !st && "border-warn/50")} value={st}
+      <select className="input w-auto max-w-[14rem] py-1 text-xs" value={st}
         onChange={(e) => save.mutate({ serviceTypeId: e.target.value || null, planId: null })} title="Which campus / service type the dashboard follows">
-        <option value="">Any (next service)</option>
+        <option value="">Any service type</option>
         {types.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
       </select>
-      <select className={clsx("input w-auto max-w-[16rem] py-1 text-xs", pinned && "border-accent/60 text-accent")} value={pinned ?? ""}
-        onChange={(e) => save.mutate({ serviceTypeId: st || null, planId: e.target.value || null })} title="Follow the next one automatically, or pin a plan">
-        <option value="">Next one{next && !pinned ? ` · ${day(next)}` : ""} (automatic)</option>
-        {pinned && !upcoming.some((p) => p.id === pinned) && <option value={pinned}>Pinned plan</option>}
-        {upcoming.map((p) => <option key={p.id} value={p.id}>{day(p)} · {p.title}{st ? "" : ` (${p.serviceTypeName})`}</option>)}
-      </select>
+      <span className={clsx("truncate", next ? "text-ink-soft" : "text-warn")}>
+        {!w?.sunday ? "Pick a weekend in the sidebar" : next ? `${day(next)} · ${next.title}` : "No service that weekend"}
+      </span>
     </div>
   );
 }

@@ -167,15 +167,18 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
         <section className="space-y-2">
           <h3 className="label">Service</h3>
           <div className="flex rounded-lg border border-line p-0.5">
-            {([["open", "The service I have open"], ["next", "Always the next service"]] as const).map(([v, label]) => (
+            {([["weekend", "The weekend’s service"], ["open", "The service I have open"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => onSave({ follow: v })}
-                className={clsx("flex-1 rounded-md px-2 py-1.5 text-xs", (s.follow ?? "open") === v ? "bg-accent text-white" : "text-ink-soft hover:bg-hover")}>{label}</button>
+                className={clsx("flex-1 rounded-md px-2 py-1.5 text-xs", (s.follow ?? "weekend") === v ? "bg-accent text-white" : "text-ink-soft hover:bg-hover")}>{label}</button>
             ))}
           </div>
-          {(s.follow ?? "open") === "open" && (
+          {(s.follow ?? "weekend") === "weekend" && (
+            <p className="text-[11px] text-ink-faint">Uses the weekend picked in the sidebar. It stays on that weekend until someone picks another.{data.state.service ? <> Now: <span className="text-ink-soft">{data.state.service.serviceTypeName} · {data.state.service.when}</span></> : null}</p>
+          )}
+          {(s.follow ?? "weekend") === "open" && (
             <p className="text-[11px] text-ink-faint">Open a service under Services and the board switches to it.{data.state.service ? <> Now: <span className="text-ink-soft">{data.state.service.serviceTypeName} · {data.state.service.when}</span></> : null}</p>
           )}
-          <label className="block"><span className="text-xs text-ink-muted">{(s.follow ?? "open") === "open" ? "Until you open one, the next service of" : "The next service of"}</span>
+          <label className="block"><span className="text-xs text-ink-muted">{(s.follow ?? "weekend") === "open" ? "Until you open one, the weekend’s service of" : "The weekend’s service of"}</span>
             <select className="input mt-1" value={s.serviceTypeId ?? ""} onChange={(e) => onSave({ serviceTypeId: e.target.value || null })}>
               <option value="">Any type</option>
               {types.data?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}

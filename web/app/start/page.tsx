@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Api } from "@/lib/api";
 import { routes } from "@/lib/routes";
+import { pickWeekendService } from "@/lib/weekend";
 import { Logo } from "@/components/Logo";
 
 export default function StartPage() {
@@ -25,10 +26,9 @@ export default function StartPage() {
         if (v.kind === "propresenter") return router.replace("/propresenter");
         if (v.kind === "paging") return router.replace("/paging");
         if (v.kind === "next-service" || v.kind === "next-checkins" || v.kind === "next-runsheet") {
-          // No type chosen: "Your service" from the dashboard, if one is set.
+          // The picked weekend's service (no type chosen: "Your service" from the dashboard, if set).
           const st = v.serviceTypeId ?? (await Api.home().catch(() => null))?.serviceTypeId ?? null;
-          const cutoff = Date.now() - 6 * 3600e3;
-          const next = (await Api.plans()).filter((p) => (!st || p.serviceTypeId === st) && Date.parse(p.sortDate) > cutoff)[0];
+          const next = pickWeekendService(await Api.weekend(), st);
           if (!next) return router.replace("/services");
           return router.replace(v.kind === "next-service" ? routes.plan(next.serviceTypeId, next.id)
             : v.kind === "next-runsheet" ? routes.runSheet(next.serviceTypeId, next.id) : routes.checkins(next.serviceTypeId, next.id));

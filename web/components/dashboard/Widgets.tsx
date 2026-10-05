@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import type { DashboardWidget, PlanSummary } from "@shared/types";
 import { Api, planQuery, qk } from "@/lib/api";
 import { clock, mmss } from "@/lib/format";
-import { usePlans } from "@/lib/plans";
+import { pickWeekendService, useWeekend } from "@/lib/weekend";
 import { routes } from "@/lib/routes";
 import { parseKey, sendKey, tuningSongs } from "@/lib/waves";
 import { TuningExtras } from "@/components/services/SongKeys";
@@ -22,22 +22,16 @@ type O = DashboardWidget["options"];
 export const useHome = () => useQuery({ queryKey: qk.home, queryFn: Api.home, staleTime: 60_000 });
 
 /**
- * The service a widget follows: today's until it's over, then the next one.
+ * The service a widget follows, always in the weekend picked in the sidebar (it never moves on to
+ * the next weekend by itself):
  *  - a widget can name its own service type;
- *  - otherwise the dashboard's service (Your service): a pinned plan, else that campus's next plan;
- *  - with nothing chosen, the next service of any type.
+ *  - otherwise the dashboard's service type (Your service);
+ *  - with neither, the weekend's service of any type.
  */
-export function useNextService(serviceTypeId?: string | null): PlanSummary | undefined {
-  const plans = usePlans({ refetchInterval: 5 * 60_000 });
+export function useWeekendService(serviceTypeId?: string | null): PlanSummary | undefined {
+  const w = useWeekend().data;
   const home = useHome().data;
-  const cutoff = Date.now() - 6 * 3600e3;
-  const list = plans.data ?? [];
-  if (!serviceTypeId && home?.planId) {
-    const pinned = list.find((p) => p.id === home.planId && Date.parse(p.sortDate) > cutoff);
-    if (pinned) return pinned;
-  }
-  const st = serviceTypeId || home?.serviceTypeId || null;
-  return list.find((p) => (!st || p.serviceTypeId === st) && Date.parse(p.sortDate) > cutoff);
+  return pickWeekendService(w, serviceTypeId || home?.serviceTypeId || null);
 }
 
 export function Frame({ title, icon: Icon, right, children, className }: { title: React.ReactNode; icon: typeof Clock3; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
@@ -53,7 +47,7 @@ export function Frame({ title, icon: Icon, right, children, className }: { title
 
 /* ── Clock ── */
 export function ClockWidget() {
-  const next = useNextService();
+  const next = useWeekendService();
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(t); }, []);
   const plan = useQuery({ ...planQuery(next?.serviceTypeId ?? "", next?.id ?? ""), enabled: Boolean(next) });
@@ -75,7 +69,7 @@ export function ClockWidget() {
 
 /* ── Planning Center Live ── */
 export function LiveWidget({ o }: { o: O }) {
-  const next = useNextService((o.serviceTypeId as string) || null);
+  const next = useWeekendService((o.serviceTypeId as string) || null);
   const data = useQuery({ queryKey: qk.runSheet(next?.id ?? ""), queryFn: () => Api.runSheet(next!.serviceTypeId, next!.id), enabled: Boolean(next), refetchInterval: 30_000 });
   const live = useQuery({ queryKey: qk.live(next?.id ?? ""), queryFn: () => Api.live(next!.serviceTypeId, next!.id), enabled: Boolean(next), refetchInterval: 3000, retry: false });
   const [now, setNow] = useState(Date.now());
@@ -105,7 +99,7 @@ export function LiveWidget({ o }: { o: O }) {
 
 /* ── Tuning keys ── */
 export function TuningWidget({ o }: { o: O }) {
-  const next = useNextService((o.serviceTypeId as string) || null);
+  const next = useWeekendService((o.serviceTypeId as string) || null);
   const plan = useQuery({ ...planQuery(next?.serviceTypeId ?? "", next?.id ?? ""), enabled: Boolean(next), refetchInterval: 60_000 });
   const settings = useQuery({ queryKey: qk.settings, queryFn: Api.settings, staleTime: 30_000 });
   const waves = settings.data?.waves;
@@ -117,10 +111,10 @@ export function TuningWidget({ o }: { o: O }) {
   };
   return (
     <Frame title={next ? `Tuning · ${next.title}` : "Tuning"} icon={AudioLines} right={waves?.enabled ? <span className="text-[10px] font-normal text-ok">Waves ready</span> : null}>
-      {!songs.length && !waves?.enabled ? <div className="grid h-full place-items-center text-sm text-ink-faint">No songs on the next service</div> : (
+      {!songs.length && !waves?.enabled ? <div className="grid h-full place-items-center text-sm text-ink-faint">No songs on the weekend’s service</div> : (
         <div className="flex h-full gap-2 overflow-x-auto">
           {waves?.enabled && <TuningExtras big waves={waves} sent={sent} onPress={(id) => void press(id, id)} />}
-          {!songs.length && <div className="grid flex-1 place-items-center text-sm text-ink-faint">No songs on the next service</div>}
+          {!songs.length && <div className="grid flex-1 place-items-center text-sm text-ink-faint">No songs on the weekend’s service</div>}
           {songs.map((s, i) => {
             const k = parseKey(s.songKey);
             return (
@@ -173,7 +167,7 @@ export function SplWidget({ o }: { o: O }) {
 
 /* ── Shure wireless ── */
 export function WirelessWidget() {
-  const next = useNextService();
+  const next = useWeekendService();
   const setup = useQuery({ queryKey: qk.micSetup, queryFn: Api.micSetup, staleTime: 60_000 });
   const mics = useQuery({ queryKey: qk.planMics(next?.id ?? ""), queryFn: () => Api.planMics(next!.id), enabled: Boolean(next) });
   const plan = useQuery({ ...planQuery(next?.serviceTypeId ?? "", next?.id ?? ""), enabled: Boolean(next) });

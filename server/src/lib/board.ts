@@ -14,6 +14,7 @@ import { pcoForUser } from "../auth/oauth.js";
 import type { PcoApi } from "../pco/api.js";
 import { cache, extras, mics } from "./db.js";
 import { readReceiver } from "./shure.js";
+import { weekend, weekendPlan, onWeekendChange } from "./weekend.js";
 import { micboardData, micboardRunning, micboardStatus, setMicboardPlanSource, statusesFromMicboard } from "./micboard.js";
 
 interface Stored { settings: BoardSettings; owner: { userId: string; demo: boolean } | null; open?: { serviceTypeId: string; planId: string } | null }
@@ -29,10 +30,13 @@ function load(): Stored {
   // Stage plots were removed in 1.22: a display set to the stage plot shows the mic board.
   if ((settings.mode as string) === "stageplot") settings.mode = "micboard";
   if ((settings.autoIdle as string) === "stageplot") settings.autoIdle = "micboard";
+  // "Always the next service" became the picked weekend's service in 1.25.
+  if ((settings.follow as string) !== "open") settings.follow = "weekend";
   return { settings, owner: s.owner ?? null, open: s.open ?? null };
 }
 let stored = load();
 const persist = () => extras.set(KEY, stored);
+onWeekendChange(() => { memo = null; planMemo = null; });
 
 export const boardSettings = () => stored.settings;
 const listeners = new Set<(s: BoardSettings) => void>();
@@ -104,25 +108,11 @@ function statusOf(c: ChannelStatus | undefined, rxOk: boolean | null): { status:
 
 /* ───────────── Which service, and which view ───────────── */
 
-async function currentPlan(api: PcoApi, st: string | null): Promise<PlanDetail | null> {
-  const now = Date.now();
-  const plans = (await api.listUpcomingPlans(st ?? undefined)).filter((p) => Date.parse(p.sortDate) > now - 14 * 3600e3).slice(0, 4);
-  let first: PlanDetail | null = null;
-  for (const p of plans) {
-    const d = await api.getPlan(p.serviceTypeId, p.id).catch(() => null);
-    if (!d) continue;
-    first ??= d;
-    // The first one that isn't over yet.
-    const end = Math.max(...d.times.map((t) => Date.parse(t.endsAt || t.startsAt)).filter(Number.isFinite), Date.parse(d.sortDate) + 3 * 3600e3);
-    if (end > now) return d;
-  }
-  return first;
-}
 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
 function autoView(plan: PlanDetail | null, idle: DisplayView): { view: DisplayView; reason: string } {
-  if (!plan) return { view: idle, reason: "No upcoming service" };
+  if (!plan) return { view: idle, reason: weekend() ? "No service that weekend" : "Pick a weekend in Sundays" };
   const now = Date.now();
   const within = (t: PlanDetail["times"][number], before: number, after: number) =>
     now >= Date.parse(t.startsAt) - before && now <= Date.parse(t.endsAt || t.startsAt) + after;
@@ -149,17 +139,17 @@ export function displayState(): Promise<DisplayState> {
 
 const imageUrl = (fileId: string) => `/api/board-out/image/${encodeURIComponent(fileId)}`;
 
-/** The service the display follows (the one open in Sundays, or the next), looked up every 10 s at most. */
+/** The service the display follows (the picked weekend's, or the one open in Sundays), looked up every 10 s at most. */
 let planMemo: { at: number; key: string; p: Promise<PlanDetail | null> } | null = null;
 export function boardPlan(): Promise<PlanDetail | null> {
   const s = stored.settings;
-  const key = JSON.stringify([s.follow, s.serviceTypeId, stored.open, stored.owner]);
+  const key = JSON.stringify([s.follow, s.serviceTypeId, stored.open, stored.owner, weekend()]);
   if (planMemo && planMemo.key === key && Date.now() - planMemo.at < 10_000) return planMemo.p;
   const p = (async () => {
     const api = pco();
     if (!api) return null;
-    const opened = s.follow !== "next" && stored.open ? await api.getPlan(stored.open.serviceTypeId, stored.open.planId).catch(() => null) : null;
-    return opened ?? (await currentPlan(api, s.serviceTypeId).catch(() => null));
+    const opened = s.follow === "open" && stored.open ? await api.getPlan(stored.open.serviceTypeId, stored.open.planId).catch(() => null) : null;
+    return opened ?? (await weekendPlan(api, s.serviceTypeId).catch(() => null));
   })();
   planMemo = { at: Date.now(), key, p };
   return p;

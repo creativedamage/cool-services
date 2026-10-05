@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { CalendarCheck, Check, Clock3, Layers, MapPin, Plus, ShieldCheck, Trash2, UsersRound } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useWeekend } from "@/lib/weekend";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { TeamCheckIns, TeamGroup } from "@shared/types";
@@ -28,7 +29,9 @@ function TeamCheckInsPage() {
   const { campus, shows } = useCampus();
   const cutoff = Date.now() - 8 * 3600e3;
   const choices = (plans.data ?? []).filter((p) => shows(p.serviceTypeId) && Date.parse(p.sortDate) > cutoff).slice(0, 20);
-  const chosen = choices.find((p) => p.id === params.get("plan")) ?? choices[0];
+  // Unless one is picked here: the weekend's first service (sidebar → Weekend).
+  const weekend = useWeekend().data;
+  const chosen = choices.find((p) => p.id === params.get("plan")) ?? choices.find((p) => weekend?.plans.some((w) => w.id === p.id)) ?? choices[0];
   const data = useQuery({
     queryKey: ["teamCheckIns", chosen?.id ?? ""],
     queryFn: () => Api.teamCheckIns(chosen!.serviceTypeId, chosen!.id),

@@ -35,6 +35,7 @@ import { micboardRouter, setFolderOpener } from "./routes/micboard.js";
 import { serviceModeGuard } from "./lib/appMode.js";
 import { wavesRelayRouter } from "./routes/wavesRelay.js";
 import { resiRouter } from "./routes/resi.js";
+import { weekendRouter } from "./routes/weekend.js";
 import { startResi } from "./lib/resi.js";
 import { initMicboard } from "./lib/micboard.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
@@ -70,6 +71,7 @@ export function createApp(webDir?: string) {
   app.use("/api/clock", requireAuth, clockRouter);
   app.use("/api/board", requireAuth, boardRouter);
   app.use("/api/micboard", requireAuth, micboardRouter); // Micboard inside Sundays
+  app.use("/api/weekend", requireAuth, weekendRouter); // the weekend everything works on
   app.use("/api/resi", requireAuth, resiRouter); // Resi live status (read-only)
   app.use("/api/waves", requireAuth, wavesRelayRouter); // Tuning keys from FOH companions, sent to Waves from this Mac
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app

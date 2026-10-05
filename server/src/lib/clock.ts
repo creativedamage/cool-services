@@ -12,6 +12,7 @@ import {
   type ClockOutputSettings, type ClockPreset, type ClockState, type ClockStatusView, type ClockTimerSpec, type ClockTimerState,
 } from "../../../shared/clock.js";
 import { pcoForUser } from "../auth/oauth.js";
+import { followPlans, onWeekendChange, weekend, weekendPlans } from "./weekend.js";
 import type { PcoApi } from "../pco/api.js";
 import { extras } from "./db.js";
 
@@ -227,7 +228,8 @@ export function clockAct(a: ClockAction): ClockState {
 let pcoBusy = false;
 async function serviceTarget(api: PcoApi, st: string | null): Promise<{ at: number; label: string } | null> {
   const now = Date.now();
-  const plans = (await api.listUpcomingPlans(st ?? undefined)).filter((p) => Date.parse(p.sortDate) > now - 12 * 3600e3).slice(0, 4);
+  // The picked weekend's services only: it never jumps ahead to the next weekend.
+  const plans = (await followPlans(api, st)).filter((p) => Date.parse(p.sortDate) > now - 12 * 3600e3).slice(0, 4);
   let best: { at: number; label: string } | null = null;
   for (const p of plans) {
     const d = await api.getPlan(p.serviceTypeId, p.id).catch(() => null);
@@ -243,7 +245,7 @@ async function serviceTarget(api: PcoApi, st: string | null): Promise<{ at: numb
 
 async function liveItem(api: PcoApi, st: string | null): Promise<{ title: string; startedAt: number; lengthMs: number } | null> {
   const now = Date.now();
-  const plans = (await api.listUpcomingPlans(st ?? undefined)).filter((p) => Math.abs(Date.parse(p.sortDate) - now) < 18 * 3600e3).slice(0, 6);
+  const plans = (await weekendPlans(api, st)).filter((p) => Math.abs(Date.parse(p.sortDate) - now) < 18 * 3600e3).slice(0, 6);
   for (const p of plans) {
     const live = await api.getLive(p.serviceTypeId, p.id).catch(() => null);
     if (!live?.currentItemId) continue;
@@ -275,7 +277,7 @@ async function refreshPco(force = false) {
       const t = state[w]!;
       if (t.mode === "service" && (force || !t.targetAt || t.targetAt < Date.now() - 60_000 || Date.now() % 60_000 < 3500)) {
         const r = await serviceTarget(api, follow[w]).catch(() => null);
-        const next: ClockTimerState = r ? { ...t, targetAt: r.at, idle: undefined, label: t.label === DEFAULT_LABEL.service || !t.label ? DEFAULT_LABEL.service : t.label } : { ...t, targetAt: null, idle: "No upcoming service" };
+        const next: ClockTimerState = r ? { ...t, targetAt: r.at, idle: undefined, label: t.label === DEFAULT_LABEL.service || !t.label ? DEFAULT_LABEL.service : t.label } : { ...t, targetAt: null, idle: weekend() ? "No more services that weekend" : "Pick a weekend in Sundays" };
         if (JSON.stringify(next) !== JSON.stringify(t)) { state = { ...state, [w]: next }; any = true; }
       }
       if (t.mode === "liveitem") {
@@ -334,5 +336,6 @@ export function startClock() {
   started = true;
   setInterval(tick, 200);
   setInterval(() => void refreshPco(), 3000);
+  onWeekendChange(() => void refreshPco(true));
   void refreshPco(true);
 }

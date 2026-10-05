@@ -17,6 +17,7 @@ import { routes } from "@/lib/routes";
 import { PrefsLink } from "@/components/settings/PrefsLink";
 import { PageRequestsBar } from "@/components/paging/PageRequests";
 import { useCampus } from "@/lib/campus";
+import { WeekendPicker, useWeekend } from "@/lib/weekend";
 import { APP_MODE_KEY, PinDialog, serviceLocked, serviceModeAllows, useAppMode, useUnlock } from "@/lib/appMode";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -79,6 +80,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <CampusSwitcher />
+        <WeekendPicker />
 
         <nav className="space-y-0.5 px-2">
           {(locked ? nav.filter((n) => serviceModeAllows(n.href)) : nav).map(({ href, to, label, icon: Icon }: { href: string; to?: string; label: string; icon: typeof CalendarDays }) => (
@@ -167,6 +169,7 @@ function ServicesNav({ activeSt, activePlan, tab }: { activeSt: string | null; a
   const plans = usePlans();
   const list = plans.data ?? [];
   const { shows } = useCampus();
+  const inWeekend = new Set(useWeekend().data?.plans.map((p) => p.id) ?? []);
   // In Planning Center's service type order; each type appears as soon as its plans arrive.
   // On the overview, only the campus you're looking at.
   const types = (plans.types ?? []).map((t) => [t.id, t.name] as [string, string])
@@ -201,6 +204,7 @@ function ServicesNav({ activeSt, activePlan, tab }: { activeSt: string | null; a
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px]">{p.title}</span>
                     <span className="block text-[10px] text-ink-faint">
+                      {inWeekend.has(p.id) && <span className="mr-1 font-semibold text-accent" title="In the weekend picked above">●</span>}
                       {d.toLocaleDateString("en-US", { weekday: "short" })}{p.neededCount ? ` · ${p.neededCount} open` : ""}
                     </span>
                   </span>

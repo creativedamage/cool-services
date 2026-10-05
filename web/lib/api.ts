@@ -1,4 +1,5 @@
 import type {
+  WeekendView,
   AppSettings, Board, Candidate, CheckInsForPlan, Conflict, MicAssignment, MicSetup, Note, PlanCounts, PlanDetail, PlanMics, ReceiverStatus, PlanSummary, RosterStatus, ScheduleRequest,
   ServiceType, StaffMe, TeamMember, WorkflowCard, WorkflowSummary, WorkflowShare, WorkflowShareGroup, WorkflowAccessRequest, Person,
   DashboardWidget, HomeService, TeamCheckIns, TeamPhonesView, TeamPhoneRole, VolunteerCheckInConfig, VolunteerCheckInSetup, TeamGroup, AppMode, AppModeView, ResiSettingsView, ResiStatus, CompanionState, CompanionStrip, CompanionTuning, DisplayInfo, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
@@ -146,6 +147,8 @@ export const Api = {
   companionLink: (host: string, port: number, code: string) => api<CompanionState>("/companion-client/link", { method: "POST", json: { host, port, code } }),
   companionUnlink: () => api<CompanionState>("/companion-client/unlink", { method: "POST" }),
   companionAct: (id: string, action: "accept" | "hold" | "deny") => api<CompanionState>("/companion-client/act", { method: "POST", json: { id, action } }),
+  weekend: () => api<WeekendView>("/weekend"),
+  setWeekend: (sunday: string | null) => api<WeekendView>("/weekend", { method: "PUT", json: { sunday } }),
   resi: () => api<ResiStatus>("/resi"),
   resiSettings: () => api<ResiSettingsView>("/resi/settings"),
   saveResiSettings: (p: { enabled?: boolean; clientId?: string; clientSecret?: string; encoderIds?: string[] }) =>
@@ -271,6 +274,7 @@ export const qk = {
   smaartStatus: ["smaartStatus"] as const,
   dashboard: ["dashboard"] as const,
   home: ["home"] as const,
+  weekend: ["weekend"] as const,
   campuses: ["campuses"] as const,
   profile: (personId: string) => ["profile", personId] as const,
   consoleConfig: ["consoleConfig"] as const,

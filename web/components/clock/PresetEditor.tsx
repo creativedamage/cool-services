@@ -61,7 +61,7 @@ export function SpecFields({ spec, onChange, compact }: { spec: ClockTimerSpec; 
       {(spec.mode === "service" || spec.mode === "liveitem") && (
         <label className="block"><span className="label block">Service type</span>
           <select className="input mt-1" value={spec.serviceTypeId ?? ""} onChange={(e) => onChange({ ...spec, serviceTypeId: e.target.value || null })}>
-            <option value="">{spec.mode === "service" ? "The next service of any type" : "Whichever is live"}</option>
+            <option value="">{spec.mode === "service" ? "The weekend’s service, any type" : "Whichever is live"}</option>
             {types.data?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </label>

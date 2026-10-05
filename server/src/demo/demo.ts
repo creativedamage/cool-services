@@ -424,6 +424,11 @@ export class DemoPco implements PcoApi {
       .sort((a, b) => a.sortDate.localeCompare(b.sortDate));
   }
 
+  async listPlansFrom(from: string, count: number, serviceTypeId?: string) {
+    const start = new Date(`${from}T00:00:00`).getTime();
+    return (await this.listUpcomingPlans(serviceTypeId)).filter((p) => Date.parse(p.sortDate) >= start).slice(0, count * 4);
+  }
+
   async getMatrix(st: string, weeks: number): Promise<Matrix> {
     const list = plans.filter((p) => p.serviceTypeId === st).sort((a, b) => a.sortDate.localeCompare(b.sortDate)).slice(0, weeks);
     return { serviceType: serviceTypes.find((t) => t.id === st) ?? { id: st, name: "Service" }, plans: await Promise.all(list.map((p) => this.getPlan(st, p.id))) };

@@ -28,7 +28,7 @@ boardRouter.get("/", h(async (_req, res) => {
 }));
 boardRouter.put("/settings", (req, res) => {
   const p = z.object({
-    mode: z.enum(["auto", "micboard", "clock"]), autoIdle: View, follow: z.enum(["open", "next"]), serviceTypeId: z.string().max(40).nullable(),
+    mode: z.enum(["auto", "micboard", "clock"]), autoIdle: View, follow: z.enum(["open", "weekend", "next"]).transform((v) => (v === "next" ? "weekend" as const : v)), serviceTypeId: z.string().max(40).nullable(),
     banner: z.object({ enabled: z.boolean(), text: z.string().max(400), scroll: z.boolean(), size: z.enum(["s", "m", "l"]), background: Color, color: Color, showService: z.boolean(), showClock: z.boolean() }).partial(),
     images: z.enum(["custom-then-pco", "pco", "custom", "none"]), imageStyle: z.enum(["background", "icon", "none"]),
     kinds: z.array(z.enum(["vocal", "pack", "other"])).max(3), hideUnassigned: z.boolean(), columns: z.number().int().min(0).max(12),

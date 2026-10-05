@@ -8,6 +8,7 @@
  * Each ministry is locked with its own PIN. An iPad signed in to Nursery can see Nursery's checked-in
  * children (name, photo, security code, room) and page the auditorium; nothing else.
  */
+import { weekendPlans } from "./lib/weekend.js";
 import fs from "node:fs";
 import path from "node:path";
 import type { Server } from "node:http";
@@ -225,7 +226,9 @@ teamLanRouter.get("/:role/data", needPhone, h(async (req, res) => {
     id: p.id, serviceTypeId: p.serviceTypeId, sortDate: p.sortDate,
     label: `${new Date(p.sortDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${p.serviceTypeName}`,
   }));
-  const chosen = services.find((x) => x.id === req.query.plan) ?? services[0] ?? null;
+  // Unless the phone picked one: the picked weekend's first service.
+  const inWeekend = new Set((await weekendPlans(api).catch(() => [])).map((p) => p.id));
+  const chosen = services.find((x) => x.id === req.query.plan) ?? services.find((x) => inWeekend.has(x.id)) ?? services[0] ?? null;
   const out: TeamPhoneData = {
     services, planId: chosen?.id ?? null, groups: extras.get<TeamGroup[]>("teamGroups", []),
     data: chosen ? await teamCheckIns(api, chosen.serviceTypeId, chosen.id, denied, "phones") : null,

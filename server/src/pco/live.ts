@@ -371,6 +371,20 @@ export class LivePco implements PcoApi {
     return all.flat().sort((a, b) => a.sortDate.localeCompare(b.sortDate));
   }
 
+  async listPlansFrom(from: string, count: number, serviceTypeId?: string): Promise<PlanSummary[]> {
+    const types = (await this.listServiceTypes()).filter((t) => !serviceTypeId || t.id === serviceTypeId);
+    const n = Math.min(Math.max(count, 1), 25);
+    const all = await Promise.all(
+      types.map(async (t) => {
+        const plans = await cache.swr(this.k(`plans:${t.id}:from:${from}:${n}`), 120, () =>
+          this.c.list(`${S}/service_types/${t.id}/plans?filter=after&after=${encodeURIComponent(from)}&order=sort_date&per_page=${n}`, 1),
+        );
+        return plans.map((p) => this.planSummary(p, t, null));
+      }),
+    );
+    return all.flat().sort((a, b) => a.sortDate.localeCompare(b.sortDate));
+  }
+
   async getMatrix(st: string, weeks: number, past: number): Promise<Matrix> {
     const t = (await this.listServiceTypes()).find((x) => x.id === st) ?? { id: st, name: "Service" };
     const base = `${S}/service_types/${st}/plans`;
