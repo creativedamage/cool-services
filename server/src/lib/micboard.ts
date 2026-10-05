@@ -1,13 +1,13 @@
 /**
- * Micboard inside Cool Services.
+ * Micboard inside Sundays.
  *
- * Cool Services runs creativedamage/micboard (vendor/micboard, unchanged) with its own bundled
+ * Sundays runs creativedamage/micboard (vendor/micboard, unchanged) with its own bundled
  * Python, exactly as `python py/micboard.py -f <config> -p <port> -b <backgrounds>` would run on
  * its own. Micboard serves its own page on the network at http://<this Mac>:<port> (8058 by
  * default), keeps its own config (receivers, slots, groups, extended names) and talks to the Shure
- * receivers. Cool Services adapts to it through Micboard's own interfaces only:
+ * receivers. Sundays adapts to it through Micboard's own interfaces only:
  *
- *   • reads /data.json (receivers, slots, battery/RF/audio) — Cool Services doesn't open its own
+ *   • reads /data.json (receivers, slots, battery/RF/audio) — Sundays doesn't open its own
  *     receiver connections while Micboard runs;
  *   • adds Micboard's slots to Mic setup (matched by receiver IP and channel), so people can be put
  *     on them in each service's Mics panel;
@@ -97,13 +97,13 @@ export async function startMicboard() {
   if (!s.enabled) { run = "off"; error = null; return; }
   const p = paths();
   if (!fs.existsSync(p.python) || !fs.existsSync(path.join(p.app, "py", "micboard.py"))) {
-    run = "missing"; error = "Micboard isn’t included in this build of Cool Services."; return;
+    run = "missing"; error = "Micboard isn’t included in this build of Sundays."; return;
   }
   if (!(await portFree(s.port))) {
     const other = await fetchJson<{ config?: { micboard_version?: string } }>(`http://127.0.0.1:${s.port}/data.json`, 1500).catch(() => null);
     run = "error";
     error = other?.config?.micboard_version
-      ? `Another copy of Micboard is already running on port ${s.port}. Quit it (Cool Services runs its own), or choose another port.`
+      ? `Another copy of Micboard is already running on port ${s.port}. Quit it (Sundays runs its own), or choose another port.`
       : `Port ${s.port} is in use by another app. Choose another port for Micboard.`;
     return;
   }
@@ -208,7 +208,7 @@ const val = (raw: Record<string, string> | undefined, ...keys: string[]) => {
   return null;
 };
 
-/** Receiver status (as Cool Services shows it) from Micboard's data. */
+/** Receiver status (as Sundays shows it) from Micboard's data. */
 export function statusesFromMicboard(d: MbData, setup: MicSetup = mics.setup()): ReceiverStatus[] {
   const at = new Date().toISOString();
   return setup.receivers.filter((r) => r.ip).map((r) => {
@@ -232,7 +232,7 @@ export function statusesFromMicboard(d: MbData, setup: MicSetup = mics.setup()):
           batteryType: val(t.raw, "BATT_TYPE", "TX_BATT_TYPE"),
           frequencyMHz: Number.isFinite(freq) && freq > 0 ? freq : null,
           antennas: on ? t.antenna ?? null : null,
-          // Micboard scales RF to 0–100 (raw/115) and audio to 0–100; Cool Services shows dBm and 0–50.
+          // Micboard scales RF to 0–100 (raw/115) and audio to 0–100; Sundays shows dBm and 0–50.
           rfDbm: on && t.rf_level != null ? Math.round(t.rf_level * 1.15 - 128) : null,
           audioLevel: on && t.audio_level != null ? Math.max(0, Math.min(50, Math.round(t.audio_level / 2))) : null,
           interference: val(t.raw, "RF_INT_DET", "INTERFERENCE_STATUS") === "CRITICAL",
@@ -250,7 +250,7 @@ const MB_TYPE: Partial<Record<ShureModel, string>> = { ULXD: "ulxd", QLXD: "qlxd
 /**
  * A Micboard with no slots yet (a new install) gets the receivers and mics from Mic setup, through
  * Micboard's own config API (POST /api/config), so it shows the mics that were already set up in
- * Cool Services. Once Micboard has slots, it's set up in Micboard (and Mic setup follows it).
+ * Sundays. Once Micboard has slots, it's set up in Micboard (and Mic setup follows it).
  */
 async function seedFromSetup(d: MbData): Promise<boolean> {
   if ((d.config.slots ?? []).length || extras.get("micboardSeeded", false)) return false;

@@ -2,7 +2,7 @@
 /**
  * Mics & packs — who's on which wireless channel for this service, plus live receiver status.
  *
- * Assignments live only in Cool Services. The Shure connection is READ-ONLY: it shows battery,
+ * Assignments live only in Sundays. The Shure connection is READ-ONLY: it shows battery,
  * runtime, antennas and signal, and never changes anything on the receivers or in Wireless Workbench.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

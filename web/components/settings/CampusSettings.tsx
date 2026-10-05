@@ -80,7 +80,7 @@ export function CampusSettings() {
       {list.length > 0 && (
         <section className="panel p-5">
           <h2 className="font-semibold">My default campus</h2>
-          <p className="mt-0.5 text-sm text-ink-muted">What you see each time you open Cool Services. You can still switch campus from the sidebar any time.</p>
+          <p className="mt-0.5 text-sm text-ink-muted">What you see each time you open Sundays. You can still switch campus from the sidebar any time.</p>
           <select className="input mt-3 w-72" value={q.data.myDefault ?? ""} onChange={(e) => setDefault.mutate(e.target.value || null)}>
             <option value="">All campuses</option>
             {list.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}

@@ -4,7 +4,7 @@ import { Providers } from "./providers";
 import { themeBootScript } from "@/lib/theme";
 
 export const metadata: Metadata = {
-  title: "Cool Services",
+  title: "Sundays",
   description: "Volunteer workflows and service scheduling, powered by Planning Center",
 };
 

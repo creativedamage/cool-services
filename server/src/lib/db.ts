@@ -1,8 +1,8 @@
 /**
- * Cool Services storage — a small JSON file on the Mac, no database engine to install or break.
+ * Sundays storage — a small JSON file on the Mac, no database engine to install or break.
  *
  * Location: <DATA_DIR>/cool-services.json (in the Mac app that's
- * ~/Library/Application Support/Cool Services/). Writes are debounced and atomic
+ * ~/Library/Application Support/Sundays/). Writes are debounced and atomic
  * (write temp file → rename), so a crash can't leave a half-written file.
  *
  * Planning Center is the source of truth for people, workflows and plans; this file only holds

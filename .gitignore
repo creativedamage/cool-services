@@ -12,3 +12,7 @@ desktop/release
 *.p12
 *.pem
 cool-services-signing.*
+sundays-signing.*
+
+# Files Claude saves for you in the project folder
+Claude outputs/

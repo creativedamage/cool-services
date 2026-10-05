@@ -71,7 +71,7 @@ console.log("• Adding koffi (ready-built, for calling the NDI library)…");
 }
 
 const NDI_PKG_URL = "https://downloads.ndi.tv/SDK/NDI_SDK_Mac/Install_NDI_SDK_v6_Apple.pkg";
-const cacheDir = path.join(os.homedir(), "Library", "Caches", "cool-services-build");
+const cacheDir = path.join(os.homedir(), "Library", "Caches", "sundays-build");
 
 /** Copy libndi.dylib (and NDI's license files) out of NDI's official SDK installer. Mac only. */
 async function addNdiLibrary() {

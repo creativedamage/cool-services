@@ -1,7 +1,7 @@
 /**
- * Planning Center Chat inside the Cool Services window.
+ * Planning Center Chat inside the Sundays window.
  *
- * Planning Center has no public Chat API, so Cool Services shows Planning Center's own Chat
+ * Planning Center has no public Chat API, so Sundays shows Planning Center's own Chat
  * (chat.planningcenteronline.com) in a native view placed over the Chat page's content area. It
  * uses the same browser session as the rest of the app, so the Planning Center sign-in from
  * "Sign in with Planning Center" usually carries over. Links that leave Planning Center open in the

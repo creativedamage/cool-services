@@ -1,7 +1,7 @@
 "use client";
 /**
  * Resi (resi.io): the live badge on the Services pages and the Dashboard widget. Status comes from
- * Cool Services' server, which asks Resi every 10 seconds (read-only; Preferences → Video → Resi).
+ * Sundays' server, which asks Resi every 10 seconds (read-only; Preferences → Video → Resi).
  */
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";

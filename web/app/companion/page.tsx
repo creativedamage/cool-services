@@ -95,7 +95,7 @@ function Idle({ st, now, onChange }: { st: CompanionState; now: number; onChange
         {menu && (
           <div className="absolute right-0 top-full z-10 mt-1 w-64 rounded-xl border border-line bg-surface p-1.5 shadow-2xl">
             <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-hover" onClick={async () => { onChange(await Api.companionUnlink()); setMenu(false); }}><Unlink size={15} /> Unlink from {st.main?.name}</button>
-            <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-hover" onClick={async () => { await Api.setAppMode("full"); router.replace("/"); }}><Logo size={15} /> Use the full Cool Services</button>
+            <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-hover" onClick={async () => { await Api.setAppMode("full"); router.replace("/"); }}><Logo size={15} /> Use the full Sundays</button>
           </div>
         )}
       </div>
@@ -148,7 +148,7 @@ function LinkWizard({ onLinked }: { onLinked: (s: CompanionState) => void }) {
   return (
     <Shell>
       <div className="w-full max-w-xl">
-        <div className="mb-6 flex items-center gap-3"><Logo size={36} /><div><div className="text-xl font-semibold">Link to your main Cool Services computer</div><div className="text-sm text-ink-muted">FOH companion</div></div></div>
+        <div className="mb-6 flex items-center gap-3"><Logo size={36} /><div><div className="text-xl font-semibold">Link to your main Sundays computer</div><div className="text-sm text-ink-muted">FOH companion</div></div></div>
         <ol className="space-y-5">
           <li className="panel p-5">
             <div className="flex items-center justify-between">
@@ -180,7 +180,7 @@ function LinkWizard({ onLinked }: { onLinked: (s: CompanionState) => void }) {
             <button className="btn-primary mt-4 w-full py-3 text-base" disabled={!target || code.length !== 6 || busy} onClick={link}>{busy ? <Loader2 size={16} className="animate-spin" /> : <Link2 size={16} />} Link</button>
           </li>
         </ol>
-        <button className="mt-6 text-xs text-ink-muted hover:text-accent" onClick={async () => { await Api.setAppMode("full"); router.replace("/"); }}>Use the full Cool Services on this Mac instead</button>
+        <button className="mt-6 text-xs text-ink-muted hover:text-accent" onClick={async () => { await Api.setAppMode("full"); router.replace("/"); }}>Use the full Sundays on this Mac instead</button>
       </div>
     </Shell>
   );
@@ -223,7 +223,7 @@ function StripPanel({ st, now }: { st: CompanionState; now: number }) {
         onPick={(d) => void save(d ? { displayId: d.id, displayLabel: d.label } : { displayId: null, displayLabel: null })} />
       <p className="mt-2 text-xs text-ink-faint">
         Tuning keys pressed here are sent to Waves SuperRack by the main computer (its Tuning bar, the service its Mic board follows), so nothing on this computer changes and the strip never takes the focus from the app you’re in.
-        Which mics show, and stacking a person’s mics, follow the main computer’s Mic board → Display settings. Hover the strip and press the gear (or click Cool Services in the Dock) to come back here.
+        Which mics show, and stacking a person’s mics, follow the main computer’s Mic board → Display settings. Hover the strip and press the gear (or click Sundays in the Dock) to come back here.
       </p>
     </div>
   );

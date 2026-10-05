@@ -67,8 +67,8 @@ export default function TeamPhonePage() {
 
   if (role === undefined) return <Shell />;
   if (role === null) return <Chooser />;
-  if (err === "off") return <Shell><Centered><p className="text-ink-soft">Team check-ins on phones is turned off.</p><p className="mt-1 text-sm text-ink-muted">A staff member can turn it on in Cool Services → Preferences → Network Connections.</p></Centered></Shell>;
-  if (err) return <Shell><Centered><p className="text-ink-soft">Can’t reach Cool Services.</p><p className="mt-1 text-sm text-ink-muted">Make sure you’re on the church Wi-Fi and the Cool Services Mac is on and awake.</p><button className="btn-outline mt-6" onClick={refresh}>Try again</button></Centered></Shell>;
+  if (err === "off") return <Shell><Centered><p className="text-ink-soft">Team check-ins on phones is turned off.</p><p className="mt-1 text-sm text-ink-muted">A staff member can turn it on in Sundays → Preferences → Network Connections.</p></Centered></Shell>;
+  if (err) return <Shell><Centered><p className="text-ink-soft">Can’t reach Sundays.</p><p className="mt-1 text-sm text-ink-muted">Make sure you’re on the church Wi-Fi and the Sundays Mac is on and awake.</p><button className="btn-outline mt-6" onClick={refresh}>Try again</button></Centered></Shell>;
   if (!info) return <Shell />;
   if (!info.unlocked) return <PinPad role={role} info={info} onUnlocked={refresh} />;
   return <Teams role={role} info={info} onLocked={refresh} />;

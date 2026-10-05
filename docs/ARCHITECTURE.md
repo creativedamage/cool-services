@@ -1,17 +1,17 @@
-# Cool Services — Architecture
+# Sundays — Architecture
 
 A macOS app (Electron) for Cool Church (Miramar, FL) built on Planning Center People + Services.
 Everything runs inside the app: nothing to host.
 
 ```
-┌──────────────── Cool Services.app ─────────────────┐
+┌─────────────────── Sundays.app ────────────────────┐
 │  Window (Electron)                                  │         ┌──────────────────────────┐
 │    loads http://127.0.0.1:47123                     │  HTTPS  │ api.planningcenteronline │
 │  Built-in server (127.0.0.1 only)                   │ ──────▶ │  /oauth/*                │
 │    • static UI (Next.js export, Tailwind dark)      │         │  /people/v2/*            │
 │    • /api: sign-in, sessions, PCO client, routes    │         │  /services/v2/*          │
-│  Data: ~/Library/Application Support/Cool Services  │         └──────────────────────────┘
-│    cool-services.json · key in macOS Keychain       │
+│  Data: ~/Library/Application Support/Sundays        │         └──────────────────────────┘
+│    cool-services.json · key.txt (not the Keychain)  │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -20,7 +20,7 @@ Ports: 47123, falling back to 47124 then 47125 if taken (never 3000/3001). The s
 
 ## 1. Sign in with Planning Center
 
-The same model as ProDeck: one **Public** OAuth application ("Cool Services"), registered once.
+The same model as ProDeck: one **Public** OAuth application ("Sundays"), registered once.
 Its Client ID is built into the app (`server/src/pco/registration.ts`), and a Public app has no
 secret. PKCE proves each sign-in is genuine.
 
@@ -159,7 +159,7 @@ PIN is stored as a scrypt hash; `PUT /api/app-mode` needs it to leave Service Mo
 - `lib/paging.ts`: one page at a time. `page()` takes a server-side lock for `onScreenSeconds`
   (default 15) before calling ProPresenter, so the app and all iPads share it; a second page gets
   409 with the seconds left. The message is cleared when the time is up. Managed mode keeps a
-  "Cool Services · <Ministry>" message (text with a `{code}` token, chosen theme slide); existing
+  "Sundays · <Ministry>" message (text with a `{code}` token, chosen theme slide); existing
   mode triggers a chosen message/token. Only the security code is sent.
 - `kiosk.ts`: a second Express app on 0.0.0.0:47130 (only when enabled) serving `kiosk.html`,
   `/_next/static` and `/api/kiosk/:ministry/*`. Per-ministry PIN (scrypt), httpOnly session cookie
@@ -240,7 +240,7 @@ hide the option with `ALLOW_DEMO=false`.
 ## 8. Building and shipping
 
 - `npm run app`: build and open the app (development).
-- `npm run dist:mac` (on a Mac) → `desktop/release/Cool-Services-<version>.dmg` (universal: Apple
+- `npm run dist:mac` (on a Mac) → `desktop/release/Sundays-<version>.dmg` (universal: Apple
   Silicon + Intel). It's ad-hoc signed. For friction-free installs on other Macs, sign with an
   Apple Developer ID and notarize (see README).
 
@@ -312,7 +312,7 @@ see shares), `mine`, `canOpen` (mine, or People manager / site administrator fro
 WorkflowShares (`/people/v2/workflows/:id/shares`, create / patch group / delete), allowed only
 when `canManage`. Access requests are local (`workflowRequests` extra): the requester's pending
 requests, and pending requests for workflows the viewer manages; approving creates the share. The
-board page shows a locked screen for workflows that aren't `canOpen` (the gate is in Cool Services;
+board page shows a locked screen for workflows that aren't `canOpen` (the gate is in Sundays;
 Planning Center's own permissions still apply underneath). `WorkflowWatcher` in the app layout
 fetches boards of `mine` workflows each minute, compares card ids with those seen before (per person,
 localStorage) and toasts new ones; it also toasts new requests to review and answers to yours.
@@ -371,7 +371,7 @@ event and the team's location; `staffRows()` turns a plan's staff check-ins into
   outputs. The LAN listener serves `clockout.html` at `/clock`.
 - Desktop: `clockOut.ts` renders `/clockout?ndi=1` in an off-screen window and sends each frame
   through `ndiLib.ts` (koffi → `NDIlib_send_send_video_v2` on a worker thread, BGRA with alpha or
-  BGRX, clock_video off and paced by Cool Services); it also opens the second-display window and
+  BGRX, clock_video off and paced by Sundays); it also opens the second-display window and
   reports displays. `build.mjs` copies koffi's Mac binaries to `app/native/koffi` and extracts
   `libndi.dylib` from NDI's SDK installer to `app/native/ndi` (unpacked from asar; `x64ArchFiles`
   covers them for the universal build). `COOL_NDI_FAKE=<folder>` writes frames as PNGs for testing.

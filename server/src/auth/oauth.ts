@@ -222,7 +222,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
 /**
  * Planning Center said no to Check-Ins. Signing in again only helps if this sign-in was made before
- * Cool Services asked for Check-Ins access (the token doesn't include it) or has expired. Otherwise
+ * Sundays asked for Check-Ins access (the token doesn't include it) or has expired. Otherwise
  * the Planning Center account itself doesn't have Check-Ins permission, and signing in again would
  * just loop, so say that instead.
  */
@@ -234,7 +234,7 @@ export function checkInsDenied(req: Request, e: { status?: number; body?: unknow
   if (pcoSays && /scope/i.test(pcoSays) && !patClient) return { error: "checkins_signin", message: "Sign in again and approve Check-Ins. It only takes a moment.", pcoSays };
   if (patClient) {
     return { error: "checkins_permission", shared: true, pcoSays,
-      message: "The Planning Center account Cool Services uses on this Mac (its personal access token) doesn’t have access to Check-Ins. Give that account Check-Ins access in Planning Center, or remove the token so people use their own sign-in." };
+      message: "The Planning Center account Sundays uses on this Mac (its personal access token) doesn’t have access to Check-Ins. Give that account Check-Ins access in Planning Center, or remove the token so people use their own sign-in." };
   }
   const scope = (req.user ? tokenStore.get(req.user.id)?.scope : "") ?? "";
   if (!scope.split(/[\s,]+/).includes("check_ins")) {

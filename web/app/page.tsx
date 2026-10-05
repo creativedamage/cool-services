@@ -37,8 +37,7 @@ function Login() {
         <div className="mb-8 flex items-center gap-3">
           <Logo />
           <div>
-            <div className="text-lg font-semibold tracking-tight">Cool Services</div>
-            <div className="text-sm text-ink-muted">for Planning Center</div>
+            <div className="text-lg font-semibold tracking-tight">Sundays</div>
           </div>
         </div>
 

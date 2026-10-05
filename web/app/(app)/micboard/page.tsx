@@ -128,7 +128,7 @@ function NetworkPanel({ on, urls, onTurnOn }: { on: boolean; urls: string[]; onT
               <p className="mt-3 text-[11px] text-ink-faint">
                 Both computers need to be on the same network. If the address stops working after a restart, give this Mac a fixed IP address (a DHCP reservation in your router).
                 To drop the “:port” from the address, set the port to 80 in Preferences → Network Connections → Kids &amp; Nursery iPads (the same port is used for all network pages).
-                The first time, macOS asks whether Cool Services may accept incoming connections: choose Allow.
+                The first time, macOS asks whether Sundays may accept incoming connections: choose Allow.
               </p>
             </>
           ) : <p className="mt-1 text-sm text-ink-muted">Starting… If this doesn’t change, check Preferences → Network Connections for a port problem.</p>}
@@ -223,7 +223,7 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
             <select className="input ml-6 w-auto py-1" value={s.screen.displayId ?? ""} onChange={(e) => onSave({ screen: { displayId: Number(e.target.value) } })}>
               {data.displays.map((d) => <option key={d.id} value={d.id}>{d.label}{d.primary ? " (main display)" : ""}</option>)}
             </select>
-          ) : <p className="pl-6 text-[11px] text-ink-faint">Displays are listed in the Cool Services Mac app.</p>}
+          ) : <p className="pl-6 text-[11px] text-ink-faint">Displays are listed in the Sundays Mac app.</p>}
         </section>
       </div>
     </Drawer>
@@ -292,7 +292,7 @@ function MicboardDisplaySection({ s, onSave }: { s: BoardSettings; onSave: (p: P
     <section className="space-y-2">
       <h3 className="label">Mic board (Micboard)</h3>
       <p className="text-[11px] text-ink-faint">
-        The mic board is Micboard, running inside Cool Services{mb.data?.status.version ? ` (version ${mb.data.status.version})` : ""}. Set up receivers, groups and names in Micboard itself (press <b>s</b> for its settings);
+        The mic board is Micboard, running inside Sundays{mb.data?.status.version ? ` (version ${mb.data.status.version})` : ""}. Set up receivers, groups and names in Micboard itself (press <b>s</b> for its settings);
         names, Planning Center photos and your own backgrounds are in <button className="text-accent hover:underline" onClick={() => void openPrefs("micboard")}>Preferences → Micboard</button>.
       </p>
       <label className="block"><span className="text-xs text-ink-muted">Group</span>

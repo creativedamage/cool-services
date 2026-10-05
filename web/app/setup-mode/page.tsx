@@ -1,6 +1,6 @@
 "use client";
 /**
- * How this Mac uses Cool Services (after signing in the first time, or from Preferences / the
+ * How this Mac uses Sundays (after signing in the first time, or from Preferences / the
  * sidebar): Full Mode, Service Mode (a shared computer) or FOH Companion.
  */
 import clsx from "clsx";
@@ -19,7 +19,7 @@ const MODES: { mode: AppMode; title: string; icon: typeof BellRing; tone: string
   { mode: "service", title: "Service Mode", icon: CalendarDays, tone: "text-ok hover:border-ok/60",
     body: "For a shared computer: only Services, ProPresenter, Clock, Mic board and Parent paging. No Workflows or Check-Ins. A PIN you choose is needed to leave it or open Preferences." },
   { mode: "companion", title: "FOH Companion", icon: BellRing, tone: "text-warn hover:border-warn/60",
-    body: "For the front-of-house computer: links to your main Cool Services computer for page requests, the mic strip and the Tuning strip. No sign-in needed." },
+    body: "For the front-of-house computer: links to your main Sundays computer for page requests, the mic strip and the Tuning strip. No sign-in needed." },
 ];
 
 export default function SetupModePage() {
@@ -54,7 +54,7 @@ export default function SetupModePage() {
   return (
     <main className="grid min-h-screen place-items-center bg-canvas px-6 py-10">
       <div className="w-full max-w-5xl">
-        <div className="mb-2 flex items-center gap-3"><Logo size={36} /><div className="text-xl font-semibold">How will this computer use Cool Services?</div></div>
+        <div className="mb-2 flex items-center gap-3"><Logo size={36} /><div className="text-xl font-semibold">How will this computer use Sundays?</div></div>
         <p className="mb-8 text-sm text-ink-muted">{cur?.mode ? <>Now: <b className="text-ink">{MODES.find((m) => m.mode === cur.mode)?.title}</b>. </> : null}You can change it later.</p>
         <div className="grid gap-4 md:grid-cols-3">
           {MODES.map(({ mode, title, icon: Icon, tone, body }) => (

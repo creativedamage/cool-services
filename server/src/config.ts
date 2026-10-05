@@ -22,7 +22,7 @@ export const config = {
   pco: {
     base: process.env.PCO_API_BASE || "https://api.planningcenteronline.com",
     /**
-     * Cool Services' Planning Center app. Built in (pco/registration.ts) so nobody has to enter
+     * Sundays' Planning Center app. Built in (pco/registration.ts) so nobody has to enter
      * anything; the env var only overrides it. A Public app has no secret — leave it blank.
      */
     clientId: (process.env.PCO_CLIENT_ID || BUILT_IN_CLIENT_ID).trim(),

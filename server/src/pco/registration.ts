@@ -1,13 +1,13 @@
 /**
- * Cool Services' Planning Center app registration — the ProDeck approach.
+ * Sundays' Planning Center app registration — the ProDeck approach.
  *
  * Register ONE **Public** OAuth application at https://api.planningcenteronline.com/oauth/applications
  * (any Planning Center organization where you're an Organization Administrator works, including
- * one you create just for this). Name it "Cool Services", type **Public** (no secret), and add
+ * one you create just for this). Name it "Sundays", type **Public** (no secret), and add
  * every redirect URI below. Then paste its Client ID into BUILT_IN_CLIENT_ID.
  *
  * The Client ID is not a secret: a public app has none, and PKCE proves each sign-in is genuine.
- * Once it's here, everyone who installs Cool Services just clicks "Sign in with Planning Center".
+ * Once it's here, everyone who installs Sundays just clicks "Sign in with Planning Center".
  */
 export const BUILT_IN_CLIENT_ID = "e7343566b677dacdb16bddea2d86dbbced0228a82cef10ca135b7c4f78d84f35";
 

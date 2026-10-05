@@ -287,7 +287,7 @@ export const planQuery = (st: string, plan: string) => ({
   staleTime: 15_000,
 });
 
-/* Micboard inside Cool Services (Preferences → Micboard). */
+/* Micboard inside Sundays (Preferences → Micboard). */
 export interface MicboardView {
   settings: { enabled: boolean; port: number; names: "first" | "full" | "off"; pcoPhotos: boolean };
   status: { run: "off" | "starting" | "running" | "error" | "missing" | "companion"; error: string | null; version: string | null; port: number; log: string[]; folder: string };

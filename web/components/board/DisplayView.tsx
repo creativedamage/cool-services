@@ -71,7 +71,7 @@ function ClockView() {
 }
 
 /**
- * The mic board is Micboard itself (creativedamage/micboard, running inside Cool Services on this
+ * The mic board is Micboard itself (creativedamage/micboard, running inside Sundays on this
  * Mac): its own page, from the same computer this page came from, at Micboard's port.
  */
 function MicboardFrame({ s }: { s: DisplayState }) {

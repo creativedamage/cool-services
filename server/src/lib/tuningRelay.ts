@@ -1,7 +1,7 @@
 /**
  * Tuning keys pressed on an FOH companion, sent to Waves SuperRack by the main computer.
  *
- * MIDI goes out from the Cool Services window on the main computer (Web MIDI, the same way its own
+ * MIDI goes out from the Sundays window on the main computer (Web MIDI, the same way its own
  * Tuning bar does it), so the companion never sends MIDI and nothing changes on that computer. The
  * main window asks for presses with a long poll (/api/waves/next); a press is handed to exactly
  * one window, which sends it and reports back (/api/waves/result).
@@ -21,7 +21,7 @@ const pending = new Map<string, (r: Result) => void>();
 let lastPoll = 0;
 let last: CompanionTuning["last"] = null;
 
-/** The Tuning row of the service the Mic board follows (open in Cool Services, or the next one). */
+/** The Tuning row of the service the Mic board follows (open in Sundays, or the next one). */
 export async function companionTuning(): Promise<CompanionTuning | null> {
   const w = settings.get().waves;
   if (!w?.enabled) return null;
@@ -45,12 +45,12 @@ export async function companionTuning(): Promise<CompanionTuning | null> {
 /** A press from a companion: hand it to the main window, wait for it to be sent. */
 export async function relayPress(slot: string, by: string): Promise<Result> {
   const row = await companionTuning();
-  if (!row) return { ok: false, error: "Waves SuperRack isn’t turned on in Cool Services on the main computer (Preferences → Audio)." };
+  if (!row) return { ok: false, error: "Waves SuperRack isn’t turned on in Sundays on the main computer (Preferences → Audio)." };
   const b = row.buttons.find((x) => x.slot === slot);
   if (!b) return { ok: false, error: "That song isn’t in the service any more." };
   const keyId = b.kind === "extra" ? b.slot : b.key;
   if (!keyId) return { ok: false, error: `${b.title} has no key in Planning Center.` };
-  if (Date.now() - lastPoll > 30_000) return { ok: false, error: "Open Cool Services on the main computer: it sends the keys to Waves." };
+  if (Date.now() - lastPoll > 30_000) return { ok: false, error: "Open Sundays on the main computer: it sends the keys to Waves." };
   const label = b.kind === "extra" ? b.title : `Song ${b.n} · ${b.label}`;
   const press: Press = { id: crypto.randomUUID(), slot, keyId, label, by };
   const result = new Promise<Result>((resolve) => {

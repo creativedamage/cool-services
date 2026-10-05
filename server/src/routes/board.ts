@@ -37,7 +37,7 @@ boardRouter.put("/settings", (req, res) => {
   }).partial().parse(req.body);
   res.json(saveBoardSettings(p as any));
 });
-/** The service you have open in Cool Services (the board follows it). */
+/** The service you have open in Sundays (the board follows it). */
 boardRouter.post("/open", (req, res) => {
   const { serviceTypeId, planId } = z.object({ serviceTypeId: z.string().min(1).max(40), planId: z.string().min(1).max(40) }).parse(req.body);
   setOpenPlan(serviceTypeId, planId);

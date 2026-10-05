@@ -2,14 +2,14 @@
  * Check for Updates: GitHub Releases → download → verify → replace the app → reopen.
  *
  * Each release (built by .github/workflows/release.yml) has:
- *   Cool-Services-<version>.dmg      first-time installs
- *   Cool-Services-<version>-mac.zip  what the updater downloads
+ *   Sundays-<version>.dmg      first-time installs
+ *   Sundays-<version>-mac.zip  what the updater downloads
  *   SHA256SUMS.txt                   checksums; an update that doesn't match is refused
  *
  * Installing: the new app is unpacked next to the download and checked (same app id, the expected
- * version, a valid code signature). Then a small script waits for Cool Services to quit, swaps the
+ * version, a valid code signature). Then a small script waits for Sundays to quit, swaps the
  * app in /Applications (keeping the old one until the new one is in place), and opens it again.
- * Settings, sign-ins and notes live in ~/Library/Application Support/Cool Services and aren't touched.
+ * Settings, sign-ins and notes live in ~/Library/Application Support/Sundays and aren't touched.
  *
  * This doesn't use Squirrel/electron-updater, which only works for apps signed with a paid Apple
  * Developer ID.
@@ -29,7 +29,7 @@ export interface UpdaterOptions {
   currentVersion: string;
   /** "owner/repo", or null until it's set (npm run set-repo). */
   repo: string | null;
-  /** Path of the running "Cool Services.app". */
+  /** Path of the running "Sundays.app". */
   appBundle: string;
   /** Quit the app (the install script takes over from here). */
   quit: () => void;
@@ -57,8 +57,8 @@ export function newer(a: string, b: string): boolean {
 /** Where a running app can't be replaced in place (and what to do instead). */
 export function installProblem(appBundle: string): string | null {
   if (!appBundle.endsWith(".app")) return "Updates install from the packaged Mac app (not while developing).";
-  if (appBundle.startsWith("/Volumes/")) return "Cool Services is running from the installer disk. Drag it into Applications, open it from there, then update.";
-  if (appBundle.includes("/AppTranslocation/")) return "macOS is running Cool Services from a temporary location. Move it into your Applications folder, open it again, then update.";
+  if (appBundle.startsWith("/Volumes/")) return "Sundays is running from the installer disk. Drag it into Applications, open it from there, then update.";
+  if (appBundle.includes("/AppTranslocation/")) return "macOS is running Sundays from a temporary location. Move it into your Applications folder, open it again, then update.";
   try {
     fs.accessSync(path.dirname(appBundle), fs.constants.W_OK);
     fs.accessSync(appBundle, fs.constants.W_OK);
@@ -70,7 +70,7 @@ export function installProblem(appBundle: string): string | null {
 
 export function createUpdater(o: UpdaterOptions): UpdateBridge & { start(): void } {
   const api = o.apiBase ?? "https://api.github.com";
-  const work = o.workDir ?? path.join(os.tmpdir(), "cool-services-update");
+  const work = o.workDir ?? path.join(os.tmpdir(), "sundays-update");
   const log = o.log ?? (() => {});
   const macChecks = o.macChecks ?? process.platform === "darwin";
   let release: GhRelease | null = null;
@@ -90,7 +90,7 @@ export function createUpdater(o: UpdaterOptions): UpdateBridge & { start(): void
   const fail = (msg: string) => { s.state = "error"; s.error = msg; s.progress = null; log(`update error: ${msg}`); return status(); };
 
   async function gh<T>(url: string): Promise<T> {
-    const res = await fetch(url, { headers: { Accept: "application/vnd.github+json", "User-Agent": `CoolServices/${o.currentVersion}`, "X-GitHub-Api-Version": "2022-11-28" } });
+    const res = await fetch(url, { headers: { Accept: "application/vnd.github+json", "User-Agent": `Sundays/${o.currentVersion}`, "X-GitHub-Api-Version": "2022-11-28" } });
     if (res.status === 404) throw new Error(`No releases found for ${o.repo} on GitHub yet.`);
     if (res.status === 403 || res.status === 429) throw new Error("GitHub is limiting requests right now. Try again in a few minutes.");
     if (!res.ok) throw new Error(`GitHub answered ${res.status}.`);
@@ -124,7 +124,7 @@ export function createUpdater(o: UpdaterOptions): UpdateBridge & { start(): void
   }
 
   async function download(a: GhAsset, to: string) {
-    const res = await fetch(a.browser_download_url, { headers: { "User-Agent": `CoolServices/${o.currentVersion}` }, redirect: "follow" });
+    const res = await fetch(a.browser_download_url, { headers: { "User-Agent": `Sundays/${o.currentVersion}` }, redirect: "follow" });
     if (!res.ok || !res.body) throw new Error(`Download failed (${res.status}).`);
     const total = Number(res.headers.get("content-length")) || a.size || 0;
     const out = fs.createWriteStream(to);
@@ -162,7 +162,7 @@ export function createUpdater(o: UpdaterOptions): UpdateBridge & { start(): void
         s.state = "downloading"; s.progress = 0; s.error = null;
 
         // Checksums first, so a tampered or half-uploaded download is caught.
-        const sumsRes = await fetch(sumsOf(r)!.browser_download_url, { headers: { "User-Agent": `CoolServices/${o.currentVersion}` } });
+        const sumsRes = await fetch(sumsOf(r)!.browser_download_url, { headers: { "User-Agent": `Sundays/${o.currentVersion}` } });
         if (!sumsRes.ok) throw new Error("Couldn’t download the checksums for this update.");
         const zip = zipOf(r)!;
         const expected = (await sumsRes.text()).split("\n").map((l) => l.trim().split(/\s+\*?/)).find(([, name]) => name === zip.name)?.[0]?.toLowerCase();
@@ -182,17 +182,17 @@ export function createUpdater(o: UpdaterOptions): UpdateBridge & { start(): void
           const found = fs.readdirSync(stage).find((f) => f.endsWith(".app"));
           if (!found) throw new Error("The update doesn’t contain the app.");
           newApp = path.join(stage, found);
-          if ((await plist(newApp, "CFBundleIdentifier")) !== APP_ID) throw new Error("The update isn’t Cool Services.");
+          if ((await plist(newApp, "CFBundleIdentifier")) !== APP_ID) throw new Error("The update isn’t Sundays.");
           const v = await plist(newApp, "CFBundleShortVersionString");
           if (v !== version) throw new Error(`The update says it's version ${v}, expected ${version}.`);
           await run("/usr/bin/codesign", ["--verify", "--deep", "--strict", newApp]).catch(() => { throw new Error("The update’s code signature isn’t valid."); });
         } else {
-          newApp = path.join(stage, "Cool Services.app");
+          newApp = path.join(stage, "Sundays.app");
           fs.mkdirSync(newApp);
         }
 
         const script = path.join(work, "install.sh");
-        fs.writeFileSync(script, installScript({ pid: process.pid, app: o.appBundle, newApp, work, logFile: path.join(os.homedir(), "Library", "Logs", "Cool Services update.log") }), { mode: 0o700 });
+        fs.writeFileSync(script, installScript({ pid: process.pid, app: o.appBundle, newApp, work, logFile: path.join(os.homedir(), "Library", "Logs", "Sundays update.log") }), { mode: 0o700 });
         log(`installing ${version}: ${script}`);
         spawn("/bin/bash", [script], { detached: true, stdio: "ignore" }).unref();
         setTimeout(o.quit, 300);
@@ -216,11 +216,11 @@ export function createUpdater(o: UpdaterOptions): UpdateBridge & { start(): void
   };
 }
 
-/** The script that swaps the app once Cool Services has quit. Keeps the old app until the new one is in place. */
+/** The script that swaps the app once Sundays has quit. Keeps the old app until the new one is in place. */
 export function installScript(v: { pid: number; app: string; newApp: string; work: string; logFile: string }): string {
   const q = (x: string) => `'${x.replace(/'/g, `'\\''`)}'`;
   return `#!/bin/bash
-# Cool Services updater: replace the app after it quits, then open it again.
+# Sundays updater: replace the app after it quits, then open it again.
 APP=${q(v.app)}
 NEW=${q(v.newApp)}
 WORK=${q(v.work)}
@@ -229,19 +229,23 @@ BACKUP="$APP.previous"
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
 echo "$(date) updating $APP"
-# Wait (up to 60s) for Cool Services to quit.
+# Wait (up to 60s) for Sundays to quit.
 for i in $(seq 1 300); do kill -0 ${v.pid} 2>/dev/null || break; sleep 0.2; done
 rm -rf "$BACKUP"
 if ! mv "$APP" "$BACKUP"; then echo "couldn't move the old app aside"; open "$APP"; exit 1; fi
-if ditto "$NEW" "$APP"; then
-  xattr -dr com.apple.quarantine "$APP" 2>/dev/null
+# The new app keeps its own name (Cool Services.app becomes Sundays.app), next to where the old one was.
+DEST="$(dirname "$APP")/$(basename "$NEW")"
+[ "$DEST" != "$APP" ] && rm -rf "$DEST"
+if ditto "$NEW" "$DEST"; then
+  xattr -dr com.apple.quarantine "$DEST" 2>/dev/null
   rm -rf "$BACKUP" "$WORK"
-  echo "$(date) updated"
+  echo "$(date) updated: $DEST"
+  open "$DEST"
 else
   echo "copy failed; putting the old app back"
-  rm -rf "$APP"
+  rm -rf "$DEST"
   mv "$BACKUP" "$APP"
+  open "$APP"
 fi
-open "$APP"
 `;
 }

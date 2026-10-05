@@ -2,7 +2,7 @@
  * Team check-ins: who on each team scheduled for a service has checked in.
  *
  * Two sources: Planning Center Check-Ins (read-only through its API: it can't create check-ins), and
- * staff check-ins recorded here in Cool Services (the Check in button on the staff phone page and on
+ * staff check-ins recorded here in Sundays (the Check in button on the staff phone page and on
  * the desktop Team check-ins page). A staff check-in covers every service that day the person is
  * scheduled on, on each of their teams.
  *

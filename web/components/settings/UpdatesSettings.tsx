@@ -38,7 +38,7 @@ export function UpdatesSettings() {
         <div>
           <h2 className="flex items-center gap-2 font-semibold"><RefreshCw size={16} /> Updates</h2>
           <p className="mt-0.5 text-sm text-ink-muted">
-            You have Cool Services <b className="text-ink-soft">{s?.current ?? "…"}</b>.
+            You have Sundays <b className="text-ink-soft">{s?.current ?? "…"}</b>.
             {s?.repo && <> New versions come from <a className="underline" href={`https://github.com/${s.repo}/releases`} target="_blank" rel="noreferrer">GitHub</a>, and it checks on its own every few hours.</>}
           </p>
         </div>
@@ -56,9 +56,9 @@ export function UpdatesSettings() {
             : s.state === "error" ? s.error
             : s.state === "checking" ? "Checking GitHub…"
             : s.state === "up-to-date" ? `You’re up to date.${s.checkedAt ? ` Checked ${new Date(s.checkedAt).toLocaleString([], { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" })}.` : ""}`
-            : s.state === "available" ? `Cool Services ${s.latest?.version} is available.`
+            : s.state === "available" ? `Sundays ${s.latest?.version} is available.`
             : s.state === "downloading" ? `Downloading ${s.latest?.version}… ${pct ?? 0}%`
-            : s.state === "installing" ? "Installing. Cool Services will close and reopen in a moment."
+            : s.state === "installing" ? "Installing. Sundays will close and reopen in a moment."
             : "Not checked yet."}
         </div>
       )}
@@ -87,7 +87,7 @@ export function UpdatesSettings() {
               {s.state === "available" ? `Update now to ${s.latest.version}` : "Updating…"}
             </button>
           )}
-          <p className="mt-2 text-[11px] text-ink-faint">Cool Services restarts to finish. Your sign-in, settings and notes stay as they are.</p>
+          <p className="mt-2 text-[11px] text-ink-faint">Sundays restarts to finish. Your sign-in, settings and notes stay as they are.</p>
         </div>
       )}
     </section>

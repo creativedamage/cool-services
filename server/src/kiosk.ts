@@ -93,7 +93,7 @@ kioskRouter.post("/:ministry/unlock", h(async (req, res) => {
   const { pin } = z.object({ pin: z.string().max(12) }).parse(req.body);
   const r = unlock(m, pin, req.ip ?? "unknown");
   if ("error" in r) {
-    const message = r.error === "no_pin" ? "This page isn't set up yet. Ask a staff member to set a PIN in Cool Services → Settings."
+    const message = r.error === "no_pin" ? "This page isn't set up yet. Ask a staff member to set a PIN in Sundays → Settings."
       : r.error === "too_many_tries" ? `Too many tries. Wait ${r.waitSeconds} seconds.` : "That PIN isn't right.";
     return res.status(r.error === "too_many_tries" ? 429 : 401).json({ ...r, message });
   }
@@ -110,7 +110,7 @@ kioskRouter.post("/:ministry/lock", h(async (req, res) => {
 export async function childrenFor(m: Ministry, as?: PcoApi | null): Promise<KioskChild[]> {
   const cfg = stored().config.ministries[m];
   const api = as ?? ownerPco();
-  if (!api) throw new PagingError("not_configured", "Ask a staff member to open Cool Services → Settings and save the Kids & Nursery settings.", 503);
+  if (!api) throw new PagingError("not_configured", "Ask a staff member to open Sundays → Settings and save the Kids & Nursery settings.", 503);
   const rooms = new Set(cfg.locationIds);
   if (!rooms.size) return [];
   const rows = await api.getTodayCheckIns();
@@ -153,7 +153,7 @@ kioskRouter.post("/:ministry/page", needIpad, h(async (req, res) => {
 /* ───────────── FOH companions (on the network) ───────────── */
 
 const companionLanRouter = Router();
-companionLanRouter.get("/hello", h(async (_req, res) => res.json({ app: "cool-services", name: (await church()) || "Cool Services" })));
+companionLanRouter.get("/hello", h(async (_req, res) => res.json({ app: "cool-services", name: (await church()) || "Sundays" })));
 companionLanRouter.post("/pair", h(async (req, res) => {
   const { code, name } = z.object({ code: z.string().regex(/^\d{6}$/), name: z.string().max(60) }).parse(req.body);
   const r = pairWithCode(code, name, req.socket.remoteAddress ?? "?");
@@ -202,7 +202,7 @@ teamLanRouter.post("/:role/unlock", h(async (req, res) => {
   const { pin } = z.object({ pin: z.string().max(12) }).parse(req.body);
   const r = phoneUnlock(role, pin, req.ip ?? "unknown");
   if ("error" in r) {
-    const message = r.error === "no_pin" ? "This page isn’t set up yet. Ask a staff member to set a PIN in Cool Services → Preferences → Network Connections → Team check-ins on phones."
+    const message = r.error === "no_pin" ? "This page isn’t set up yet. Ask a staff member to set a PIN in Sundays → Preferences → Network Connections → Team check-ins on phones."
       : r.error === "too_many_tries" ? `Too many tries. Wait ${r.waitSeconds} seconds.` : "That PIN isn’t right.";
     return res.status(r.error === "too_many_tries" ? 429 : 401).json({ ...r, message });
   }
@@ -218,7 +218,7 @@ const needPhone = (req: Request, res: Response, next: NextFunction) => {
 const denied = () => "Planning Center Check-Ins isn’t available to the account that set up these pages, so only staff check-ins show.";
 teamLanRouter.get("/:role/data", needPhone, h(async (req, res) => {
   const api = phonesPco();
-  if (!api) return res.status(503).json({ error: "not_configured", message: "Ask a staff member to open Cool Services → Preferences and save the Team check-ins phone settings." });
+  if (!api) return res.status(503).json({ error: "not_configured", message: "Ask a staff member to open Sundays → Preferences and save the Team check-ins phone settings." });
   const cutoff = Date.now() - 8 * 3600e3;
   const plans = (await api.listUpcomingPlans()).filter((p) => Date.parse(p.sortDate) > cutoff).slice(0, 14);
   const services = plans.map((p) => ({
@@ -291,10 +291,10 @@ function createKioskApp() {
     });
     app.get(["/", "/nursery", "/kids"], ipadsOn, send);
     // The stage display (mic board / clock).
-    app.get("/display", (_req, res, next) => (boardSettings().lan ? next() : res.status(404).send("The stage display isn’t shared on the network. Turn it on in Cool Services → Mic board → Display settings.")),
+    app.get("/display", (_req, res, next) => (boardSettings().lan ? next() : res.status(404).send("The stage display isn’t shared on the network. Turn it on in Sundays → Mic board → Display settings.")),
       (_req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(webRoot!, "displayout.html")));
     // The production clock (full screen in any browser on the network).
-    app.get("/clock", (_req, res, next) => (clockSettings().lan ? next() : res.status(404).send("The clock isn’t shared on the network. Turn it on in Cool Services → Preferences → Clock.")), (_req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(webRoot!, "clockout.html")));
+    app.get("/clock", (_req, res, next) => (clockSettings().lan ? next() : res.status(404).send("The clock isn’t shared on the network. Turn it on in Sundays → Preferences → Clock.")), (_req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(webRoot!, "clockout.html")));
     const teamPage = path.join(webRoot, "team.html");
     app.get(["/leads", "/staff"], (_req, res) => (phones().enabled ? res.set("Cache-Control", "no-cache").sendFile(teamPage) : res.status(404).send("Not found")));
     // Only what the iPad page needs: its scripts/styles, the PDF-free static bundle and icons.

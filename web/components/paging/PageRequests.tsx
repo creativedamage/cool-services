@@ -1,7 +1,7 @@
 "use client";
 /**
  * Page requests from the Kids & Nursery iPads, waiting for you to send them. A bar across the top of
- * every Cool Services screen: send one, send all, or cancel. Sent requests go on the ProPresenter
+ * every Sundays screen: send one, send all, or cancel. Sent requests go on the ProPresenter
  * screens as soon as nothing else is showing, one after another.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

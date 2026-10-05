@@ -1,6 +1,6 @@
 "use client";
 /**
- * Preferences → Video → Resi: the API client from Resi Studio, so Cool Services can show when you're
+ * Preferences → Video → Resi: the API client from Resi Studio, so Sundays can show when you're
  * live (the Dashboard's Resi widget and the badge on Services). Read-only: it never starts or stops
  * anything in Resi.
  */
@@ -51,7 +51,7 @@ export function ResiSettings() {
       </div>
       <p className="text-sm text-ink-muted">
         Shows when your Resi stream is live: a <b>Resi live</b> badge on Services and the <b>Resi</b> widget on the Dashboard (where it’s going, how long it’s been live).
-        Cool Services only reads from Resi; it never starts or stops a stream.
+        Sundays only reads from Resi; it never starts or stops a stream.
       </p>
       <form className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]" onSubmit={(e) => { e.preventDefault(); save.mutate({ enabled: true, clientId: id, ...(secret ? { clientSecret: secret } : {}) }); }}>
         <label className="block"><span className="text-xs text-ink-muted">Client ID</span>

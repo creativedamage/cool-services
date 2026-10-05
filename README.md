@@ -1,16 +1,22 @@
-# Cool Services
+<img src="docs/brand/sundays-icon.png" alt="Sundays" width="128" align="right">
+
+# Sundays
 
 A dark-mode Mac app for church production and volunteer teams, built on Planning Center: People
 workflows, Services scheduling, run sheets, check-ins, a production clock, a wireless mic board and
 more, in one place.
 
-**[⬇ Download the latest version](https://github.com/creativedamage/cool-services/releases/latest)** · [All releases](https://github.com/creativedamage/cool-services/releases) ·
+**[⬇ Download the latest version](https://github.com/creativedamage/sundays/releases/latest)** · [All releases](https://github.com/creativedamage/sundays/releases) ·
 [What's new](CHANGELOG.md)
 
-On the release page, download **Cool-Services-<version>.dmg**, open it and drag Cool Services to
-Applications. After that, Cool Services updates itself (Cool Services → Check for Updates).
+On the release page, download **Sundays-<version>.dmg**, open it and drag Sundays to
+Applications. After that, Sundays updates itself (Sundays → Check for Updates).
 
-![A service in Cool Services: tuning keys, mics and packs, and the roster](docs/screenshots/service.png)
+**Was Cool Services.** Sundays is the new name (1.24). Updating from Cool Services keeps everything:
+the app becomes **Sundays.app** in Applications, and your sign-in, settings, notes and Micboard
+move to `~/Library/Application Support/Sundays` by themselves.
+
+![A service in Sundays: tuning keys, mics and packs, and the roster](docs/screenshots/service.png)
 
 ## A quick tour
 
@@ -79,7 +85,7 @@ Screenshots use the built-in sample data (Sign in → "Or explore with sample da
   to show it, previous / next, clear layers, clear groups and looks, timers (start, stop, reset,
   change the time, ±30 s / 1 min), stage message and each stage screen's layout. Add computers in
   Preferences → Video; the Kids & Nursery one from paging is included automatically.
-- **Chat**: Planning Center Chat inside Cool Services (sidebar → Chat): current conversations, new
+- **Chat**: Planning Center Chat inside Sundays (sidebar → Chat): current conversations, new
   ones, teams and direct messages. Planning Center has no public Chat API, so this is Planning
   Center's own Chat shown in the app window, using your Planning Center sign-in.
 - **Message the team**: on any service, text or email one person, a team, or everyone (by status).
@@ -144,35 +150,35 @@ npm install
 npm run dist:mac
 ```
 
-The installer lands at **`desktop/release/Cool-Services-<version>.dmg`**. It runs on both Apple Silicon
+The installer lands at **`desktop/release/Sundays-<version>.dmg`**. It runs on both Apple Silicon
 and Intel Macs.
 
 To try the app without making a DMG: `npm run app`.
 
 ### Updating
 
-Cool Services updates itself from this project's GitHub Releases: **Cool Services → Check for
+Sundays updates itself from this project's GitHub Releases: **Sundays → Check for
 Updates…** in the menu bar, or **Preferences → About**. It also checks on its own a few seconds after
 opening and every six hours, and shows "Update to x.y.z" at the bottom of the sidebar when there's
-one. **Update now** downloads it, checks it against the release's checksums, closes Cool Services,
+one. **Update now** downloads it, checks it against the release's checksums, closes Sundays,
 replaces the app in Applications and opens the new version. Sign-ins, settings and notes
-stay as they are (they live in `~/Library/Application Support/Cool Services`).
+stay as they are (they live in `~/Library/Application Support/Sundays`).
 
 The app must be running from the Applications folder (not from the DMG) to update itself.
 Versions before 1.7.0 don’t have the updater: install the first GitHub release from its DMG once.
 
 ### Installing on a Mac
 
-1. Open the DMG and drag **Cool Services** into **Applications**.
-2. **First open only:** double-click Cool Services. macOS says it can't verify the app. Open
+1. Open the DMG and drag **Sundays** into **Applications**.
+2. **First open only:** double-click Sundays. macOS says it can't verify the app. Open
    **System Settings → Privacy & Security**, scroll down, click **Open Anyway** next to Cool
    Services, and confirm. macOS asks this once, because the app isn't signed with a paid Apple
    Developer ID (see below).
 3. Click **Sign in with Planning Center**.
 
-Each Mac keeps its own sign-in and staff-only notes in `~/Library/Application Support/Cool Services`.
+Each Mac keeps its own sign-in and staff-only notes in `~/Library/Application Support/Sundays`.
 The key that protects saved sign-ins is in that folder too (`key.txt`, readable only by your Mac
-account). Cool Services doesn't use the macOS Keychain, so updates never ask for your password.
+account). Sundays doesn't use the macOS Keychain, so updates never ask for your password.
 
 ### Skipping the "Open Anyway" step (optional)
 
@@ -186,11 +192,11 @@ With an Apple Developer account ($99/year), sign and notarize the app so it open
 ## Parent paging and the Kids & Nursery iPads
 
 1. In ProPresenter (7.9 or newer): **Settings → Network → Enable Network**. Note the port.
-2. In Cool Services: **Preferences → Network Connections → ProPresenter** → **Find automatically** (or type the computer's IP
+2. In Sundays: **Preferences → Network Connections → ProPresenter** → **Find automatically** (or type the computer's IP
    and port) → the status turns green. Set **Page stays on screen for** to match your ProPresenter
    message time (15 seconds by default).
 3. **Parent paging**, for Nursery and for Kids:
-   - *Cool Services message*: Cool Services creates and keeps a message called "Cool Services ·
+   - *Sundays message*: Sundays creates and keeps a message called "Sundays ·
      Nursery" in ProPresenter with your text (`{code}` is replaced by the tag code) and the **theme**
      you choose. Or *My existing message*: pick a message you already use and the token the code goes in.
    - Tick that ministry's **Check-Ins rooms**, and set its **iPad PIN** (4–8 digits).
@@ -201,8 +207,8 @@ With an Apple Developer account ($99/year), sign and notarize the app so it open
 
 Notes:
 - Only the security code goes to the screens. Children's names stay on the iPad.
-- The Mac running Cool Services must be on, awake and on the same network during services. The first
-  time, macOS asks to allow incoming connections for Cool Services: choose **Allow**.
+- The Mac running Sundays must be on, awake and on the same network during services. The first
+  time, macOS asks to allow incoming connections for Sundays: choose **Allow**.
 - The iPad pages read Check-Ins with the Planning Center access of whoever last saved these settings.
 - The iPad server only serves the iPad page and its own small API. Staff screens, notes, people and
   plans can't be reached from the network. A wrong PIN 5 times locks that iPad out for a minute (doubling).
@@ -223,7 +229,7 @@ Services → a service type → **Matrix**: several weeks side by side.
 ## Campuses
 
 Preferences → **Campuses**: add campuses, choose the campus each service type belongs to, and set **My
-default campus**. Cool Services opens on your default campus; the switcher at the top of the sidebar
+default campus**. Sundays opens on your default campus; the switcher at the top of the sidebar
 shows another campus (or all) for now. The Services list, the sidebar and Schedule in Services
 follow it (Schedule has an "All campuses" link). Campuses are kept on this Mac; the default is per person.
 
@@ -231,7 +237,7 @@ follow it (Schedule has an "All campuses" link). Campuses are kept on this Mac; 
 
 Preferences → **Video → Resi**: paste an API **Client ID** and **Client Secret** from Resi Studio
 (your account's API settings; ask Resi support to turn on API access if you don't see them) and
-press **Connect**. Cool Services checks Resi every 10 seconds through its public API
+press **Connect**. Sundays checks Resi every 10 seconds through its public API
 (`api.resi.io`): your encoders and their live schedules, with each destination's state (Web/Embed,
 YouTube, Facebook, RTMP: setting up, starting, started, stopped, error). An encoder is **live**
 while any of its destinations is starting or started.
@@ -241,14 +247,14 @@ while any of its destinations is starting or started.
 - **Dashboard → Add widget → Resi live stream**: how long you've been live and since when, each
   encoder (live, starting, setting up, error, off air) with the title and every destination's state,
   when you were last live, and a link to Resi Studio.
-- Choose which encoders to watch (all of them by default). Cool Services never starts or stops a
+- Choose which encoders to watch (all of them by default). Sundays never starts or stops a
   stream. The Client Secret is saved encrypted on this Mac.
 
 <img src="docs/screenshots/resi.png" alt="Resi on the Dashboard" width="70%">
 
 ## Modes
 
-The first time someone signs in on a computer, Cool Services asks how it will be used:
+The first time someone signs in on a computer, Sundays asks how it will be used:
 
 - **Full Mode**: everything.
 - **Service Mode**: for a shared computer (the booth, a volunteer laptop). The sidebar has only
@@ -266,7 +272,7 @@ from the sign-in screen ("Setting up a shared or front-of-house computer?").
 
 ## Preferences
 
-**Cool Services → Preferences…** (⌘,) opens Preferences in their own window (the ⚙ next to your
+**Sundays → Preferences…** (⌘,) opens Preferences in their own window (the ⚙ next to your
 name does too):
 
 - **About**: version, and Check for Updates.
@@ -306,7 +312,7 @@ banks), so ID 139 is Bank 1 / Program 14. ("Numbers are → Program numbers" swi
 - SuperRack on the same Mac: Audio MIDI Setup → Window → Show MIDI Studio → IAC Driver → tick
   **Device is online**, then choose "IAC Driver Bus 1".
 - SuperRack on another Mac: Audio MIDI Setup → MIDI Studio → Network. Create and connect a session on
-  both Macs (rtpMIDI on Windows) and choose it in Cool Services. On the SuperRack Mac, if SuperRack
+  both Macs (rtpMIDI on Windows) and choose it in Sundays. On the SuperRack Mac, if SuperRack
   doesn't react to a "Network MIDI 2.0" session, route the session into IAC Driver Bus 1 (Live
   Routings, incoming only; routing both ways makes a MIDI loop) and have SuperRack listen to Bus 1.
 - In SuperRack: Controllers → MIDI Controller → gear → tick that port under MIDI IN, set **Follow
@@ -327,8 +333,8 @@ Ups") can be left off the Tuning bar under "Leave off the Tuning bar".
   Pick a plan in the second list to pin it; "Next one (automatic)" moves on by itself. A widget can
   still be set to another service type in its options.
 - **Smaart v9 SPL**: in Smaart, start logging on a calibrated input and turn on Options → API
-  (default port 26000, optional password). In Cool Services, Preferences → Audio → Smaart (SPL): enter the
-  computer and password, then Save and connect. Cool Services lists Smaart's measurements (e.g. RTA
+  (default port 26000, optional password). In Sundays, Preferences → Audio → Smaart (SPL): enter the
+  computer and password, then Save and connect. Sundays lists Smaart's measurements (e.g. RTA
   MIC, REF) and streams each one. SPL values Smaart sends are used as they are; otherwise the overall
   level is worked out from the measurement's spectrum (marked ≈, accurate only if the input is
   calibrated). Pick a reading for the SPL widget in its options. Rational Acoustics hasn't published
@@ -339,20 +345,20 @@ Ups") can be left off the Tuning bar under "Leave off the Tuning bar".
 
 With **Hold iPad pages until I send them** on (Preferences → Network Connections → ProPresenter,
 on by default), the Kids and Nursery iPads **request** a page instead of putting it straight on the
-screens. A bar across the top of every Cool Services screen shows each request (ministry, code,
+screens. A bar across the top of every Sundays screen shows each request (ministry, code,
 child, how long ago) with **Send now** and **Cancel**, plus **Send all** when there are several.
 Sent pages go up as soon as nothing else is on screen, one after another. The iPads show each
 request as "Waiting for the auditorium", "On the screens" or "Not sent". Pages started in Cool
-Services itself go straight up. Requests are kept while Cool Services is open.
+Services itself go straight up. Requests are kept while Sundays is open.
 
 ## FOH companion (a second computer at front of house)
 
-A second Mac can run Cool Services as an **FOH companion**: a full-screen panel that only handles
+A second Mac can run Sundays as an **FOH companion**: a full-screen panel that only handles
 Kids and Nursery page requests.
 
-1. On the main Cool Services Mac: Preferences → Network Connections → **FOH companions** → **Pair a
+1. On the main Sundays Mac: Preferences → Network Connections → **FOH companions** → **Pair a
    companion**. A 6-digit code appears (good for 10 minutes).
-2. On the FOH Mac: install Cool Services and choose **FOH companion** when it asks how this computer
+2. On the FOH Mac: install Sundays and choose **FOH companion** when it asks how this computer
    is used (or "Use it as an FOH companion" on the sign-in screen, or Preferences → Default Startup).
    It finds the main Mac on the network; pick it (or enter its address) and type the code.
 
@@ -368,7 +374,7 @@ it, a status color (orange low battery, red change it or RF trouble, striped whe
 off or the receiver can't be reached), battery, audio and RF. Only that bar is a window, so
 everything above it (Waves SuperRack, the console app) stays clickable. When a page request comes in
 the companion takes the full screen; once it's answered, the strip comes back. Hover the strip and
-press the gear (or click Cool Services in the Dock) to open the companion window: turn the strip on
+press the gear (or click Sundays in the Dock) to open the companion window: turn the strip on
 or off, make it short, medium or tall, and pick which display it's on (click it in the picture of
 your displays, arranged as macOS has them; hover the strip and press its display button to move it to the next display).
 The mics, hidden mics and stacked mics follow the main computer's Mic board → Display settings.
@@ -379,7 +385,7 @@ board follows: **Chromatic**, **Off**, then each song's key in service order. Pr
 companion never sends MIDI and nothing changes on it. The strip is a non-activating panel: pressing
 a key doesn't take the focus from the app you're working in. The key you pressed lights up (also
 when it's pressed on the main computer's Tuning bar). Needs Waves set up on the main computer
-(Preferences → Audio) and Cool Services open there. Turn it off in the companion window
+(Preferences → Audio) and Sundays open there. Turn it off in the companion window
 ("Tuning strip above the mics").
 
 <img src="docs/screenshots/companion-strip.png" alt="FOH companion mic strip">
@@ -394,7 +400,7 @@ workflow with that person in Planning Center, and it appears under their My work
 
 - Managers can also share directly: the **Share** button on a board (or the share icon on its tile).
   This is Planning Center's own workflow sharing, so it applies everywhere.
-- Requests are kept on the Mac where they were made. If the manager uses Cool Services on a
+- Requests are kept on the Mac where they were made. If the manager uses Sundays on a
   different computer, the requester can send a quick email from the request window and the manager
   adds them with Share.
 - People managers and site administrators still see every workflow, under "Other workflows".
@@ -409,7 +415,7 @@ is live: click into it to use it.
 
 The mic board is **[Micboard](https://github.com/creativedamage/micboard)** (creativedamage/micboard,
 the fork that builds and runs on current Node and Python). Its code is in `vendor/micboard`,
-unchanged, and runs inside Cool Services with its own Python, which comes with the app. Nothing to
+unchanged, and runs inside Sundays with its own Python, which comes with the app. Nothing to
 install.
 
 - **On the network:** Micboard's own page is at `http://<this Mac>:8058` for any phone, tablet, TV or
@@ -418,10 +424,10 @@ install.
 - **Set it up in Micboard itself:** receivers (it discovers Shure receivers on the network), slots,
   groups, TV view and extended names. Press <kbd>s</kbd> in Micboard for its settings and
   <kbd>?</kbd> for its shortcuts. Its config and log live in
-  `~/Library/Application Support/Cool Services/micboard`.
+  `~/Library/Application Support/Sundays/micboard`.
 - **Mic setup follows Micboard:** the first time, Micboard starts with the receivers and mics already in Mic setup. After that, each Micboard slot shows up in Mic setup by itself (matched by
   receiver IP and channel; nothing of yours is renamed or removed), so you can put people on it in a
-  service's Mics panel. While Micboard runs, Cool Services reads the receivers' battery, RF and audio
+  service's Mics panel. While Micboard runs, Sundays reads the receivers' battery, RF and audio
   from Micboard instead of connecting to them a second time.
 - **Names from Planning Center:** who's on each mic in the service the Mic board follows goes to
   Micboard as that mic's name (Micboard's extended names): first names, full names where two people
@@ -449,7 +455,7 @@ install.
 - **FOH companion mic strip** (Display settings): show or hide each mic on the companion's strip,
   stack a person's mics on one tile, and add mics that aren't on the network.
 
-**On another computer (the display endpoint).** Cool Services runs on your main Mac; the display
+**On another computer (the display endpoint).** Sundays runs on your main Mac; the display
 computer only needs a browser. On the Mic board page, **Show it on another computer → Turn on the
 network display**, then open the address it shows (like `http://192.168.1.20/display`) on the
 other computer and make the browser full screen. It shows the banner with Micboard below it and
@@ -481,7 +487,7 @@ Sidebar → **Clock**. The preview at the top is exactly what every output shows
 
 **Outputs** (Preferences → Video → Clock outputs):
 
-- **NDI®**: a source named "<this Mac> (Cool Services Clock)" at 1920×1080 or 1280×720, 25–60 fps,
+- **NDI®**: a source named "<this Mac> (Sundays Clock)" at 1920×1080 or 1280×720, 25–60 fps,
   optionally with a **transparent background** to key it over video. Add it in ProPresenter, vMix,
   OBS, a TriCaster or an NDI monitor.
 - **On the church network**: `http://<this Mac>/clock` (or with the iPad port) full screen in any
@@ -493,7 +499,7 @@ Sidebar → **Clock**. The preview at the top is exactly what every output shows
 **How NDI is built.** NDI is sent by calling NDI's own library with koffi, which ships ready-built
 for Apple Silicon and Intel, so nothing is compiled on your Mac (the add-on that broke in 1.9–1.12
 needed compiling). `npm run dist:mac` downloads NDI's official Mac SDK installer once (kept in
-`~/Library/Caches/cool-services-build`), takes `libndi.dylib` out of it and puts it in the app. If it
+`~/Library/Caches/sundays-build`), takes `libndi.dylib` out of it and puts it in the app. If it
 can't, the build stops and tells you why. To use a copy you already have:
 `COOL_NDI_LIB="/Library/NDI SDK for Apple/lib/macOS/libndi.dylib" npm run dist:mac`. To build without
 NDI: `COOL_SKIP_NDI=1 npm run dist:mac`. NDI® is a registered trademark of Vizrt NDI AB.
@@ -514,7 +520,7 @@ campus's setup.
   on every service that day they're on. They show on the service's Check-ins tab in that room, marked
   "by staff".
 - Tiles show each team's area; anyone who checked in at a different location is flagged.
-- Planning Center's API can't create check-ins, so these stay in Cool Services and don't appear in
+- Planning Center's API can't create check-ins, so these stay in Sundays and don't appear in
   Planning Center's own Check-Ins reports.
 
 ## Team check-ins on phones (leads and staff)
@@ -531,7 +537,7 @@ the QR code), enter the PIN once and stay signed in; Share → Add to Home Scree
   "by Wayne (staff phone)"; a staff check-in can be undone from the same row.
 - The desktop Team check-ins page has the same Check in button.
 - Planning Center's Check-Ins can't be written to by other apps (its API is read-only), so staff
-  check-ins are kept by Cool Services on this Mac. They count on every Team check-ins screen, marked
+  check-ins are kept by Sundays on this Mac. They count on every Team check-ins screen, marked
   "by staff", but don't show in Planning Center's own Check-Ins reports. Scans in Check-Ins count
   automatically.
 - Phones only get names, photos, positions and check-in times, never contact details. They use the
@@ -545,7 +551,7 @@ the QR code), enter the PIN once and stay signed in; Share → Add to Home Scree
 Preferences → Network Connections → Kids & Nursery iPads → **Friendly addresses**: enter e.g.
 `kids.libertychurch.net` and `nursery.libertychurch.net`. Then:
 
-1. Give the Cool Services Mac a fixed IP (a DHCP reservation in the router/firewall).
+1. Give the Sundays Mac a fixed IP (a DHCP reservation in the router/firewall).
 2. Add a DNS **A record** for each name pointing at that IP: in the router/firewall's local DNS, or
    in the domain's public DNS (it only resolves to something useful on the church network, since the
    IP is private).
@@ -568,7 +574,7 @@ With a shared personal access token, that token's account needs Check-Ins access
 ## If something feels slow
 
 Planning Center requests that take longer than a second are noted in
-`~/Library/Application Support/Cool Services/cool-services.log` (only the request path and timing,
+`~/Library/Application Support/Sundays/cool-services.log` (only the request path and timing,
 no personal data). Send that file along when reporting slowness.
 
 ## GitHub and releases
@@ -578,8 +584,8 @@ from Claude land there as new commits; you publish them to GitHub with one comma
 
 ### One-time setup
 
-1. On github.com, create a new **public** repository named `cool-services`. Don't add a README,
-   license or .gitignore: leave it empty. (Public, so every Cool Services can check it for updates
+1. On github.com, create a new **public** repository named `sundays`. Don't add a README,
+   license or .gitignore: leave it empty. (Public, so every Sundays can check it for updates
    without a password.)
 2. Let git sign in to GitHub once. The easiest way is the GitHub CLI:
 
@@ -592,9 +598,9 @@ from Claude land there as new commits; you publish them to GitHub with one comma
 
    ```bash
    cd ~/Downloads/cool-services
-   npm run set-repo -- YOUR-GITHUB-NAME/cool-services
+   npm run set-repo -- YOUR-GITHUB-NAME/sundays
    git add -A && git commit -m "Point updates at GitHub"
-   git remote add origin https://github.com/YOUR-GITHUB-NAME/cool-services.git
+   git remote add origin https://github.com/YOUR-GITHUB-NAME/sundays.git
    git push -u origin main
    ```
 
@@ -614,21 +620,21 @@ npm run release
 ```
 
 This releases the version the project is at (e.g. 1.18.3): it makes a release commit named
-**"Cool Services 1.18.3 — <summary>"**, tags `v1.18.3` and pushes both. The GitHub Actions run and the
+**"Sundays 1.18.3 — <summary>"**, tags `v1.18.3` and pushes both. The GitHub Actions run and the
 release get that name, and the release notes come from the changelog. `npm run release -- 1.19.0` picks a version yourself.
 GitHub Actions (`.github/workflows/release.yml`) then builds the universal Mac app on a GitHub Mac
-(including NDI) and publishes a release with `Cool-Services-<version>.dmg` (first installs),
-`Cool-Services-<version>-mac.zip` (what the updater downloads) and `SHA256SUMS.txt`. It takes about
+(including NDI) and publishes a release with `Sundays-<version>.dmg` (first installs),
+`Sundays-<version>-mac.zip` (what the updater downloads) and `SHA256SUMS.txt`. It takes about
 15 minutes; follow it under the repo's **Actions** tab. Edit the release notes on GitHub if you like:
 they're what "What's new" shows.
 
 The first time, download the `.dmg` from the release and install it on each Mac. After that every
-Cool Services offers new versions itself (Check for Updates). To rebuild an existing tag, run the
+Sundays offers new versions itself (Check for Updates). To rebuild an existing tag, run the
 Release workflow by hand from the Actions tab.
 
 ## Planning Center app registration
 
-Cool Services signs in through one **Public** Planning Center OAuth application. Its Client ID is
+Sundays signs in through one **Public** Planning Center OAuth application. Its Client ID is
 built into `server/src/pco/registration.ts`. The registered callback URLs are:
 
 ```
@@ -650,10 +656,10 @@ Download it from https://www.planningcenter.com/logos and save the full-colour i
    Workbench), and channel count. Click **Test**. This Mac must be on the same network as the receivers.
 3. List your mics and packs, which receiver channel each is on, and which positions each is for
    (e.g. Vox 1 → Worship Leader, Vox 2–4 → Vocals, AG Pack → Acoustic Guitar).
-4. On each service, click **Auto-assign** or pick people by hand. Assignments stay in Cool Services.
+4. On each service, click **Auto-assign** or pick people by hand. Assignments stay in Sundays.
 
 With Micboard running (it is by default), set up receivers in Micboard instead: its slots appear in
-Mic setup by themselves, and Cool Services reads the receivers through Micboard.
+Mic setup by themselves, and Sundays reads the receivers through Micboard.
 
 **Read-only:** the app only asks receivers questions (Shure's `GET` commands on TCP port 2202):
 battery bars, minutes left, charge, transmitter model, frequency, antennas and signal. It never
@@ -675,7 +681,7 @@ server/src/lib/db.ts       Local data file (users, tokens, sessions, staff notes
 server/src/lib/shure.ts    Shure receiver status, read-only (TCP 2202), when Micboard isn't running
 server/src/lib/micboard.ts Runs Micboard (vendor/micboard) and adapts to it: data, slots, names, backgrounds
 vendor/micboard/           creativedamage/micboard, unchanged (git subtree; npm run micboard:update)
-desktop/micboard-runtime/  Built Micboard + Python (→ Cool Services.app/Contents/Resources/micboard)
+desktop/micboard-runtime/  Built Micboard + Python (→ Sundays.app/Contents/Resources/micboard)
 desktop/micboard-build.mjs Builds Micboard's page and adds it, its Python and Tornado to the app
 server/src/lib/propresenter.ts  ProPresenter API client + finding it on the network
 server/src/routes/pro.ts   ProPresenter control (slides, timers, stage) for any computer

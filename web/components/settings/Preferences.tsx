@@ -1,7 +1,7 @@
 "use client";
 /**
  * Preferences: About, Appearance, Default Startup, Campuses, Audio, Network Connections and Video.
- * In the Mac app they open in their own window (Cool Services → Preferences…, ⌘,); in a browser
+ * In the Mac app they open in their own window (Sundays → Preferences…, ⌘,); in a browser
  * at /preferences. A hash picks the tab (and section): /preferences#smaart opens Audio at Smaart.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -142,7 +142,7 @@ function AboutSection() {
     <section id="about" className="panel flex items-center gap-5 p-6">
       <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl border border-line bg-canvas"><Logo size={56} /></div>
       <div className="min-w-0">
-        <div className="text-2xl font-semibold tracking-tight">Cool Services</div>
+        <div className="text-2xl font-semibold tracking-tight">Sundays</div>
         <div className="mt-0.5 text-sm text-ink-soft">Version <b className="font-mono">{version ?? "…"}</b></div>
         {me.data && <div className="mt-1 text-xs text-ink-muted">{me.data.orgName} · signed in as {me.data.name}</div>}
         <div className="mt-1 text-[11px] text-ink-faint">Planning Center services, workflows and production tools for the whole team.</div>
@@ -222,7 +222,7 @@ function StartupSection({ s, save }: { s: AppSettings; save: Save }) {
   );
   return (
     <section id="startup" className="panel scroll-mt-6 p-5">
-      <h2 className="font-semibold">When Cool Services opens</h2>
+      <h2 className="font-semibold">When Sundays opens</h2>
       <p className="mt-0.5 text-sm text-ink-muted">
         The first screen after opening the app or signing in. “Your service” is the one chosen at the top of the Dashboard (or the next service of any type if none is chosen).
       </p>

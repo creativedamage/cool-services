@@ -1,5 +1,5 @@
 {
-  "name": "@cool-services/server",
+  "name": "@sundays/server",
   "private": true,
   "type": "module",
   "scripts": {

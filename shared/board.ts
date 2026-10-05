@@ -13,7 +13,7 @@ export interface BoardSettings {
   mode: DisplayMode;
   /** In auto, outside rehearsal and service times. */
   autoIdle: DisplayView;
-  /** "open": the service you have open in Cool Services (else the next one); "next": always the next service. */
+  /** "open": the service you have open in Sundays (else the next one); "next": always the next service. */
   follow: "open" | "next";
   /** For "next" (and before any service is opened): which service type (null = any). */
   serviceTypeId: string | null;
@@ -32,7 +32,7 @@ export interface BoardSettings {
   /** A person with more than one mic gets one tile, with their other mics stacked on it. */
   stack: boolean;
   /**
-   * The mic board is Micboard (creativedamage/micboard, running inside Cool Services). How the
+   * The mic board is Micboard (creativedamage/micboard, running inside Sundays). How the
    * display shows it: which Micboard group (0 = all slots), TV view with its info drawer (or the
    * desk view), and background pictures/videos (from Preferences → Micboard).
    */

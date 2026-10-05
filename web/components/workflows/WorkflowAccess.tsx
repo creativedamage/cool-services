@@ -82,7 +82,7 @@ export function ShareModal({ workflow, onClose }: { workflow: { id: string; name
               {!shares.data?.some((s) => s.group !== "No Access") && <li className="px-3 py-3 text-sm text-ink-muted">Not shared with anyone by name yet.</li>}
             </ul>
           )}
-          <p className="mt-2 text-[11px] text-ink-faint">This is the workflow’s sharing in Planning Center, so it applies everywhere (Planning Center and every copy of Cool Services).</p>
+          <p className="mt-2 text-[11px] text-ink-faint">This is the workflow’s sharing in Planning Center, so it applies everywhere (Planning Center and every copy of Sundays).</p>
         </section>
       </div>
     </Modal>
@@ -158,20 +158,20 @@ export function RequestAccessModal({ workflow, onClose }: { workflow: { id: stri
     onError: (e) => toast.error("Couldn’t send the request", { description: (e as Error).message }),
   });
   const mail = `mailto:?subject=${encodeURIComponent(`Access to ${workflow.name}`)}&body=${encodeURIComponent(
-    `Hi,\n\nCould you give me access to the “${workflow.name}” workflow? In Cool Services: Workflows → ${workflow.name} → Share, then add ${me.data?.name ?? "me"}.${note.trim() ? `\n\n${note.trim()}` : ""}\n\nThanks!`)}`;
+    `Hi,\n\nCould you give me access to the “${workflow.name}” workflow? In Sundays: Workflows → ${workflow.name} → Share, then add ${me.data?.name ?? "me"}.${note.trim() ? `\n\n${note.trim()}` : ""}\n\nThanks!`)}`;
   return (
     <Modal open onClose={onClose} width={520} title={<span className="flex items-center gap-2"><Lock size={15} /> {workflow.name}</span>}>
       <div className="space-y-4 p-5 text-sm">
         {!sent ? (
           <>
-            <p className="text-ink-soft">This workflow isn’t assigned or shared to you. Ask for access and one of its managers can approve it in Cool Services.</p>
+            <p className="text-ink-soft">This workflow isn’t assigned or shared to you. Ask for access and one of its managers can approve it in Sundays.</p>
             <textarea className="input min-h-[80px]" placeholder="Anything they should know? (optional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} />
           </>
         ) : (
           <>
             <p className="flex items-center gap-2 font-medium text-ok"><Check size={16} /> Request sent</p>
-            <p className="text-ink-soft">Its managers see it under <b>Workflows → Access requests</b> the next time they open Cool Services on this Mac. Once they approve it, {workflow.name} shows up under My workflows.</p>
-            <p className="text-xs text-ink-muted">If they use Cool Services on a different computer, send them a quick email as well. They can add you from the workflow’s Share button.</p>
+            <p className="text-ink-soft">Its managers see it under <b>Workflows → Access requests</b> the next time they open Sundays on this Mac. Once they approve it, {workflow.name} shows up under My workflows.</p>
+            <p className="text-xs text-ink-muted">If they use Sundays on a different computer, send them a quick email as well. They can add you from the workflow’s Share button.</p>
           </>
         )}
       </div>

@@ -39,7 +39,7 @@ export function TeamPhonesSettings() {
         <div>
           <h2 className="flex items-center gap-2 font-semibold"><Smartphone size={16} /> Team check-ins on phones</h2>
           <p className="mt-0.5 text-sm text-ink-muted">
-            The Team check-ins page for phones on the church Wi-Fi, and nothing else from Cool Services. <b>Team leads</b> see every team and who’s in;
+            The Team check-ins page for phones on the church Wi-Fi, and nothing else from Sundays. <b>Team leads</b> see every team and who’s in;
             <b> Staff</b> can also check people in. Each has its own PIN. Phones get names, photos and positions only, no contact details.
           </p>
         </div>
@@ -88,7 +88,7 @@ export function TeamPhonesSettings() {
       <Friendly v={v} onSave={(hostnames) => save.mutate({ hostnames })} />
       <p className="mt-3 text-[11px] text-ink-faint">
         Uses the same network port as the Kids &amp; Nursery iPads (Port, above) and your Planning Center access to read Services and Check-Ins.
-        Planning Center’s Check-Ins can’t be written to by other apps, so staff check-ins are kept in Cool Services on this Mac: they count on every
+        Planning Center’s Check-Ins can’t be written to by other apps, so staff check-ins are kept in Sundays on this Mac: they count on every
         Team check-ins screen, marked “by staff”, but don’t appear in Planning Center’s Check-Ins reports.
       </p>
     </section>

@@ -76,7 +76,7 @@ async function tokenRequest(body: Record<string, string>): Promise<TokenSet> {
 }
 
 /** Planning Center requires every API request to identify the app. */
-export const USER_AGENT = `CoolServices/${process.env.APP_VERSION ?? "dev"}`;
+export const USER_AGENT = `Sundays/${process.env.APP_VERSION ?? "dev"}`;
 
 /* ───────────── Rate limiter (per client instance / user) ───────────── */
 

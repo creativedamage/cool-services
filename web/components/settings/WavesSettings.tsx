@@ -119,7 +119,7 @@ export function WavesSettings({ w, onChange }: { w: W; onChange: (patch: Partial
           <li>Not recalling? Press ▶ next to a key: the message shows exactly what was sent. The free app
             <b> MIDI Monitor</b> (snoize.com) shows whether it arrives on the IAC bus.</li>
         </ol>
-        <p className="mt-2">Cool Services sends Bank LSB (CC 32) and a Program Change. SuperRack’s External IDs run 125 to a bank, so ID 139 is Bank 1 / Program 14.</p>
+        <p className="mt-2">Sundays sends Bank LSB (CC 32) and a Program Change. SuperRack’s External IDs run 125 to a bank, so ID 139 is Bank 1 / Program 14.</p>
       </details>
     </section>
   );

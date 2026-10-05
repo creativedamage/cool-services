@@ -74,7 +74,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-2.5 px-4 py-4">
           <Logo size={30} />
           <div className="leading-tight">
-            <div className="text-sm font-semibold">Cool Services</div>
+            <div className="text-sm font-semibold">Sundays</div>
             <div className="truncate text-[11px] text-ink-muted">{me.data?.orgName ?? "\u00a0"}</div>
           </div>
         </div>

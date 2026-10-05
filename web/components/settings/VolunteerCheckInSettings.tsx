@@ -85,7 +85,7 @@ export function VolunteerCheckInSettings() {
           <li>Tiles show each team’s area, and flag anyone who checked in somewhere else.</li>
         </ul>
         <p className="mt-2 text-[12px] text-ink-faint">
-          Planning Center doesn’t let other apps create check-ins, so staff check-ins are kept by Cool Services (they show on the service’s Check-ins tab and on
+          Planning Center doesn’t let other apps create check-ins, so staff check-ins are kept by Sundays (they show on the service’s Check-ins tab and on
           Team check-ins, marked “by staff”) but not in Planning Center’s Check-Ins reports.
         </p>
         {eventsError && <p className="mt-3 rounded-lg bg-warn-soft px-3 py-2 text-warn">{eventsError}</p>}

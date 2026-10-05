@@ -1,5 +1,5 @@
 /**
- * How this Mac uses Cool Services (see AppMode in shared/types.ts).
+ * How this Mac uses Sundays (see AppMode in shared/types.ts).
  *
  * Service Mode is for a shared computer: Services, ProPresenter, Clock, Mic board and Parent paging.
  * Workflows, Check-Ins (the services' Check-ins tab, Team check-ins), the Dashboard and Chat are

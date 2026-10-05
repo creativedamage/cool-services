@@ -8,7 +8,7 @@
  * list schedules for the account, while the encoder itself reports that it's streaming).
  *
  * Polled every 10 seconds while it's set up; the Dashboard widget and the Services badge read the
- * result. Cool Services never starts or stops anything in Resi.
+ * result. Sundays never starts or stops anything in Resi.
  */
 import type { ResiSettingsView, ResiStatus, ResiEncoder } from "../../../shared/types.js";
 import { decrypt, encrypt } from "./crypto.js";

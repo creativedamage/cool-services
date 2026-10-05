@@ -1,5 +1,5 @@
 "use client";
-/** Settings → ProPresenter computers: the ones Cool Services can watch and control. */
+/** Settings → ProPresenter computers: the ones Sundays can watch and control. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MonitorUp, Plus, Radar, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";

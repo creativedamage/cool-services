@@ -1,9 +1,9 @@
 # Builds the Mac app and publishes a GitHub Release whenever a version tag (v1.7.1 …) is pushed.
-# Cool Services' "Check for Updates" reads the newest release from here.
+# Sundays' "Check for Updates" reads the newest release from here.
 #
 # Start one with:  npm run release -- 1.7.1
 name: Release
-# Shows as "Cool Services 1.18.3 — <summary>" (the release commit) in the Actions list.
+# Shows as "Sundays 1.18.3 — <summary>" (the release commit) in the Actions list.
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('Rebuild {0}', github.event.inputs.tag) || github.event.head_commit.message }}
 
 on:
@@ -44,7 +44,7 @@ jobs:
         run: |
           V="${TAG#v}"
           node -e 'const fs=require("fs");const f="desktop/package.json";const p=JSON.parse(fs.readFileSync(f));p.version=process.argv[1];fs.writeFileSync(f,JSON.stringify(p,null,2)+"\n")' "$V"
-          node -e 'const p=require("./desktop/package.json");if(!p.coolServices||!p.coolServices.updateRepo||p.coolServices.updateRepo.startsWith("YOUR-")){console.error("Run: npm run set-repo -- <github-name>/<repo> and commit it");process.exit(1)}'
+          node -e 'const p=require("./desktop/package.json");if(!p.sundays||!p.sundays.updateRepo||p.sundays.updateRepo.startsWith("YOUR-")){console.error("Run: npm run set-repo -- <github-name>/<repo> and commit it");process.exit(1)}'
           echo "VERSION=$V" >> "$GITHUB_ENV"
 
       - name: Install
@@ -55,7 +55,7 @@ jobs:
       - name: Signing certificate
         if: env.MAC_CERT_P12 != ''
         run: |
-          KC="$RUNNER_TEMP/cool-services.keychain-db"
+          KC="$RUNNER_TEMP/sundays.keychain-db"
           security create-keychain -p ci "$KC"
           security set-keychain-settings -lut 3600 "$KC"
           security unlock-keychain -p ci "$KC"
@@ -63,7 +63,7 @@ jobs:
           security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$MAC_CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ci "$KC" >/dev/null
           security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
-          SHA=$(security find-certificate -c "Cool Services" -Z "$KC" | awk '/SHA-1 hash/{print $3; exit}')
+          SHA=$(security find-certificate -c "Sundays" -Z "$KC" | awk '/SHA-1 hash/{print $3; exit}')
           echo "COOL_SIGN_IDENTITY=$SHA" >> "$GITHUB_ENV"
           echo "COOL_SIGN_KEYCHAIN=$KC" >> "$GITHUB_ENV"
 
@@ -74,7 +74,7 @@ jobs:
         working-directory: desktop/release
         run: |
           ls -la
-          shasum -a 256 Cool-Services-*.dmg Cool-Services-*-mac.zip > SHA256SUMS.txt
+          shasum -a 256 Sundays-*.dmg Sundays-*-mac.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Release notes from CHANGELOG.md
@@ -87,7 +87,7 @@ jobs:
             const summary = (lines.find((l) => l.trim() && !l.startsWith("-")) || "").trim().replace(/\.$/, "");
             const body = lines.filter((l) => l.trim() !== summary + "." && l.trim() !== summary).join("\n").trim();
             fs.writeFileSync("release-notes.md", (summary ? summary + ".\n\n" : "") + body + "\n");
-            fs.appendFileSync(process.env.GITHUB_ENV, "SUMMARY=" + (summary || "Cool Services " + v) + "\n");
+            fs.appendFileSync(process.env.GITHUB_ENV, "SUMMARY=" + (summary || "Sundays " + v) + "\n");
           '
           cat release-notes.md
 
@@ -95,9 +95,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
-          name: Cool Services ${{ env.VERSION }} — ${{ env.SUMMARY }}
+          name: Sundays ${{ env.VERSION }} — ${{ env.SUMMARY }}
           body_path: release-notes.md
           files: |
-            desktop/release/Cool-Services-${{ env.VERSION }}.dmg
-            desktop/release/Cool-Services-${{ env.VERSION }}-mac.zip
+            desktop/release/Sundays-${{ env.VERSION }}.dmg
+            desktop/release/Sundays-${{ env.VERSION }}-mac.zip
             desktop/release/SHA256SUMS.txt

@@ -1,6 +1,6 @@
 "use client";
 /**
- * Preferences open in their own window in the Mac app (Cool Services → Preferences…, ⌘,). In a
+ * Preferences open in their own window in the Mac app (Sundays → Preferences…, ⌘,). In a
  * browser they open as a page. Sections ("smaart", "paging"…) pick the tab they're on.
  */
 export type PrefsTab = "about" | "appearance" | "startup" | "campuses" | "checkins" | "audio" | "network" | "micboard" | "video";

@@ -1,5 +1,5 @@
 /**
- * /api/waves (signed in, this Mac's Cool Services window): Tuning keys pressed on an FOH companion,
+ * /api/waves (signed in, this Mac's Sundays window): Tuning keys pressed on an FOH companion,
  * sent to Waves from here (see lib/tuningRelay.ts).
  */
 import { Router } from "express";

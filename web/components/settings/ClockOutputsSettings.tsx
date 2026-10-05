@@ -123,7 +123,7 @@ export function ClockOutputsSettings() {
           <select className="input mt-3 w-auto text-sm" value={s.screen.displayId ?? ""} onChange={(e) => save.mutate({ screen: { displayId: Number(e.target.value) } })}>
             {status.displays.map((d) => <option key={d.id} value={d.id}>{d.label}{d.primary ? " (main display)" : ""}</option>)}
           </select>
-        ) : <p className="mt-2 text-xs text-ink-muted">Displays are listed in the Cool Services Mac app.</p>}
+        ) : <p className="mt-2 text-xs text-ink-muted">Displays are listed in the Sundays Mac app.</p>}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

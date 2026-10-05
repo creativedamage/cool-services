@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Cool Services palette. Every color is a CSS variable (see globals.css) so the whole app switches
+ * Sundays palette. Every color is a CSS variable (see globals.css) so the whole app switches
  * between dark and light themes instantly — no raw hex values in components.
  */
 const v = (name: string) => `rgb(var(--c-${name}) / <alpha-value>)`;

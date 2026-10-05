@@ -66,7 +66,7 @@ export function loadNdi(): { ndi: Ndi | null; error?: string; lib?: string } {
 
     const ndi: Ndi = {
       createSender(name) {
-        // clock_video off: frames are paced by Cool Services, and sending never blocks.
+        // clock_video off: frames are paced by Sundays, and sending never blocks.
         const inst = sendCreate({ p_ndi_name: name, p_groups: null, clock_video: false, clock_audio: false });
         if (!inst) throw new Error("NDI couldn’t create the source.");
         let alive = true;

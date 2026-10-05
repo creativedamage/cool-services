@@ -1,5 +1,5 @@
 /**
- * The Cool Services server: API + (in the Mac app) the web UI, on one 127.0.0.1 address.
+ * The Sundays server: API + (in the Mac app) the web UI, on one 127.0.0.1 address.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -69,7 +69,7 @@ export function createApp(webDir?: string) {
   app.use("/api/volunteer-checkin", requireAuth, volunteerCheckInRouter);
   app.use("/api/clock", requireAuth, clockRouter);
   app.use("/api/board", requireAuth, boardRouter);
-  app.use("/api/micboard", requireAuth, micboardRouter); // Micboard inside Cool Services
+  app.use("/api/micboard", requireAuth, micboardRouter); // Micboard inside Sundays
   app.use("/api/resi", requireAuth, resiRouter); // Resi live status (read-only)
   app.use("/api/waves", requireAuth, wavesRelayRouter); // Tuning keys from FOH companions, sent to Waves from this Mac
   app.use("/api/kiosk", kioskRouter); // the iPad page, also previewable inside the app
@@ -122,7 +122,7 @@ export function startServer(opts: { port: number; webDir?: string }): Promise<Se
   const app = createApp(opts.webDir);
   return new Promise((resolve, reject) => {
     const server = app.listen(opts.port, "127.0.0.1", () => {
-      console.log(`Cool Services on http://127.0.0.1:${opts.port}`);
+      console.log(`Sundays on http://127.0.0.1:${opts.port}`);
       console.log(pcoConfigured()
         ? `  Planning Center sign-in on (client ${config.pco.clientId.slice(0, 6)}…) · return address ${config.pco.redirectUri}`
         : "  Planning Center sign-in OFF — add the Client ID in server/src/pco/registration.ts");

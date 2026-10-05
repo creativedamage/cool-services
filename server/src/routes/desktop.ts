@@ -32,6 +32,6 @@ const Req = z.object({
 
 desktopRouter.get("/embed", (_req, res) => res.json({ available: Boolean(embed) }));
 desktopRouter.post("/embed", (req, res) => {
-  if (!embed) return res.status(404).json({ error: "unavailable", message: "Only in the Cool Services Mac app." });
+  if (!embed) return res.status(404).json({ error: "unavailable", message: "Only in the Sundays Mac app." });
   res.json(embed.apply(Req.parse(req.body)));
 });

@@ -111,7 +111,7 @@ servicesRouter.post("/plans/:st/:plan/team-checkins/:person", h(async (req, res)
 servicesRouter.get("/plans/:st/:plan/checkins", h(async (req, res) => {
   try {
     const r: CheckInsForPlan = await req.pco.getCheckIns(req.params.st, req.params.plan);
-    // Staff check-ins (Cool Services) show as volunteers at their area, unless Check-Ins already has them.
+    // Staff check-ins (Sundays) show as volunteers at their area, unless Check-Ins already has them.
     const inPco = new Set(r.rows.map((x) => x.personId).filter(Boolean));
     const extra = staffRows(req.params.plan).filter((x) => !inPco.has(x.personId));
     res.json({ ...r, rows: [...r.rows, ...extra].sort((a, b) => b.at.localeCompare(a.at)) });

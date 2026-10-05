@@ -308,9 +308,9 @@ export interface TeamCheckIns {
 }
 export interface TeamCheckInPerson {
   personId: string; name: string; avatarUrl: string | null; positions: string[]; status: RosterStatus;
-  /** First check-in: from Planning Center Check-Ins, or a staff check-in in Cool Services. */
+  /** First check-in: from Planning Center Check-Ins, or a staff check-in in Sundays. */
   checkedInAt: string | null;
-  /** "checkins" = scanned in Planning Center Check-Ins; "staff" = checked in by staff in Cool Services. */
+  /** "checkins" = scanned in Planning Center Check-Ins; "staff" = checked in by staff in Sundays. */
   checkedInVia?: "checkins" | "staff";
   checkedInBy?: string;
   /** Where they checked in (Check-Ins location, or the team's location for a staff check-in). */
@@ -319,7 +319,7 @@ export interface TeamCheckInPerson {
   expectedLocation?: string | null;
 }
 
-/** A check-in recorded in Cool Services (Planning Center's Check-Ins API can't create check-ins). */
+/** A check-in recorded in Sundays (Planning Center's Check-Ins API can't create check-ins). */
 export interface StaffCheckIn {
   id: string; personId: string; name: string; planId: string; serviceTypeId: string; teamId: string; at: string; by: string;
   /** Always "Volunteer"; the event and location come from Preferences → Team Check-ins. */
@@ -437,7 +437,7 @@ export interface CheckInRow {
   at: string; // checked in
   checkedOutAt: string | null;
   securityCode: string | null;
-  /** Checked in by staff in Cool Services (not in Planning Center Check-Ins). */
+  /** Checked in by staff in Sundays (not in Planning Center Check-Ins). */
   byStaff?: string;
 }
 
@@ -480,7 +480,7 @@ export interface MinistryPaging {
   /** Check-Ins rooms whose children appear on this ministry's iPad page. */
   locationIds: string[];
   /**
-   * "managed": Cool Services keeps its own ProPresenter message ("Cool Services · Nursery") with
+   * "managed": Sundays keeps its own ProPresenter message ("Sundays · Nursery") with
    * the text and theme below. "existing": trigger a message you already have in ProPresenter.
    */
   mode: "managed" | "existing";
@@ -506,7 +506,7 @@ export interface PagingConfig {
   ipads: { enabled: boolean; port: number; hostnames?: Partial<Record<Ministry, string>> };
   ministries: Record<Ministry, MinistryPaging>;
   /**
-   * Hold iPad pages until someone sends them from Cool Services (a banner shows each request).
+   * Hold iPad pages until someone sends them from Sundays (a banner shows each request).
    * Off: iPads put codes straight on the screens.
    */
   approval: boolean;
@@ -520,7 +520,7 @@ export interface PageRequest {
   childName: string | null;
   by: string;
   requestedAt: string;
-  /** waiting → (sent | cancelled); "released" = sent from Cool Services, goes up as soon as the screen is free. */
+  /** waiting → (sent | cancelled); "released" = sent from Sundays, goes up as soon as the screen is free. */
   state: "waiting" | "released" | "sent" | "cancelled" | "failed";
   doneAt?: string;
   error?: string;
@@ -569,7 +569,7 @@ export interface CompanionTuning {
 }
 export interface CompanionInfo { id: string; name: string; pairedAt: string; lastSeen: string | null; online: boolean }
 /**
- * How this Mac uses Cool Services: Full Mode (everything), Service Mode (a shared computer: Services,
+ * How this Mac uses Sundays: Full Mode (everything), Service Mode (a shared computer: Services,
  * ProPresenter, Clock, Mic board and Parent paging only; a PIN to leave it or open Preferences), or
  * FOH Companion.
  */

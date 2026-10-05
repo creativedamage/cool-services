@@ -1,7 +1,7 @@
 "use client";
 /**
  * The campus you're looking at. It starts at your default campus (Preferences → Campuses) each time
- * Cool Services opens, and the switcher in the sidebar changes it for now. "all" shows every campus.
+ * Sundays opens, and the switcher in the sidebar changes it for now. "all" shows every campus.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";

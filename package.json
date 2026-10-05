@@ -1,5 +1,5 @@
 {
-  "name": "cool-services",
+  "name": "sundays",
   "private": true,
   "workspaces": [
     "server",
@@ -25,6 +25,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/creativedamage/cool-services.git"
+    "url": "https://github.com/creativedamage/sundays.git"
   }
 }

@@ -4,8 +4,8 @@
  * - One page at a time. ProPresenter shows the message for `onScreenSeconds` (15s by default,
  *   matching the church's ProPresenter setup); nobody can page again until it's gone. The lock is
  *   held here on the server, so the app and every iPad see the same countdown.
- * - Each ministry (Nursery, Kids) either gets its own ProPresenter message that Cool Services
- *   keeps up to date ("Cool Services · Nursery", with the chosen theme), or triggers an existing one.
+ * - Each ministry (Nursery, Kids) either gets its own ProPresenter message that Sundays
+ *   keeps up to date ("Sundays · Nursery", with the chosen theme), or triggers an existing one.
  * - Only the security code goes to the screen.
  */
 import crypto from "node:crypto";
@@ -210,7 +210,7 @@ export async function page(m: Ministry, rawCode: string, opts: { by: string; act
       id = min.existing.id.uuid || min.existing.id.name;
       token = min.existing.token;
     } else {
-      id = messageIds.get(m) ?? await pro.ensureMessage(`Cool Services · ${min.title}`, min.text.includes("{code}") ? min.text : `${min.text} {code}`, min.theme);
+      id = messageIds.get(m) ?? await pro.ensureMessage(`Sundays · ${min.title}`, min.text.includes("{code}") ? min.text : `${min.text} {code}`, min.theme);
       messageIds.set(m, id);
       token = "code";
     }
@@ -220,7 +220,7 @@ export async function page(m: Ministry, rawCode: string, opts: { by: string; act
       // Our message was deleted in ProPresenter: make it again once.
       if (min.mode === "managed" && e instanceof ProPresenterError && e.status === 404) {
         messageIds.delete(m);
-        id = await pro.ensureMessage(`Cool Services · ${min.title}`, min.text, min.theme);
+        id = await pro.ensureMessage(`Sundays · ${min.title}`, min.text, min.theme);
         messageIds.set(m, id);
         await pro.trigger(id, token, code);
       } else throw e;
@@ -249,7 +249,7 @@ export const testPage = (m: Ministry, by: string, actorId: string) => page(m, "T
 /* ───────────── Page requests (approval) ───────────── */
 
 /**
- * With approval on, an iPad's page becomes a request. It waits (a banner in Cool Services shows it)
+ * With approval on, an iPad's page becomes a request. It waits (a banner in Sundays shows it)
  * until someone sends it; then it goes on the screens as soon as nothing else is showing, one after
  * another. Kept in memory: requests are for the service that's happening now.
  */

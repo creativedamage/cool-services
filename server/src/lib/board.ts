@@ -5,7 +5,7 @@
  * The board joins three things: the mic setup (which mic is on which receiver channel), this
  * service's mic assignments (who has which mic), and the receivers' live status (battery, RF,
  * audio; read-only, see shure.ts). Names and photos come from the service's roster in Planning
- * Center, or from pictures uploaded in Cool Services.
+ * Center, or from pictures uploaded in Sundays.
  */
 import crypto from "node:crypto";
 import { DEFAULT_BOARD, type BoardSettings, type BoardTile, type DisplayState, type DisplayView, type TileStatus } from "../../../shared/board.js";
@@ -53,7 +53,7 @@ export function setBoardOwner(owner: { userId: string; demo: boolean }) {
   stored.owner = owner;
   persist();
 }
-/** The service last opened in Cool Services (the board follows it when follow is "open"). */
+/** The service last opened in Sundays (the board follows it when follow is "open"). */
 export function setOpenPlan(serviceTypeId: string, planId: string) {
   if (stored.open?.planId === planId && stored.open.serviceTypeId === serviceTypeId) return;
   stored.open = { serviceTypeId, planId };
@@ -149,7 +149,7 @@ export function displayState(): Promise<DisplayState> {
 
 const imageUrl = (fileId: string) => `/api/board-out/image/${encodeURIComponent(fileId)}`;
 
-/** The service the display follows (the one open in Cool Services, or the next), looked up every 10 s at most. */
+/** The service the display follows (the one open in Sundays, or the next), looked up every 10 s at most. */
 let planMemo: { at: number; key: string; p: Promise<PlanDetail | null> } | null = null;
 export function boardPlan(): Promise<PlanDetail | null> {
   const s = stored.settings;
@@ -186,7 +186,7 @@ async function build(): Promise<DisplayState> {
   const s = stored.settings;
   const api = pco();
   const plan = await boardPlan();
-  const { view, reason } = s.mode === "auto" ? autoView(plan, s.autoIdle) : { view: s.mode, reason: "Chosen in Cool Services" };
+  const { view, reason } = s.mode === "auto" ? autoView(plan, s.autoIdle) : { view: s.mode, reason: "Chosen in Sundays" };
 
   const setup = mics.setup();
   const assignments = plan ? mics.plan(plan.id).assignments : [];
@@ -255,7 +255,7 @@ async function build(): Promise<DisplayState> {
       when: new Date(plan.sortDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }),
       nextTime: next ? clock(next.startsAt) : null,
     } : null,
-    tiles, error: api ? null : "Open the Mic board in Cool Services once so the display can read Planning Center.",
+    tiles, error: api ? null : "Open the Mic board in Sundays once so the display can read Planning Center.",
     at: new Date().toISOString(),
   };
 }

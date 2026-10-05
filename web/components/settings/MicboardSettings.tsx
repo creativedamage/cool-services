@@ -1,6 +1,6 @@
 "use client";
 /**
- * Preferences → Micboard. Micboard (creativedamage/micboard) runs inside Cool Services; this is where
+ * Preferences → Micboard. Micboard (creativedamage/micboard) runs inside Sundays; this is where
  * it's turned on, which port it uses on the network, whether it gets names and photos from Planning
  * Center, and your own backgrounds (Micboard shows <name>.jpg or .mp4 behind that name).
  */
@@ -60,7 +60,7 @@ export function MicboardSettings() {
           </div>
         </div>
         <p className="text-sm text-ink-muted">
-          Micboard (creativedamage/micboard) runs inside Cool Services: its own page, receivers, groups and extended names, on the network at the address below.
+          Micboard (creativedamage/micboard) runs inside Sundays: its own page, receivers, groups and extended names, on the network at the address below.
           The Mic board’s display shows it too. Set up receivers and groups in Micboard itself (press <b>s</b> there for its settings, <b>?</b> for its shortcuts).
         </p>
         {st.error && <p className="rounded-lg bg-bad-soft px-3 py-2 text-sm text-bad">{st.error}</p>}

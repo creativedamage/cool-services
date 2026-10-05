@@ -136,7 +136,7 @@ async function call<T>(l: { host: string; port: number; token?: string }, path: 
   } finally { clearTimeout(t); }
 }
 
-/** Cool Services computers on this network that accept companions. */
+/** Sundays computers on this network that accept companions. */
 export async function findMains(): Promise<{ host: string; port: number; name: string }[]> {
   const ports = [47130, 80];
   const targets: { host: string; port: number }[] = [];
@@ -152,7 +152,7 @@ export async function findMains(): Promise<{ host: string; port: number; name: s
 
 export async function linkTo(host: string, port: number, code: string) {
   const hello = await call<{ app: string; name: string }>({ host, port }, "/hello");
-  if (hello.app !== "cool-services") throw new Error("That isn’t a Cool Services computer.");
+  if (hello.app !== "cool-services") throw new Error("That isn’t a Sundays computer.");
   const r = await call<{ token?: string; error?: string }>({ host, port }, "/pair", { code, name: os.hostname().replace(/\.local$/, "") });
   if (!r.token) throw new Error(r.error ?? "Pairing didn’t work.");
   extras.set("companionLink", { host, port, token: r.token, name: hello.name } satisfies Link);

@@ -10,7 +10,7 @@ export const setUpdateBridge = (b: UpdateBridge) => { bridge = b; };
 
 const none = (): UpdateStatus => ({
   state: "unavailable", current: process.env.APP_VERSION ?? "dev", repo: null, latest: null, progress: null,
-  error: "Updates are checked by the Cool Services Mac app.", checkedAt: null, installProblem: null,
+  error: "Updates are checked by the Sundays Mac app.", checkedAt: null, installProblem: null,
 });
 
 export const updatesRouter = Router();

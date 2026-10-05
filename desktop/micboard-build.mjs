@@ -3,13 +3,13 @@
 //
 // The Micboard code lives unchanged in vendor/micboard (creativedamage/micboard, added with
 // `git subtree`; update it with `npm run micboard:update`). Nothing in it is edited. To run it inside
-// Cool Services this adds, in the runtime folder:
+// Sundays this adds, in the runtime folder:
 //
 //   micboard/        Micboard's server (py/), its built web page (static/ after `npm run build`),
 //                    demo.html, democonfig.json, dcid.json, package.json (what its own
 //                    py/micboard.spec ships)
 //   micboard-site/   Micboard's Python requirements (py/requirements.txt: Tornado), pip-installed
-//   micboard-run.py  Cool Services' launcher: stops Micboard if Cool Services goes away, then runs
+//   micboard-run.py  Sundays' launcher: stops Micboard if Sundays goes away, then runs
 //                    py/micboard.py exactly as `python py/micboard.py` would
 //   python/          A self-contained Python (python-build-standalone, pinned below). On a Mac it's
 //                    made universal (Apple silicon + Intel) with lipo, like the rest of the app.
@@ -57,7 +57,7 @@ function buildMicboardWeb(src, cacheDir) {
   fs.mkdirSync(stage, { recursive: true });
   for (const f of files) { fs.mkdirSync(path.dirname(path.join(stage, f)), { recursive: true }); fs.copyFileSync(path.join(src, f), path.join(stage, f)); }
   console.log("  npm ci (Micboard’s own dependencies, in a copy)…");
-  // Its package.json also lists Electron for its own desktop wrapper; Cool Services doesn't use it.
+  // Its package.json also lists Electron for its own desktop wrapper; Sundays doesn't use it.
   const env = { ...process.env, ELECTRON_SKIP_BINARY_DOWNLOAD: "1", npm_config_audit: "false", npm_config_fund: "false" };
   execSync("npm ci --ignore-scripts --no-audit --no-fund", { cwd: stage, stdio: "inherit", env });
   console.log("  npm run build (Micboard’s webpack build)…");
@@ -139,9 +139,9 @@ async function addPython(native, cacheDir) {
   throw new Error(`No Python for ${process.platform}/${process.arch}`);
 }
 
-/** The Micboard launcher: Cool Services' own file, next to (not inside) Micboard's code. */
-const RUNNER = `# Cool Services runs Micboard with this. Micboard itself (micboard/py) is unchanged.
-# It stops Micboard when Cool Services closes (its stdin closes), then runs py/micboard.py
+/** The Micboard launcher: Sundays' own file, next to (not inside) Micboard's code. */
+const RUNNER = `# Sundays runs Micboard with this. Micboard itself (micboard/py) is unchanged.
+# It stops Micboard when Sundays closes (its stdin closes), then runs py/micboard.py
 # exactly as "python py/micboard.py <args>" would.
 import os, runpy, sys, threading
 
@@ -156,7 +156,7 @@ def watch_parent():
         pass
     os._exit(0)
 
-threading.Thread(target=watch_parent, name="cool-services-watch", daemon=True).start()
+threading.Thread(target=watch_parent, name="sundays-watch", daemon=True).start()
 sys.path.insert(0, os.path.dirname(script))
 sys.argv = [script] + sys.argv[1:]
 runpy.run_path(script, run_name="__main__")

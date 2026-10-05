@@ -44,7 +44,7 @@ export function MicSetupModal({ setup, positions, onClose }: { setup: MicSetup; 
           </div>
           <p className="mb-3 text-xs text-ink-muted">
             ULX-D, QLX-D, SLX-D and Axient Digital. Use the IP address shown on the receiver’s network menu or in Wireless Workbench.
-            This Mac must be on the same network. Cool Services only <strong>reads</strong> battery, antenna and signal info. It never
+            This Mac must be on the same network. Sundays only <strong>reads</strong> battery, antenna and signal info. It never
             changes anything on the receivers or in Wireless Workbench. Leave the IP blank for mics you just want to assign.
           </p>
           <div className="space-y-2">

@@ -1,4 +1,4 @@
-/** A Planning Center page shown inside the Cool Services window (the Mac app draws it natively). */
+/** A Planning Center page shown inside the Sundays window (the Mac app draws it natively). */
 export interface EmbedRequest {
   /** "show" places it over the given rectangle (CSS pixels in the window); "hide" removes it. */
   action: "show" | "hide" | "reload" | "home";

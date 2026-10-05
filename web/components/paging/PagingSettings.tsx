@@ -89,7 +89,7 @@ function ProPresenterSection({ c, save }: { c: PagingConfig; save: (p: PagingPat
     <section id="paging" className="panel scroll-mt-6 p-5">
       <h2 className="flex items-center gap-2 font-semibold"><MonitorUp size={16} /> ProPresenter</h2>
       <p className="mt-0.5 text-sm text-ink-muted">
-        Cool Services pages parents by showing the child’s security code as a ProPresenter message. In ProPresenter, open
+        Sundays pages parents by showing the child’s security code as a ProPresenter message. In ProPresenter, open
         Settings → Network and turn on <b>Enable Network</b>. ProPresenter 7.9 or newer.
       </p>
 
@@ -146,7 +146,7 @@ function ProPresenterSection({ c, save }: { c: PagingConfig; save: (p: PagingPat
         <span>
           <span className="block text-sm font-medium">Hold iPad pages until I send them</span>
           <span className="block text-[12px] text-ink-muted">
-            The Kids and Nursery iPads <b>request</b> a page. A bar across the top of Cool Services shows each request with <b>Send now</b> and
+            The Kids and Nursery iPads <b>request</b> a page. A bar across the top of Sundays shows each request with <b>Send now</b> and
             <b> Cancel</b>, so pages only go up when it suits the service. Sent pages go up one after another. Off: iPads put codes straight on the screens.
           </span>
         </span>
@@ -196,7 +196,7 @@ function MinistriesSection({ c, save }: { c: PagingConfig; save: (p: PagingPatch
         <div>
           <span className="label">On the screens</span>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {([["managed", "Cool Services message", "Cool Services keeps its own ProPresenter message with your text and theme."],
+            {([["managed", "Sundays message", "Sundays keeps its own ProPresenter message with your text and theme."],
               ["existing", "My existing message", "Use a message you already have in ProPresenter."]] as const).map(([mode, title, desc]) => (
               <button key={mode} onClick={() => set({ mode })}
                 className={clsx("rounded-xl border p-3 text-left transition", m.mode === mode ? "border-accent bg-accent-soft" : "border-line hover:border-line-strong")}>
@@ -222,7 +222,7 @@ function MinistriesSection({ c, save }: { c: PagingConfig; save: (p: PagingPatch
                   {themes.data?.map((t) => <option key={t.id.uuid} value={t.id.uuid}>{t.label}</option>)}
                 </select>
                 {themes.error && <span className="mt-1 block text-[11px] text-bad">{(themes.error as Error).message}</span>}
-                <span className="mt-1 block text-[11px] text-ink-faint">It appears in ProPresenter’s Messages as “Cool Services · {m.title}”.</span>
+                <span className="mt-1 block text-[11px] text-ink-faint">It appears in ProPresenter’s Messages as “Sundays · {m.title}”.</span>
               </label>
             </div>
           ) : (
@@ -378,7 +378,7 @@ function IpadSection({ c, save }: { c: PagingConfig; save: (p: PagingPatch) => v
           <h2 className="flex items-center gap-2 font-semibold"><Tablet size={16} /> Kids &amp; Nursery iPads</h2>
           <p className="mt-0.5 text-sm text-ink-muted">
             A separate page for each ministry that iPads open in Safari on the church Wi-Fi. It only shows that ministry’s checked-in
-            children and the Page button. Nothing else in Cool Services can be reached from it.
+            children and the Page button. Nothing else in Sundays can be reached from it.
           </p>
         </div>
         <Switch label="iPad pages" on={c.ipads.enabled} onChange={(v) => save({ ipads: { enabled: v } })} />
@@ -425,7 +425,7 @@ function IpadSection({ c, save }: { c: PagingConfig; save: (p: PagingPatch) => v
         <input className="input mt-1 w-28 font-mono text-sm" inputMode="numeric" value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, ""))}
           onBlur={() => { const n = Number(port); if (n && n !== c.ipads.port) save({ ipads: { port: n } }); }} />
         <span className="mt-1 block text-[11px] text-ink-faint">
-          Use <b>80</b> for friendly addresses (below), so nobody has to type a port. This Mac must stay on and awake with Cool Services open during services. The first time, macOS asks whether Cool Services
+          Use <b>80</b> for friendly addresses (below), so nobody has to type a port. This Mac must stay on and awake with Sundays open during services. The first time, macOS asks whether Sundays
           may accept incoming network connections: choose <b>Allow</b>. The iPad pages use your Planning Center access to read Check-Ins.
         </span>
       </label>
@@ -488,7 +488,7 @@ function CompanionsSection() {
         <div>
           <h2 className="flex items-center gap-2 font-semibold"><BellRing size={16} /> FOH companions</h2>
           <p className="mt-0.5 text-sm text-ink-muted">
-            A front-of-house computer running Cool Services as a <b>companion</b> takes over its screen when Kids or Nursery ask for a page,
+            A front-of-house computer running Sundays as a <b>companion</b> takes over its screen when Kids or Nursery ask for a page,
             with big Accept, Hold until clear and Deny buttons. It never sees children’s names. You can still answer requests here too.
           </p>
         </div>

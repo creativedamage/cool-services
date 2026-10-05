@@ -1,5 +1,5 @@
 /**
- * Cool Services — macOS app.
+ * Sundays — macOS app.
  *
  * Everything runs inside the app: a small server on 127.0.0.1 (never reachable from the network)
  * serves the UI and talks to Planning Center; this window shows it. Signing in happens on
@@ -18,7 +18,42 @@ import { createEmbed } from "./embed";
 // Must match server/src/pco/registration.ts (and the redirect URIs registered with Planning Center).
 const PORTS = [47123, 47124, 47125];
 
-app.setName("Cool Services");
+app.setName("Sundays");
+
+// Cool Services was renamed Sundays in 1.24. Its data folder (sign-ins, settings, notes, Micboard)
+// comes along: ~/Library/Application Support/Cool Services → …/Sundays, the first time.
+{
+  const appData = app.getPath("appData");
+  const before = path.join(appData, "Cool Services");
+  const now = path.join(appData, "Sundays");
+  let dir = now;
+  try {
+    if (fs.existsSync(before) && !fs.existsSync(now)) fs.renameSync(before, now);
+  } catch {
+    dir = before; // couldn't move it: keep using it where it is
+  }
+  app.setPath("userData", dir);
+}
+
+/**
+ * The app itself: an update from Cool Services lands as "Cool Services.app"; rename it Sundays.app
+ * (once, in place) and start again from there, before any window or helper is open.
+ */
+function renameBundle(): boolean {
+  if (!app.isPackaged || process.platform !== "darwin") return false;
+  const bundle = path.resolve(process.execPath, "..", "..", "..");
+  if (path.basename(bundle) !== "Cool Services.app") return false;
+  const target = path.join(path.dirname(bundle), "Sundays.app");
+  try {
+    if (fs.existsSync(target)) return false;
+    fs.renameSync(bundle, target);
+    app.relaunch({ execPath: path.join(target, "Contents", "MacOS", path.basename(process.execPath)) });
+    app.exit(0);
+    return true;
+  } catch {
+    return false; // not allowed to rename it (another account's Applications folder): it still works
+  }
+}
 
 // Never use the macOS Keychain (it asked for the password after every update of the ad hoc-signed
 // app). Chromium's own storage then uses a built-in key instead of a Keychain item. The one
@@ -37,7 +72,9 @@ let win: BrowserWindow | null = null;
 let origin = "";
 let embed: ReturnType<typeof createEmbed> | null = null;
 
-if (!app.requestSingleInstanceLock()) {
+if (renameBundle()) {
+  // starting again as Sundays.app
+} else if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on("second-instance", () => {
@@ -57,7 +94,7 @@ function portFree(port: number): Promise<boolean> {
 
 /**
  * Key that encrypts saved Planning Center sign-ins: a file only this Mac user can read
- * (~/Library/Application Support/Cool Services/key.txt).
+ * (~/Library/Application Support/Sundays/key.txt).
  *
  * It used to be kept in the macOS Keychain, but the app is signed ad hoc, so every update looks like
  * a different app to the Keychain and macOS asked for the password again. The first launch of
@@ -86,15 +123,15 @@ function encryptionKey(dir: string): string {
 }
 
 function fatal(message: string) {
-  dialog.showErrorBox("Cool Services couldn’t start", message);
+  dialog.showErrorBox("Sundays couldn’t start", message);
   app.quit();
 }
 
 async function boot() {
-  const dataDir = app.getPath("userData"); // ~/Library/Application Support/Cool Services
+  const dataDir = app.getPath("userData"); // ~/Library/Application Support/Sundays
   let port: number | undefined;
   for (const p of PORTS) if (await portFree(p)) { port = p; break; }
-  if (!port) return fatal(`Ports ${PORTS.join(", ")} are all in use. Quit other copies of Cool Services and try again.`);
+  if (!port) return fatal(`Ports ${PORTS.join(", ")} are all in use. Quit other copies of Sundays and try again.`);
 
   origin = `http://127.0.0.1:${port}`;
   // The server reads its settings from the environment when it loads, so set them first.
@@ -147,11 +184,11 @@ async function boot() {
   createWindow();
 }
 
-/** "owner/repo" from package.json → coolServices.updateRepo (set with `npm run set-repo`). */
+/** "owner/repo" from package.json → sundays.updateRepo (set with `npm run set-repo`). */
 function updateRepo(): string | null {
   try {
     const pkg = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), "package.json"), "utf8"));
-    const r = String(pkg.coolServices?.updateRepo ?? "");
+    const r = String(pkg.sundays?.updateRepo ?? "");
     return /^[\w.-]+\/[\w.-]+$/.test(r) && !r.startsWith("YOUR-") ? r : null;
   } catch {
     return null;
@@ -170,13 +207,13 @@ async function checkFromMenu(updater: Updater) {
   const st = await updater.check();
   const parent = win ?? undefined;
   if (st.state === "up-to-date") {
-    await dialog.showMessageBox(parent!, { type: "info", message: "You’re up to date", detail: `Cool Services ${st.current} is the newest version.` });
+    await dialog.showMessageBox(parent!, { type: "info", message: "You’re up to date", detail: `Sundays ${st.current} is the newest version.` });
   } else if (st.state === "available" && st.latest) {
     const notes = st.latest.notes.length > 600 ? `${st.latest.notes.slice(0, 600)}…` : st.latest.notes;
     const r = await dialog.showMessageBox(parent!, {
       type: "info",
-      message: `Cool Services ${st.latest.version} is available`,
-      detail: `You have ${st.current}.${notes ? `\n\n${notes}` : ""}\n\nUpdating downloads it, restarts Cool Services and keeps all your settings.`,
+      message: `Sundays ${st.latest.version} is available`,
+      detail: `You have ${st.current}.${notes ? `\n\n${notes}` : ""}\n\nUpdating downloads it, restarts Sundays and keeps all your settings.`,
       buttons: ["Update Now", "Later", "What’s New"],
       defaultId: 0, cancelId: 1,
     });
@@ -226,7 +263,7 @@ function isInApp(url: string) {
   }
 }
 
-/** Preferences in their own window (Cool Services → Preferences…). One at a time. */
+/** Preferences in their own window (Sundays → Preferences…). One at a time. */
 let prefsWin: BrowserWindow | null = null;
 function openPreferences(section = "") {
   if (!origin) return;
@@ -362,7 +399,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 640,
-    title: "Cool Services",
+    title: "Sundays",
     backgroundColor: "#0A0C10",
     show: false,
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },

@@ -4,6 +4,14 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.24.0
+Cool Services is now Sundays, with a new icon: a countdown ring around a live dot.
+- New name everywhere: the app, its menus and windows, the sign-in screen, the installer
+  (Sundays-<version>.dmg) and the GitHub releases.
+- New app icon and logo.
+- Updating keeps everything: Cool Services.app becomes Sundays.app, and your sign-in, settings, notes
+  and Micboard move to ~/Library/Application Support/Sundays on the first launch.
+
 ## 1.23.0
 Resi: a "Resi live" badge on Services and a Resi widget on the Dashboard showing when you're streaming.
 - Connect Resi in Preferences → Video → Resi with an API Client ID and Secret from Resi Studio.

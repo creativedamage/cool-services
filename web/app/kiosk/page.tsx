@@ -61,9 +61,9 @@ export default function KioskPage() {
 
   if (m === undefined) return <Shell />;
   if (m === null) return <Chooser />;
-  if (err) return <Shell><Centered><p className="text-ink-soft">Can’t reach Cool Services.</p><p className="mt-1 text-sm text-ink-muted">Make sure the Mac running Cool Services is on and awake.</p><button className="btn-outline mt-6" onClick={load}>Try again</button></Centered></Shell>;
+  if (err) return <Shell><Centered><p className="text-ink-soft">Can’t reach Sundays.</p><p className="mt-1 text-sm text-ink-muted">Make sure the Mac running Sundays is on and awake.</p><button className="btn-outline mt-6" onClick={load}>Try again</button></Centered></Shell>;
   if (!info) return <Shell />;
-  if (!info.enabled) return <Shell><Centered><p className="text-ink-soft">{info.title} paging is turned off.</p><p className="mt-1 text-sm text-ink-muted">A staff member can turn it on in Cool Services → Settings.</p></Centered></Shell>;
+  if (!info.enabled) return <Shell><Centered><p className="text-ink-soft">{info.title} paging is turned off.</p><p className="mt-1 text-sm text-ink-muted">A staff member can turn it on in Sundays → Settings.</p></Centered></Shell>;
   if (!info.unlocked) return <PinPad m={m} info={info} onUnlocked={load} />;
   return <Board m={m} info={info} onLocked={load} />;
 }

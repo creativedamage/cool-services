@@ -5,7 +5,7 @@
  *
  *   < GET 1 BATT_BARS >   →   < REP 1 BATT_BARS 004 >
  *
- * Cool Services never changes a receiver: no channel names, no gain, no frequencies, nothing that
+ * Sundays never changes a receiver: no channel names, no gain, no frequencies, nothing that
  * Wireless Workbench or the receiver would show as changed. Mic assignments stay inside the app.
  *
  * The one non-GET message is METER_RATE on ULX-D-family receivers. It only asks the receiver to

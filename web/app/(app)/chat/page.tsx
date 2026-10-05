@@ -60,7 +60,7 @@ export default function ChatPage() {
           <div className="grid h-full place-items-center p-8 text-center">
             <div className="max-w-md">
               <MessageCircle className="mx-auto text-accent" size={28} />
-              <h2 className="mt-3 font-semibold">Chat opens inside the Cool Services Mac app</h2>
+              <h2 className="mt-3 font-semibold">Chat opens inside the Sundays Mac app</h2>
               <p className="mt-1 text-sm text-ink-muted">In a browser, open Planning Center Chat in its own tab.</p>
               <a className="btn-primary mt-4" href={CHAT} target="_blank" rel="noreferrer">Open Planning Center Chat</a>
             </div>

@@ -19,7 +19,7 @@ interface Stored { presets: ClockPreset[]; settings: ClockOutputSettings; state:
 const KEY = "clock";
 
 const defaultSettings = (): ClockOutputSettings => ({
-  ndi: { enabled: false, name: "Cool Services Clock", resolution: "1080p", fps: 30, transparent: false },
+  ndi: { enabled: false, name: "Sundays Clock", resolution: "1080p", fps: 30, transparent: false },
   screen: { enabled: false, displayId: null },
   lan: false,
   title: "MASTER TIME",
@@ -60,7 +60,7 @@ export const clockSettings = () => stored.settings;
 
 /* ───────────── Outputs (NDI and the second display live in the Mac app) ───────────── */
 
-let status: ClockStatusView = { ndi: { available: false, running: false, sourceName: null, connections: 0, error: "NDI output works in the Cool Services Mac app." }, displays: [] };
+let status: ClockStatusView = { ndi: { available: false, running: false, sourceName: null, connections: 0, error: "NDI output works in the Sundays Mac app." }, displays: [] };
 const settingsListeners = new Set<(s: ClockOutputSettings) => void>();
 /** Registered by desktop/src/main.ts. */
 export const clockOutputs = {
@@ -264,7 +264,7 @@ async function refreshPco(force = false) {
   if (!needs.length || pcoBusy) return;
   const api = pco();
   if (!api) {
-    for (const w of needs) state = { ...state, [w]: { ...state[w]!, idle: "Open the Clock in Cool Services once so it can read Planning Center." } };
+    for (const w of needs) state = { ...state, [w]: { ...state[w]!, idle: "Open the Clock in Sundays once so it can read Planning Center." } };
     changed(false);
     return;
   }

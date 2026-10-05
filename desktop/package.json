@@ -1,7 +1,7 @@
 {
-  "name": "cool-services",
-  "productName": "Cool Services",
-  "version": "1.23.0",
+  "name": "sundays",
+  "productName": "Sundays",
+  "version": "1.24.0",
   "description": "Volunteer workflows and service scheduling, powered by Planning Center.",
   "author": "Wayne Goodman Productions",
   "private": true,
@@ -21,7 +21,7 @@
   },
   "build": {
     "appId": "org.coolchurch.coolservices",
-    "productName": "Cool Services",
+    "productName": "Sundays",
     "copyright": "Wayne Goodman Productions",
     "files": [
       "app/**/*",
@@ -50,15 +50,15 @@
         }
       ],
       "identity": "-",
-      "artifactName": "Cool-Services-${version}-mac.${ext}",
+      "artifactName": "Sundays-${version}-mac.${ext}",
       "x64ArchFiles": "{**/app/native/**,**/Resources/micboard/**}",
       "extendInfo": {
-        "NSLocalNetworkUsageDescription": "Cool Services and Micboard talk to your Shure receivers, ProPresenter, consoles and iPads on the church network."
+        "NSLocalNetworkUsageDescription": "Sundays and Micboard talk to your Shure receivers, ProPresenter, consoles and iPads on the church network."
       }
     },
     "dmg": {
-      "title": "Cool Services",
-      "artifactName": "Cool-Services-${version}.dmg"
+      "title": "Sundays",
+      "artifactName": "Sundays-${version}.dmg"
     },
     "npmRebuild": false,
     "afterSign": "build/after-sign.cjs",
@@ -75,8 +75,8 @@
       }
     ]
   },
-  "coolServices": {
-    "updateRepo": "creativedamage/cool-services"
+  "sundays": {
+    "updateRepo": "creativedamage/sundays"
   },
-  "repository": "github:creativedamage/cool-services"
+  "repository": "github:creativedamage/sundays"
 }

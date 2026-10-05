@@ -150,7 +150,7 @@ export function CheckInsView({ serviceTypeId, planId }: { serviceTypeId: string;
                             <div className="truncate text-sm font-medium">{r.name}</div>
                             <div className="truncate text-[11px] text-ink-muted">{r.event}{r.locations.length > 1 ? ` · ${r.locations.slice(1).join(", ")}` : ""}</div>
                           </div>
-                          {r.kind !== "Regular" && <Badge tone={KIND_TONE[r.kind]}>{r.kind}</Badge>}{r.byStaff && <span className="text-[10px] text-ink-faint" title={`Checked in by ${r.byStaff} in Cool Services`}>by staff</span>}
+                          {r.kind !== "Regular" && <Badge tone={KIND_TONE[r.kind]}>{r.kind}</Badge>}{r.byStaff && <span className="text-[10px] text-ink-faint" title={`Checked in by ${r.byStaff} in Sundays`}>by staff</span>}
                           {r.securityCode && <span className="rounded bg-hover px-1.5 font-mono text-[11px] text-ink-soft">{r.securityCode}</span>}
                           <PageChildButton pager={pager} row={r} />
                           <span className="w-16 text-right text-[11px] tabular-nums text-ink-muted">

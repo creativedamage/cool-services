@@ -15,7 +15,7 @@ exports.default = async function afterSign(context) {
   const app = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
   const args = ["--force", "--deep", "--timestamp=none", "--sign", id];
   if (process.env.COOL_SIGN_KEYCHAIN) args.push("--keychain", process.env.COOL_SIGN_KEYCHAIN);
-  console.log(`  • signing ${path.basename(app)} with the Cool Services certificate`);
+  console.log(`  • signing ${path.basename(app)} with the Sundays certificate`);
   execFileSync("/usr/bin/codesign", [...args, app], { stdio: "inherit" });
   execFileSync("/usr/bin/codesign", ["--verify", "--deep", "--strict", app], { stdio: "inherit" });
 };
