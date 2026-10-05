@@ -149,6 +149,7 @@ export const Api = {
   companionAct: (id: string, action: "accept" | "hold" | "deny") => api<CompanionState>("/companion-client/act", { method: "POST", json: { id, action } }),
   weekend: () => api<WeekendView>("/weekend"),
   syncStatus: () => api<SyncStatus>("/sync"),
+  cloud: () => api<{ supabaseUrl: string; publishableKey: string; opsUrl: string; testToken: string | null }>("/cloud"),
   syncNow: () => api<SyncStatus>("/sync", { method: "POST" }),
   setWeekend: (sunday: string | null) => api<WeekendView>("/weekend", { method: "PUT", json: { sunday } }),
   resi: () => api<ResiStatus>("/resi"),

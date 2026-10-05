@@ -2,7 +2,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { BellRing, CalendarDays, UsersRound, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, Lock, LockOpen, LogOut, Settings, Timer, MicVocal } from "lucide-react";
+import { Building2, BellRing, CalendarDays, UsersRound, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, Lock, LockOpen, LogOut, Settings, Timer, MicVocal } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -18,6 +18,7 @@ import { PrefsLink } from "@/components/settings/PrefsLink";
 import { PageRequestsBar } from "@/components/paging/PageRequests";
 import { useCampus } from "@/lib/campus";
 import { WeekendPicker, useWeekend } from "@/lib/weekend";
+import { OpsNav } from "@/components/ops/OpsNav";
 import { APP_MODE_KEY, PinDialog, serviceLocked, serviceModeAllows, useAppMode, useUnlock } from "@/lib/appMode";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -60,6 +61,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const nav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/workflows", label: "Workflows", icon: KanbanSquare },
+    { href: "/ops", label: "Church Ops", icon: Building2 },
     { href: "/services", to: servicesHref, label: "Services", icon: CalendarDays },
     { href: "/team-checkins", label: "Team check-ins", icon: UsersRound },
     { href: "/propresenter", label: "ProPresenter", icon: MonitorUp },
@@ -98,6 +100,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="flex-1" />
         ) : path.startsWith("/services") ? (
           <ServicesNav activeSt={search.get("st")} activePlan={search.get("plan")} tab={path} />
+        ) : path.startsWith("/ops") ? (
+          <OpsNav />
         ) : path.startsWith("/paging") ? (
           <PagingNav />
         ) : path.startsWith("/chat") || path.startsWith("/propresenter") || path.startsWith("/dashboard") || path.startsWith("/team-checkins") || path.startsWith("/clock") || path.startsWith("/micboard") ? (

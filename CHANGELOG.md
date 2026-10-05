@@ -4,6 +4,25 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.25.0
+Church Ops inside Sundays (requests, facilities, AVL quoting, with your own accounts), one Weekend everywhere, and settings that follow you to every Mac.
+- **Church Ops** (Full Mode only, sidebar → Church Ops): ask for technology, supplies and building
+  repairs; a work queue for the teams that handle them (approve, assign, start, hold, order, complete,
+  with every step on the record); AVL quotes with vendor price lists, margins, print / PDF; vendors
+  with CSV and Excel price-list import; and Settings for users, teams, request types and routing,
+  campuses, activity and the organization's logo and quoting defaults.
+- Church Ops has its own accounts: people create one with their email, and a manager approves them and
+  sets their role (Staff, Manager, Executive, System admin), AVL access and campus. The first account
+  becomes System admin. Someone a manager adds ahead of time is straight in when they register.
+- Quotes are locked when they're sent; print them or save the PDF for the customer, then record the
+  answer (accepted, wants changes, declined). Online sign-and-pay comes later.
+- **Weekend picker** in the sidebar: pick the weekend you're working on, and the Dashboard, Mic board
+  and displays, Clock, Tuning strip, FOH companion, team check-ins and the start-up view all use that
+  weekend's service. Nothing moves on to the next weekend by itself.
+- **Sync across your Macs**: sign in with Planning Center on another Mac and it gets the same setup
+  (Preferences → About shows when it last synced). Each Mac keeps its own mode, PIN, screens, MIDI
+  output and FOH links.
+
 ## 1.24.0
 Cool Services is now Sundays, with a new icon: a countdown ring around a live dot.
 - New name everywhere: the app, its menus and windows, the sign-in screen, the installer

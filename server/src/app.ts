@@ -37,6 +37,7 @@ import { wavesRelayRouter } from "./routes/wavesRelay.js";
 import { resiRouter } from "./routes/resi.js";
 import { weekendRouter } from "./routes/weekend.js";
 import { syncRouter } from "./routes/sync.js";
+import { cloudRouter } from "./routes/cloud.js";
 import { startSync } from "./lib/sync.js";
 import { startResi } from "./lib/resi.js";
 import { initMicboard } from "./lib/micboard.js";
@@ -73,6 +74,7 @@ export function createApp(webDir?: string) {
   app.use("/api/clock", requireAuth, clockRouter);
   app.use("/api/board", requireAuth, boardRouter);
   app.use("/api/micboard", requireAuth, micboardRouter); // Micboard inside Sundays
+  app.use("/api/cloud", requireAuth, cloudRouter); // Church Ops (Supabase)
   app.use("/api/sync", requireAuth, syncRouter); // settings sync across your Macs
   app.use("/api/weekend", requireAuth, weekendRouter); // the weekend everything works on
   app.use("/api/resi", requireAuth, resiRouter); // Resi live status (read-only)

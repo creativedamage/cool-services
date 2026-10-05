@@ -4,22 +4,25 @@
   "scripts": {
     "dev": "next dev -H 127.0.0.1 -p 5173",
     "build": "NEXT_EXPORT=1 next build",
-    "typecheck": "tsc --noEmit",
-    "predev": "node scripts/copy-pdf-worker.mjs"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
+    "@supabase/supabase-js": "^2.117.2",
     "@tanstack/react-query": "^5.62.8",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
     "next": "^15.5.26",
+    "papaparse": "^5.7.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "sonner": "^1.7.1",
+    "xlsx": "^0.18.5",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "autoprefixer": "^10.4.20",
