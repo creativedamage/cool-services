@@ -6,10 +6,12 @@ import type { OrgSettings } from "@shared/ops/types";
 import { ops, useOps, useOpsRefresh } from "@/lib/ops";
 import { Card, ErrorBox, Field, Loading, PageHeader } from "@/components/ops/OpsUi";
 import { LogoPicker } from "@/components/ops/LogoPicker";
+import { PlanBilling } from "@/components/ops/PlanBilling";
+import { useModule } from "@/components/ops/context";
 
 type Data = { org: OrgSettings; logo: string | null; logoDark: string | null };
 const TEXT: [keyof OrgSettings, string][] = [
-  ["name", "Church name"], ["legalName", "Legal name"], ["addressLine1", "Address"], ["addressLine2", "Address line 2"], ["city", "City"], ["state", "State"],
+  ["name", "Name"], ["legalName", "Legal name"], ["addressLine1", "Address"], ["addressLine2", "Address line 2"], ["city", "City"], ["state", "State"],
   ["postalCode", "ZIP"], ["phone", "Phone"], ["email", "Email"], ["website", "Website"], ["ein", "EIN (Federal Tax ID)"], ["salesTaxId", "Sales tax / exemption #"],
   ["quotePrefix", "Request number prefix"],
 ];
@@ -21,6 +23,7 @@ export default function Organization() {
 }
 
 function OrgForm({ data }: { data: Data }) {
+  const branded = useModule("branding");
   const refresh = useOpsRefresh();
   const [o, setO] = useState<OrgSettings>(data.org);
   const [busy, setBusy] = useState(false);
@@ -33,16 +36,19 @@ function OrgForm({ data }: { data: Data }) {
   const remove = (variant: "light" | "dark") => () => ops(`/settings/organization/logo/${variant}`, { method: "DELETE" });
   return (
     <>
-      <PageHeader crumb="Settings" title="Organization" description="The church's name, logo and details in Sundays | Operations." />
+      <PageHeader crumb="Settings" title="Organization & billing" description="Your plan, what you pay, and your organization's details." />
       <div className="space-y-5">
-        <Card eyebrow="Branding" title="Logo">
+        <PlanBilling />
+        {!branded ? (
+          <Card eyebrow="Branding" title="Logo"><p className="p-4 text-sm text-ink-muted">Your logo in the app and on printouts comes with the Custom branding module.</p></Card>
+        ) : <Card eyebrow="Branding" title="Logo">
           <div className="grid gap-4 p-4 md:grid-cols-2">
             <LogoPicker current={data.logo} label="For light backgrounds (printouts)" upload={upload("light")} remove={remove("light")} />
             <LogoPicker dark current={data.logoDark} label="For dark backgrounds (Sundays)" upload={upload("dark")} remove={remove("dark")} />
           </div>
-        </Card>
+        </Card>}
         <form onSubmit={save}>
-          <Card eyebrow="Church" title="Details" action={<button className="btn-primary" disabled={busy}>Save</button>}>
+          <Card eyebrow="Organization" title="Details" action={<button className="btn-primary" disabled={busy}>Save</button>}>
             <div className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
               {TEXT.map(([k, label]) => <Field key={k} label={label}><input className="input" value={(o[k] as string | null) ?? ""} onChange={(e) => setO({ ...o, [k]: e.target.value })} /></Field>)}
             </div>

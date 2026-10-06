@@ -21,9 +21,16 @@ const cloud = () => (cfgP ??= (STANDALONE
   ? Promise.resolve({
     supabaseUrl: SUPABASE_URL, publishableKey: SUPABASE_PUBLISHABLE_KEY,
     // NEXT_PUBLIC_OPS_URL / _TEST_TOKEN: a local copy of the ops function, for testing a website build.
-    opsUrl: process.env.NEXT_PUBLIC_OPS_URL || `${SUPABASE_URL}/functions/v1/ops`, testToken: process.env.NEXT_PUBLIC_OPS_TEST_TOKEN || null,
+    opsUrl: process.env.NEXT_PUBLIC_OPS_URL || `${SUPABASE_URL}/functions/v1/ops`, testToken: testToken(),
   })
   : Api.cloud()).catch((e) => { cfgP = null; throw e; }));
+
+/** Test builds only (NEXT_PUBLIC_OPS_TEST_TOKEN set at build time): sign in as a test person. Real builds never set it. */
+function testToken(): string | null {
+  const t = process.env.NEXT_PUBLIC_OPS_TEST_TOKEN;
+  if (t === "localStorage") { try { return localStorage.getItem("ops-test-token"); } catch { return null; } }
+  return t || null;
+}
 
 /** Where the "confirm your email" link lands: the website itself, or (from the Mac app) Sundays' confirmation page. */
 export const confirmRedirect = () => (STANDALONE && typeof window !== "undefined" ? `${window.location.origin}/` : CONFIRMED_URL);
@@ -59,6 +66,13 @@ export function useOpsSession(): { session: Session | null | undefined; test: bo
   return { session, test };
 }
 
+/* ── Which organization (the switcher). Sent as X-Org; the server checks they belong to it. ── */
+const ORG_KEY = "sundays-ops-org";
+export const currentOrgId = (): string | null => { try { return localStorage.getItem(ORG_KEY); } catch { return null; } };
+export function rememberOrg(id: string | null) {
+  try { if (id) localStorage.setItem(ORG_KEY, id); else localStorage.removeItem(ORG_KEY); } catch { /* private window */ }
+}
+
 export class OpsError extends Error {
   constructor(message: string, public status: number, public body: Record<string, unknown> = {}) { super(message); }
 }
@@ -77,7 +91,10 @@ export async function ops<T>(path: string, init: { method?: string; json?: unkno
   if (!t) throw new OpsError("Sign in to Sundays | Operations.", 401);
   const res = await fetch(`${c.opsUrl}${path}`, {
     method: init.method ?? (init.json !== undefined ? "POST" : "GET"),
-    headers: { Authorization: `Bearer ${t}`, apikey: c.publishableKey, ...(init.json !== undefined ? { "Content-Type": "application/json" } : {}) },
+    headers: {
+      Authorization: `Bearer ${t}`, apikey: c.publishableKey, ...(currentOrgId() ? { "X-Org": currentOrgId()! } : {}),
+      ...(init.json !== undefined ? { "Content-Type": "application/json" } : {}),
+    },
     body: init.json !== undefined ? JSON.stringify(init.json) : undefined,
   });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -98,7 +115,32 @@ export function useOps<T>(path: string | null, opts: Omit<UseQueryOptions<T>, "q
   });
 }
 
-export const useOpsMe = (enabled = true) => useOps<OpsMe>("/me", { enabled, staleTime: 30_000, refetchInterval: 60_000 });
+export function useOpsMe(enabled = true) {
+  const q = useOps<OpsMe>("/me", { enabled, staleTime: 30_000, refetchInterval: 60_000 });
+  // Keep the remembered organization in step with the one the server picked.
+  const picked = q.data && "org" in q.data ? q.data.org.id : null;
+  useEffect(() => { if (picked && picked !== currentOrgId()) rememberOrg(picked); }, [picked]);
+  return q;
+}
+
+/** Switch organization: everything reloads for the new one. */
+export function useSwitchOrg() {
+  const qc = useQueryClient();
+  return async (id: string, go?: string) => {
+    rememberOrg(id);
+    qc.removeQueries({ queryKey: ["ops"] });
+    if (go && typeof window !== "undefined") window.location.assign(go);
+    else await qc.invalidateQueries({ queryKey: ["ops"] });
+  };
+}
+
+/** Public plans and add-ons (no sign-in needed). */
+export async function publicPricing<T>(): Promise<T> {
+  const c = await cloud();
+  const res = await fetch(`${c.opsUrl}/public/pricing`, { headers: { apikey: c.publishableKey } });
+  if (!res.ok) throw new OpsError("Couldn't load plans.", res.status);
+  return res.json() as Promise<T>;
+}
 
 /** After a change: refetch every Sundays | Operations screen. */
 export function useOpsRefresh() {
@@ -108,6 +150,7 @@ export function useOpsRefresh() {
 
 export async function opsSignOut() {
   const c = await cloud();
+  rememberOrg(null);
   if (!c.testToken) await (await supabase()).auth.signOut();
 }
 

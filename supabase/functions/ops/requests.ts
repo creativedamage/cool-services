@@ -6,7 +6,8 @@
 import { applyRequestAction, availableActions, initialStatus, OPEN_STATUSES, resolveRoute, type RequestAction, type RequestRole } from "./lib/workflow.ts";
 import { atLeast, canAccessCampus, isAdmin, seesAllCampuses } from "./lib/rbac.ts";
 import type { OpsSessionUser, RequestDetail, RequestRow, TimelineEntry } from "./lib/types.ts";
-import { getOrg, HttpError, logActivity, nextNumber, sql, type Tx } from "./db.ts";
+import { ctx, getOrg, hasModule, HttpError, logActivity, nextNumber, sql, type Tx } from "./db.ts";
+import { kindAllowed } from "./lib/billing.ts";
 
 type U = OpsSessionUser;
 
@@ -119,6 +120,11 @@ export async function submitRequest(u: U, input: SubmitInput) {
     getOrg(),
   ]);
   if (!category?.active) throw new HttpError(422, "Choose a request type.");
+  if (!kindAllowed(category.kind, ctx()!.modules)) throw new HttpError(403, "That kind of request isn't part of this organization's plan.");
+  if (!hasModule("campuses")) {
+    const [first] = await sql`select id from ops.campuses where active order by sort_order, name limit 1`;
+    if (first && campus && campus.id !== first.id) throw new HttpError(422, "Choose a campus.");
+  }
   if (!campus?.active) throw new HttpError(422, "Choose a campus.");
   if (category.requiresLocation && !input.location?.trim()) throw new HttpError(422, "Please tell us where (building / room).");
 

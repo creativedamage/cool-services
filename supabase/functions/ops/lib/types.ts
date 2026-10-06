@@ -3,6 +3,7 @@
 import type { AvlLevel, Permission, Role } from "./rbac.ts";
 import type { RequestAction, RequestKind, RequestRole, RequestStatus, RequestWorkflow } from "./workflow.ts";
 import type { QuoteStatus } from "./state-machine.ts";
+import type { Bill, Interval, ModuleDef, ModuleKey, OrgStatus, OrgType, PlanDef } from "./billing.ts";
 
 export type Priority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 export interface Ref { id: string; name: string }
@@ -20,15 +21,24 @@ export interface OpsSessionUser {
   teamIds: string[];
 }
 
+/** An organization this person belongs to (for the switcher). */
+export interface MyOrg { id: string; name: string; status: OrgStatus; memberStatus: "active" | "pending" | "inactive"; support: boolean }
+interface MeBase { email: string; orgs: MyOrg[]; platform: boolean }
 export type OpsMe =
-  | { status: "ok"; user: OpsSessionUser; org: OrgBrand; nav: OpsNav }
-  | { status: "pending" | "inactive"; name: string; email: string; org: OrgBrand };
+  | (MeBase & { status: "ok"; user: OpsSessionUser; org: OrgBrand; nav: OpsNav })
+  | (MeBase & { status: "pending" | "inactive"; name: string; org: OrgBrand })
+  | (MeBase & { status: "suspended"; org: OrgBrand })
+  | (MeBase & { status: "no-org" });
 
-export interface OrgBrand { name: string | null; logo: string | null; logoDark: string | null }
+export interface OrgBrand { id: string; name: string | null; logo: string | null; logoDark: string | null; status: OrgStatus; trialEndsAt: string | null; modules: ModuleKey[] }
 export interface OpsNav {
   handlesRequests: boolean; queueCount: number; pendingUsers: number; manager: boolean; admin: boolean; campusName: string | null;
   /** Which apps this person can open. */
   ops: boolean; avl: boolean; avlManager: boolean; avlPending: number; avlName: string | null;
+  /** Modules this organization has. */
+  modules: ModuleKey[];
+  /** Sundays super admin (acting in this org as admin). */
+  platform: boolean;
 }
 
 export interface RequestRow {
@@ -148,3 +158,34 @@ export interface AvlBusiness {
   quotePrefix: string; defaultTaxBps: number; defaultDepositBps: number; defaultMarginBps: number; laborRateCents: number;
   quoteValidDays: number; quoteTerms: string | null;
 }
+
+/* ── Plans, billing and the super-admin console ── */
+export interface PublicPricing { plans: PlanDef[]; modules: ModuleDef[]; churchDiscountBps: number; trialDays: number }
+export interface InvoiceRow {
+  id: string; orgId: string; orgName?: string; number: string; period: string | null; description: string | null;
+  lines: { label: string; amountCents: number }[]; subtotalCents: number; discountCents: number; totalCents: number;
+  status: "DRAFT" | "SENT" | "PAID" | "VOID"; dueAt: string | null; sentAt: string | null; paidAt: string | null; notes: string | null; createdAt: string;
+}
+export interface OrgBillingView {
+  org: { id: string; name: string | null; orgType: OrgType; status: OrgStatus; trialEndsAt: string | null; billingInterval: Interval; billingEmail: string | null; fullLicense: boolean };
+  plan: PlanDef | null; modules: ModuleDef[]; enabled: ModuleKey[]; bill: Bill; invoices: InvoiceRow[]; members: number; campuses: number;
+}
+export interface AdminOrgRow {
+  id: string; name: string | null; orgType: OrgType; status: OrgStatus; planId: string | null; planName: string | null; fullLicense: boolean;
+  members: number; createdAt: string; trialEndsAt: string | null; totalCents: number; billingInterval: Interval;
+}
+export interface AdminOrg {
+  id: string; name: string | null; orgType: OrgType; status: OrgStatus; planId: string | null; billingInterval: Interval; billingEmail: string | null;
+  trialEndsAt: string | null; fullLicense: boolean; moduleOverrides: Record<string, boolean>; churchDiscount: boolean; discountBps: number;
+  discountCents: number; discountEndsAt: string | null; discountNote: string | null; adminNotes: string | null; createdAt: string;
+}
+export interface AdminOrgPage {
+  org: AdminOrg; plans: PlanDef[]; modules: ModuleDef[]; enabled: ModuleKey[]; bill: Bill; churchDiscountBps: number;
+  members: { id: string; name: string; email: string; role: string; avlLevel: string; active: boolean; pending: boolean; registered: boolean; lastLoginAt: string | null }[];
+  invoices: InvoiceRow[];
+}
+export interface AdminOverview {
+  orgs: number; active: number; trial: number; pastDue: number; suspended: number; fullLicense: number; people: number;
+  mrrCents: number; recent: AdminOrgRow[]; openInvoicesCents: number;
+}
+export interface PlatformAdminRow { id: string; email: string; authId: string | null; addedBy: string | null; createdAt: string }

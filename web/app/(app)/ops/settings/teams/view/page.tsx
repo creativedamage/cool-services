@@ -1,4 +1,5 @@
 "use client";
+import { useModule } from "@/components/ops/context";
 import { TypeIcon } from "@/components/ops/TypeIcon";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -61,6 +62,7 @@ function TeamView() {
 function TeamDetails({ data }: { data: Data }) {
   const refresh = useOpsRefresh();
   const t = data.team;
+  const multi = useModule("campuses");
   const [f, setF] = useState({ name: t.name, campusId: t.campusId ?? "", email: t.email ?? "", description: t.description ?? "", active: t.active });
   return (
     <Card eyebrow="Settings" title="Team details">
@@ -69,8 +71,8 @@ function TeamDetails({ data }: { data: Data }) {
         try { await ops(`/settings/teams/${t.id}`, { method: "PUT", json: { ...f, campusId: f.campusId || null } }); toast.success("Saved"); await refresh(); } catch (err) { toast.error((err as Error).message); }
       }}>
         <Field label="Name"><input required className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
-        <Field label="Campus">{data.global ? <select className="input" value={f.campusId} onChange={(e) => setF({ ...f, campusId: e.target.value })}><option value="">All campuses</option>{data.campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-          : <input className="input" readOnly value={data.campuses.find((c) => c.id === t.campusId)?.name ?? "All campuses"} />}</Field>
+        {multi && <Field label="Campus">{data.global ? <select className="input" value={f.campusId} onChange={(e) => setF({ ...f, campusId: e.target.value })}><option value="">All campuses</option>{data.campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          : <input className="input" readOnly value={data.campuses.find((c) => c.id === t.campusId)?.name ?? "All campuses"} />}</Field>}
         <Field label="Shared inbox"><input type="email" className="input" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
         <Field label="Description"><input className="input" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
         <Check label="Active" checked={f.active} onChange={(v) => setF({ ...f, active: v })} />

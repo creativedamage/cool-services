@@ -74,6 +74,8 @@ export interface SessionUser {
   permissions: Permission[];
   /** Uses Sundays | Operations (admins always do). */
   opsAccess: boolean;
+  /** Sundays super admin acting in this organization. */
+  platform?: boolean;
   campusId: string | null;
   /** true for global managers, executives and admins */
   allCampuses: boolean;

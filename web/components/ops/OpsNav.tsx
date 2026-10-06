@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
-  Activity, AudioLines, Boxes, Briefcase, Building, Building2, ClipboardList, FileText, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Users, UsersRound,
+  ArrowLeft, CreditCard, Gauge, Layers, ShieldHalf, Activity, AudioLines, Boxes, Briefcase, Building, Building2, ClipboardList, FileText, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Users, UsersRound,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -66,9 +66,9 @@ export function OpsNav() {
     { href: "/ops/settings/users", label: "Users", icon: Users, badge: n.pendingUsers, tone: "warn" },
     { href: "/ops/settings/teams", label: "Teams", icon: UsersRound },
     { href: "/ops/settings/request-types", label: "Request types", icon: Tags },
-    { href: "/ops/settings/campuses", label: "Campuses", icon: Building },
+    ...(n.modules.includes("campuses") ? [{ href: "/ops/settings/campuses", label: "Campuses", icon: Building }] : []),
     { href: "/ops/settings/activity", label: "Activity", icon: Activity },
-    ...(n.admin ? [{ href: "/ops/settings/organization", label: "Organization", icon: Settings2 }] : []),
+    ...(n.admin ? [{ href: "/ops/settings/organization", label: "Organization & billing", icon: Settings2 }] : []),
   ] });
   return <SideNav groups={groups} footer={`Operations · ${me.user.name}${n.campusName ? ` · ${n.campusName}` : ""}`} />;
 }
@@ -103,7 +103,7 @@ function Brand({ app, logo, icon, name }: { app: string; logo: string | null; ic
         : <span className="grid h-[30px] w-[30px] place-items-center rounded-lg bg-accent text-on-accent">{icon}</span>}
       <div className="min-w-0 leading-tight">
         <div className="text-sm font-semibold">Sundays <span className="font-normal text-ink-faint">|</span> {app}</div>
-        <div className="truncate text-[11px] text-ink-muted">{name ?? " "}</div>
+        {name && <div className="truncate text-[11px] text-ink-muted">{name}</div>}
       </div>
     </div>
   );
@@ -113,11 +113,39 @@ function Brand({ app, logo, icon, name }: { app: string; logo: string | null; ic
 export function OpsBrand({ fallback }: { fallback: string | null }) {
   const { session } = useOpsSession();
   const me = useOpsMe(Boolean(session)).data;
-  return <Brand app="Operations" logo={me?.org.logoDark ?? null} icon={<Building2 size={16} />} name={me?.org.name ?? fallback} />;
+  const org = me && "org" in me ? me.org : null;
+  // The organization's name is in the switcher right under this; before sign-in, the church from Planning Center.
+  return <Brand app="Operations" logo={org?.logoDark ?? null} icon={<Building2 size={16} />} name={org ? null : fallback} />;
 }
 
 /** Top of the sidebar in Sundays | AVL: AVL's business name (Business settings). */
 export function AvlBrand() {
   const me = useMeOk();
-  return <Brand app="AVL" logo={null} icon={<AudioLines size={16} />} name={me?.nav.avlName ?? me?.org.name ?? null} />;
+  return <Brand app="AVL" logo={null} icon={<AudioLines size={16} />} name={me?.nav.avlName && me.nav.avlName !== me.org.name ? me.nav.avlName : null} />;
+}
+
+/** The super-admin console's sidebar. */
+export function AdminNav() {
+  const { session } = useOpsSession();
+  const me = useOpsMe(Boolean(session)).data;
+  if (!me?.platform) return <div className="flex-1" />;
+  return (
+    <>
+      <SideNav footer={`Super admin · ${me.email}`} groups={[
+        { items: [
+          { href: "/admin", label: "Overview", icon: Gauge, exact: true },
+          { href: "/admin/orgs", label: "Organizations", icon: Building },
+          { href: "/admin/billing", label: "Billing", icon: CreditCard },
+        ] },
+        { title: "Setup", items: [
+          { href: "/admin/plans", label: "Plans & modules", icon: Layers },
+          { href: "/admin/admins", label: "Super admins", icon: ShieldHalf },
+        ] },
+        { items: [{ href: "/ops", label: "Back to Operations", icon: ArrowLeft, exact: true }] },
+      ]} />
+    </>
+  );
+}
+export function AdminBrand() {
+  return <Brand app="Admin" logo={null} icon={<ShieldHalf size={16} />} name="Sundays as a service" />;
 }

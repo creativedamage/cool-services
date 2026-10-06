@@ -18,7 +18,8 @@ import { PrefsLink } from "@/components/settings/PrefsLink";
 import { PageRequestsBar } from "@/components/paging/PageRequests";
 import { useCampus } from "@/lib/campus";
 import { WeekendPicker, useWeekend } from "@/lib/weekend";
-import { AvlBrand, AvlNav, OpsBrand, OpsNav } from "@/components/ops/OpsNav";
+import { AdminBrand, AdminNav, AvlBrand, AvlNav, OpsBrand, OpsNav } from "@/components/ops/OpsNav";
+import { OrgSwitcher } from "@/components/ops/OrgSwitcher";
 import { AppSwitcher, sideOf, useRememberApp } from "@/components/AppSwitcher";
 import { APP_MODE_KEY, PinDialog, serviceLocked, serviceModeAllows, useAppMode, useUnlock } from "@/lib/appMode";
 
@@ -77,9 +78,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <div className={clsx("flex h-screen overflow-hidden", side === "ops" && "app-ops", side === "avl" && "app-avl")}>
+    <div className={clsx("flex h-screen overflow-hidden", side === "ops" && "app-ops", side === "avl" && "app-avl", side === "admin" && "app-admin")}>
       <aside className={clsx("flex w-[240px] shrink-0 flex-col border-r border-line", inOps ? "bg-gradient-to-b from-accent/10 to-surface/60" : "bg-surface/60")}>
-        {side === "avl" ? <AvlBrand /> : side === "ops" ? <OpsBrand fallback={me.data?.orgName ?? null} /> : (
+        {side === "admin" ? <AdminBrand /> : side === "avl" ? <AvlBrand /> : side === "ops" ? <OpsBrand fallback={me.data?.orgName ?? null} /> : (
           <div className="flex items-center gap-2.5 px-4 py-4">
             <Logo size={30} />
             <div className="leading-tight">
@@ -89,6 +90,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           </div>
         )}
         {mode?.mode === "full" && <AppSwitcher side={side} />}
+        {inOps && side !== "admin" && <OrgSwitcher />}
         {!inOps && <CampusSwitcher />}
         {!inOps && <WeekendPicker />}
 
@@ -108,6 +110,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="flex-1" />
         ) : path.startsWith("/services") ? (
           <ServicesNav activeSt={search.get("st")} activePlan={search.get("plan")} tab={path} />
+        ) : side === "admin" ? (
+          <AdminNav />
         ) : side === "avl" ? (
           <AvlNav />
         ) : side === "ops" ? (

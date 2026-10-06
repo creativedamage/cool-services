@@ -9,8 +9,10 @@ import { KIND_LABEL, type RequestKind } from "@shared/ops/workflow";
 import type { CategoryRow } from "@shared/ops/types";
 import { ops, useOps, useOpsRefresh } from "@/lib/ops";
 import { Card, ErrorBox, Loading, PageHeader, Pill, Table } from "@/components/ops/OpsUi";
-import { CategoryFields, emptyCategory } from "@/components/ops/CategoryFields";
+import { CategoryFields, emptyCategory, type CategoryForm } from "@/components/ops/CategoryFields";
 import { TypeIcon } from "@/components/ops/TypeIcon";
+import { useOpsUser } from "@/components/ops/context";
+import { kindAllowed } from "@shared/ops/billing";
 
 const WF = { APPROVAL: "Approval", FULFILLMENT: "Fulfillment", WORK_ORDER: "Work order" } as const;
 
@@ -57,7 +59,11 @@ export default function RequestTypes() {
 function NewType({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const refresh = useOpsRefresh();
-  const [f, setF] = useState(emptyCategory());
+  const modules = useOpsUser().nav.modules;
+  const [f, setF] = useState<CategoryForm>(() => {
+    const kind = (["MAINTENANCE", "TECHNOLOGY", "SUPPLY", "OTHER"] as const).find((k) => kindAllowed(k, modules)) ?? "OTHER";
+    return { ...emptyCategory(), kind, workflow: kind === "MAINTENANCE" || kind === "OTHER" ? "WORK_ORDER" as const : "APPROVAL" as const };
+  });
   return (
     <Card eyebrow="Add" title="New request type" className="mb-5" action={<button className="btn-ghost" onClick={onClose} aria-label="Close"><X size={15} /></button>}>
       <form className="p-4" onSubmit={async (e) => {

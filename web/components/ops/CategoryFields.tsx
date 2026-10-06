@@ -5,6 +5,9 @@ import { ArrowRight } from "lucide-react";
 import { KIND_LABEL, type RequestKind, type RequestWorkflow } from "@shared/ops/workflow";
 import { Check, Field, MoneyInput } from "./OpsUi";
 import { IconPicker, TypeIcon } from "./TypeIcon";
+import { kindAllowed } from "@shared/ops/billing";
+import { OpsMeContext } from "./context";
+import { useContext } from "react";
 
 export interface CategoryForm {
   name: string; icon: string; kind: RequestKind; workflow: RequestWorkflow; description: string; approvalThresholdCents: number | null;
@@ -20,6 +23,8 @@ const WORKFLOWS: { key: RequestWorkflow; label: string; help: string; hint: stri
 ];
 
 export function CategoryFields({ f, set }: { f: CategoryForm; set: (f: CategoryForm) => void }) {
+  const modules = useContext(OpsMeContext)?.nav.modules ?? [];
+  const kinds = KINDS.filter((k) => kindAllowed(k, modules) || k === f.kind);
   const wf = WORKFLOWS.find((w) => w.key === f.workflow)!;
   return (
     <div className="space-y-6">
@@ -52,7 +57,7 @@ export function CategoryFields({ f, set }: { f: CategoryForm; set: (f: CategoryF
         <div>
           <div className="label mb-1.5">Shows under</div>
           <div className="inline-flex flex-wrap rounded-lg border border-line p-0.5">
-            {KINDS.map((k) => (
+            {kinds.map((k) => (
               <button key={k} type="button" onClick={() => set({ ...f, kind: k })}
                 className={clsx("rounded-md px-3 py-1.5 text-xs font-medium transition", f.kind === k ? "bg-accent text-on-accent" : "text-ink-soft hover:bg-hover")}>{KIND_LABEL[k]}</button>
             ))}
@@ -77,7 +82,7 @@ export function CategoryFields({ f, set }: { f: CategoryForm; set: (f: CategoryF
         </div>
         <div className="flex flex-wrap gap-6">
           <Check label="Ask for a location (building / room)" checked={f.requiresLocation} onChange={(v) => set({ ...f, requiresLocation: v })} />
-          <Check label="Pick items from a supply list" checked={f.allowLineItems} onChange={(v) => set({ ...f, allowLineItems: v })} />
+          {modules.includes("supplies") && <Check label="Pick items from a supply list" checked={f.allowLineItems} onChange={(v) => set({ ...f, allowLineItems: v })} />}
           <Check label="Active (people can choose it)" checked={f.active} onChange={(v) => set({ ...f, active: v })} />
         </div>
       </div>

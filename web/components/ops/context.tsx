@@ -10,3 +10,9 @@ export function useOpsUser(): OpsOk {
   if (!v) throw new Error("useOpsUser outside Sundays | Operations");
   return v;
 }
+
+/** Is this module part of the organization's plan? (Inside Operations / AVL pages.) */
+export function useModule(key: import("@shared/ops/billing").ModuleKey): boolean {
+  const v = useContext(OpsMeContext);
+  return !!v?.nav.modules.includes(key);
+}

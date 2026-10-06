@@ -8,7 +8,8 @@ import { Menu, Moon, Sun, X } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AppSwitcher, sideOf, useRememberApp } from "@/components/AppSwitcher";
-import { AvlBrand, AvlNav, OpsBrand, OpsNav } from "@/components/ops/OpsNav";
+import { AdminBrand, AdminNav, AvlBrand, AvlNav, OpsBrand, OpsNav } from "@/components/ops/OpsNav";
+import { OrgSwitcher } from "@/components/ops/OrgSwitcher";
 import { currentTheme, setTheme } from "@/lib/theme";
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
@@ -18,13 +19,14 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
 function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const qs = useSearchParams().toString();
-  const side = sideOf(path) === "avl" ? "avl" : "ops";
+  const s0 = sideOf(path);
+  const side = s0 === "avl" || s0 === "admin" ? s0 : "ops";
   useRememberApp(side, qs ? `${path}?${qs}` : path);
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [path, qs]);
-  const brand = side === "avl" ? <AvlBrand /> : <OpsBrand fallback={null} />;
+  const brand = side === "admin" ? <AdminBrand /> : side === "avl" ? <AvlBrand /> : <OpsBrand fallback={null} />;
   return (
-    <div className={clsx("flex h-[100dvh] flex-col overflow-hidden md:flex-row", side === "ops" ? "app-ops" : "app-avl")}>
+    <div className={clsx("flex h-[100dvh] flex-col overflow-hidden md:flex-row", side === "ops" ? "app-ops" : side === "avl" ? "app-avl" : "app-admin")}>
       {/* Phones: a top bar with a menu button. */}
       <header className="flex items-center justify-between border-b border-line bg-surface/80 pr-2 backdrop-blur md:hidden">
         {brand}
@@ -40,7 +42,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           <button className="btn-ghost mr-2 p-2 md:hidden" aria-label="Close menu" onClick={() => setOpen(false)}><X size={18} /></button>
         </div>
         <AppSwitcher side={side} sundays={false} />
-        {side === "avl" ? <AvlNav /> : <OpsNav />}
+        {side !== "admin" && <OrgSwitcher />}
+        {side === "admin" ? <AdminNav /> : side === "avl" ? <AvlNav /> : <OpsNav />}
         <ThemeToggle />
       </aside>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</main>

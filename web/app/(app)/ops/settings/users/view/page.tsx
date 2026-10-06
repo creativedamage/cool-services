@@ -1,4 +1,5 @@
 "use client";
+import { useModule } from "@/components/ops/context";
 /** One person: approve a sign-up, or change their role, AVL access, campus and teams. */
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -20,6 +21,7 @@ function EditUser() {
 }
 
 function Form({ data }: { data: Data }) {
+  const multi = useModule("campuses");
   const { user: u, self, global } = data;
   const router = useRouter();
   const refresh = useOpsRefresh();
@@ -50,7 +52,7 @@ function Form({ data }: { data: Data }) {
             <Field label="Title"><input className="input" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></Field>
             <Field label="Department"><input className="input" value={f.department} onChange={(e) => setF({ ...f, department: e.target.value })} /></Field>
             <Field label="Phone"><input className="input" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></Field>
-            {global ? (
+            {!multi ? null : global ? (
               <Field label="Home campus"><select className="input" value={f.campusId} onChange={(e) => setF({ ...f, campusId: e.target.value })}><option value="">—</option>{data.campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
             ) : <Field label="Campus"><input className="input" readOnly value={u.campusName ?? data.campuses.find((c) => c.id === f.campusId)?.name ?? "Your campus"} /></Field>}
             <div className="md:col-span-2"><span className="label mb-1.5 block">Role</span><RolePicker allowed={data.grantableRoles} value={f.role} onChange={(role) => setF({ ...f, role })} /></div>
@@ -62,7 +64,7 @@ function Form({ data }: { data: Data }) {
               ) : <p className="text-xs text-ink-muted">Sundays | AVL: {u.effectiveAvl === "NONE" ? "no access" : avlLabel(u.effectiveAvl)} <span className="text-ink-faint">(an AVL Manager changes this)</span></p>}
             </div>
             <div className="space-y-3">
-              {global && !self && <Check label="Global: all campuses" hint="Managers with this act at every campus. Executives and admins always do." checked={f.allCampuses} onChange={(v) => setF({ ...f, allCampuses: v })} />}
+              {global && multi && !self && <Check label="Global: all campuses" hint="Managers with this act at every campus. Executives and admins always do." checked={f.allCampuses} onChange={(v) => setF({ ...f, allCampuses: v })} />}
               {!self && !u.pending && <Check label="Active" hint="Inactive people can't sign in to Operations or AVL." checked={f.active} onChange={(v) => setF({ ...f, active: v })} />}
             </div>
             <div className="md:col-span-2"><span className="label mb-1.5 block">Teams</span>

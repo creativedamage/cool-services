@@ -6,6 +6,7 @@ import type { AvlBusiness } from "@shared/ops/types";
 import { ops, useOps, useOpsRefresh } from "@/lib/ops";
 import { Card, ErrorBox, Field, Loading, MoneyInput, PageHeader, PercentInput } from "@/components/ops/OpsUi";
 import { LogoPicker } from "@/components/ops/LogoPicker";
+import { useModule } from "@/components/ops/context";
 import { Spinner } from "@/components/ui";
 
 type Data = { business: AvlBusiness; logo: string | null; canEdit: boolean };
@@ -21,6 +22,7 @@ export default function Business() {
 }
 
 function Form({ data }: { data: Data }) {
+  const branded = useModule("branding");
   const refresh = useOpsRefresh();
   const [b, setB] = useState<AvlBusiness>(data.business);
   const [busy, setBusy] = useState(false);
@@ -36,7 +38,7 @@ function Form({ data }: { data: Data }) {
       <div className="space-y-5">
         <Card eyebrow="Proposals" title="Logo">
           <div className="grid gap-4 p-4 md:grid-cols-2">
-            <LogoPicker current={data.logo} disabled={ro} label="On printed proposals (until you add one, the church's logo is used)"
+            <LogoPicker current={data.logo} disabled={ro || !branded} label="On printed proposals (until you add one, the church's logo is used)"
               upload={(mime, dataB64) => ops("/avl/business/logo", { json: { mime, dataB64 } })} remove={() => ops("/avl/business/logo", { method: "DELETE" })} />
           </div>
         </Card>

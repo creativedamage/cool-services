@@ -4,6 +4,26 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.27.0
+Sundays | Operations is now a service any church or team can sign up for, with plans, add-on modules, church pricing and a Sundays admin console.
+- **Anyone can start an organization.** Sign up, pick a plan and you get your own organization with a
+  main campus and the usual request types and supply lists ready to go. Everything is kept separate
+  per organization.
+- **Belong to more than one organization.** The organization switcher (top of the sidebar) moves
+  between them and starts new ones.
+- **Invite people by email.** Inviting someone copies a ready-to-send invitation; when they create
+  their account with that email they're straight in.
+- **Modules.** Technology requests, supply requests, facilities work orders, multiple campuses, custom
+  branding and AVL quoting are each a module. A plan includes some, and others can be added on per
+  organization. Anything an organization doesn't have is hidden.
+- **Plans and pricing.** A public pricing page, monthly or yearly billing, free trials. Churches get
+  15% off automatically.
+- **Plan & billing** in Settings → Organization shows your plan, modules, discounts and invoices.
+- **Sundays admin console** for super admins: every organization (status, plan, modules, discounts,
+  full licenses, notes), plans and add-on prices (changes show on the pricing page right away),
+  invoices (generate, send, mark paid or void) and who the super admins are. Super admins can open
+  any organization to help out without showing up in its people list.
+
 ## 1.26.0
 Sundays | AVL is its own app with a client list, Sundays | Operations and AVL are on the web for your team, and request types get icons.
 - **Sundays | AVL** is now separate from Operations, with its own sidebar and teal look. Operations is

@@ -10,7 +10,7 @@ const web = path.join(here, "..", "web", "app", "(app)");
 const site = path.join(here, "app", "(site)");
 const wanted = new Set();
 
-for (const app of ["ops", "avl"]) {
+for (const app of ["ops", "avl", "admin"]) {
   const walk = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, e.name);

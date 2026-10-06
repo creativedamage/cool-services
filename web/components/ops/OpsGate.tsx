@@ -6,7 +6,9 @@
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { ArrowRight, AudioLines, Building2, Clock3, KeyRound, LogOut, RefreshCw, ShieldCheck, UserPlus } from "lucide-react";
+import { ArrowRight, AudioLines, Building2, Clock3, KeyRound, LogOut, Mail, RefreshCw, ShieldCheck, ShieldHalf, UserPlus } from "lucide-react";
+import { CreateOrgForm } from "./Plans";
+import { OrgList } from "./OrgSwitcher";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -78,7 +80,10 @@ export function OpsGate({ app = "ops", children }: { app?: OpsApp; children: (me
   if (!session || (me.error && (me.error as { status?: number }).status === 401)) return <SignIn app={app} churchName={sundaysMe.data?.orgName ?? null} />;
   if (me.error) return <Center><p className="max-w-sm text-center text-sm text-bad">{(me.error as Error).message}</p><Retry onClick={() => void me.refetch()} /></Center>;
   if (!m) return null;
-  if (m.status !== "ok") return <Waiting me={m} onCheck={() => void me.refetch()} checking={me.isFetching} />;
+  if (m.status === "no-org") return <Welcome me={m} />;
+  if (m.status === "suspended") return <Suspended me={m} />;
+  if (m.status === "pending" || m.status === "inactive") return <Waiting me={m} onCheck={() => void me.refetch()} checking={me.isFetching} />;
+  if (m.status !== "ok") return null;
   return <>{children(m)}</>;
 }
 
@@ -104,7 +109,7 @@ const PITCH: Record<OpsApp, { icon: typeof Building2; blurb: (church: string) =>
   },
 };
 
-function SignIn({ app, churchName }: { app: OpsApp; churchName: string | null }) {
+export function SignIn({ app, churchName }: { app: OpsApp; churchName: string | null }) {
   const pitch = PITCH[app];
   const qc = useQueryClient();
   const [mode, setMode] = useState<"in" | "up">("in");
@@ -178,7 +183,7 @@ function SignIn({ app, churchName }: { app: OpsApp; churchName: string | null })
             <div className="label">Sundays | {APP_NAME[app]}</div>
             <h1 className="mt-1 text-xl font-semibold">{mode === "in" ? "Sign in" : "Create your account"}</h1>
             <p className="mt-1 text-sm text-ink-muted">
-              {mode === "in" ? "Your Sundays account for Operations and AVL (separate from Planning Center)." : "A manager approves new accounts and sets what you can do."}
+              {mode === "in" ? "Your Sundays account for Operations and AVL (separate from Planning Center)." : "Then start your organization, or join your team when an admin invites you."}
             </p>
           </div>
           {mode === "up" && (
@@ -198,6 +203,7 @@ function SignIn({ app, churchName }: { app: OpsApp; churchName: string | null })
             {mode === "in" ? <>New here? <button type="button" className="text-accent hover:underline" onClick={() => { setMode("up"); setMsg(null); }}>Create an account</button></>
               : <>Have an account? <button type="button" className="text-accent hover:underline" onClick={() => { setMode("in"); setMsg(null); }}>Sign in</button></>}
           </p>
+          {STANDALONE && <p className="text-center text-xs"><Link href="/pricing" className="text-ink-muted hover:text-accent">See plans &amp; pricing</Link></p>}
         </form>
         )}
       </div>
@@ -219,6 +225,7 @@ function Waiting({ me, onCheck, checking }: { me: Extract<OpsMe, { status: "pend
             ? <>Thanks, {me.name.split(" ")[0]}. A manager{me.org.name ? ` at ${me.org.name}` : ""} needs to approve <b className="text-ink">{me.email}</b> and choose your campus and access. This page opens as soon as they do.</>
             : <>A manager turned off <b className="text-ink">{me.email}</b>. Ask them if you need access again.</>}
         </p>
+        {me.orgs.length > 1 && <div className="mt-5 text-left"><div className="label mb-2">Switch to</div><OrgList me={me} /></div>}
         <div className="mt-5 flex justify-center gap-2">
           <button className="btn-outline" onClick={onCheck} disabled={checking}><RefreshCw size={14} className={clsx(checking && "animate-spin")} /> Check again</button>
           <button className="btn-ghost" onClick={async () => { await opsSignOut(); await qc.invalidateQueries({ queryKey: ["ops"] }); }}><LogOut size={14} /> Sign out</button>
@@ -226,4 +233,62 @@ function Waiting({ me, onCheck, checking }: { me: Extract<OpsMe, { status: "pend
       </div>
     </Center>
   );
+}
+
+/** Signed in, but not in any organization yet: start one, or wait for an invitation. */
+function Welcome({ me }: { me: Extract<OpsMe, { status: "no-org" }> }) {
+  const qc = useQueryClient();
+  return (
+    <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+      <div className="mx-auto max-w-4xl space-y-5">
+        <div>
+          <div className="label">Welcome to Sundays</div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Start your organization</h1>
+          <p className="mt-1 text-sm text-ink-muted">Set up your church or ministry. You&apos;ll be its System admin and can invite your team from Settings → Users.</p>
+        </div>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <section className="panel p-5"><CreateOrgForm /></section>
+          <aside className="space-y-4">
+            <section className="panel p-4 text-sm">
+              <div className="flex items-center gap-2 font-medium"><Mail size={15} className="text-accent" /> Joining your team?</div>
+              <p className="mt-1 text-ink-muted">Ask an admin at your church to add <b className="text-ink">{me.email}</b> under Settings → Users. Then check again.</p>
+              <button className="btn-outline mt-3 w-full justify-center" onClick={() => void qc.invalidateQueries({ queryKey: ["ops"] })}><RefreshCw size={14} /> Check again</button>
+            </section>
+            {me.orgs.length > 0 && <section className="panel p-4"><div className="label mb-2">Your organizations</div><OrgList me={me} /></section>}
+            {me.platform && <Link href="/admin" className="panel flex items-center gap-2 p-4 text-sm font-medium hover:border-line-strong"><ShieldHalf size={15} className="text-accent" /> Open the admin console <ArrowRight size={14} className="ml-auto" /></Link>}
+            <button className="btn-ghost w-full justify-center" onClick={async () => { await opsSignOut(); await qc.invalidateQueries({ queryKey: ["ops"] }); }}><LogOut size={14} /> Sign out</button>
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Suspended({ me }: { me: Extract<OpsMe, { status: "suspended" }> }) {
+  const qc = useQueryClient();
+  return (
+    <Center>
+      <div className="panel max-w-md p-8 text-center">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-bad-soft text-bad"><ShieldCheck size={22} /></div>
+        <h1 className="mt-4 text-lg font-semibold">{me.org.name ?? "This organization"} is {me.org.status === "CANCELLED" ? "cancelled" : "paused"}</h1>
+        <p className="mt-1 text-sm text-ink-muted">Its data is safe. Contact Sundays to turn it back on.</p>
+        {me.orgs.length > 1 && <div className="mt-5 text-left"><div className="label mb-2">Switch to</div><OrgList me={me} /></div>}
+        <button className="btn-ghost mt-4" onClick={async () => { await opsSignOut(); await qc.invalidateQueries({ queryKey: ["ops"] }); }}><LogOut size={14} /> Sign out</button>
+      </div>
+    </Center>
+  );
+}
+
+/** The Sundays admin console: signed in as a super admin (no organization needed). */
+export function AdminBody({ children }: { children: React.ReactNode }) {
+  const { session } = useOpsSession();
+  const me = useOpsMe(Boolean(session));
+  if (session === undefined || (session && me.isLoading)) return <Center><Spinner size={18} /></Center>;
+  if (!session || (me.error && (me.error as { status?: number }).status === 401)) return <div className="flex min-h-0 flex-1 flex-col"><SignIn app="ops" churchName={null} /></div>;
+  if (me.error) return <Center><p className="max-w-sm text-center text-sm text-bad">{(me.error as Error).message}</p><Retry onClick={() => void me.refetch()} /></Center>;
+  if (!me.data?.platform) {
+    return <Center><div className="panel max-w-md p-8 text-center"><ShieldHalf size={22} className="mx-auto text-ink-muted" /><h1 className="mt-3 text-lg font-semibold">Super admins only</h1>
+      <p className="mt-1 text-sm text-ink-muted">The Sundays admin console is for the people who run Sundays.</p><Link href="/ops" className="btn-outline mt-4 inline-flex">Back to Operations</Link></div></Center>;
+  }
+  return <div className="min-h-0 flex-1 overflow-y-auto"><div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">{children}</div></div>;
 }

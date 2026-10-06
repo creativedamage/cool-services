@@ -19,28 +19,52 @@ import {
 } from "./lib/rbac.ts";
 import { OPEN_STATUSES, type RequestKind } from "./lib/workflow.ts";
 import { isDeletable, QUOTE_STATUSES, type QuoteStatus } from "./lib/state-machine.ts";
+import { computeBill, effectiveModules, kindAllowed, MODULE_KEYS, type ModuleKey } from "./lib/billing.ts";
 import type { AvlOverview, OpsSessionUser, OverviewData, QuoteRow, UserRow } from "./lib/types.ts";
-import { defined, getAvl, getOrg, HttpError, logActivity, sql } from "./db.ts";
-import { caller, requireUser } from "./auth.ts";
+import { ctx as reqCtx, defined, getAvl, getOrg, hasModule, inOrg, orgId, raw, HttpError, logActivity, sql } from "./db.ts";
+import { account, checkEntry, myOrgs, pickOrg, requireUser, sessionUser, touch, type Account } from "./auth.ts";
 import { addRequestComment, handlesRequests, performRequestAction, requestDetail, requestRows, submitRequest, workQueueWhere } from "./requests.ts";
 import { applyEvent, createQuote, effectiveTotals, liveTotals, loadQuote, quoteDTO, saveQuote, toPublicQuote, type FullQuote } from "./quotes.ts";
 
 type U = OpsSessionUser;
-type Ctx = { req: Request; url: URL; params: Record<string, string>; body: () => Promise<any> };
+type Ctx = { req: Request; url: URL; params: Record<string, string>; body: () => Promise<any>; acc: Account };
 type Handler = (c: Ctx) => Promise<unknown>;
+/**
+ * public   — no sign-in (pricing).
+ * account  — signed in, no organization needed (who am I, create an organization).
+ * org      — inside the caller's current organization (X-Org), as ops_app with row-level security.
+ * platform — Sundays super admins only (the admin console), across organizations.
+ */
+type Scope = "public" | "account" | "org" | "platform";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-org",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
-const routes: { method: string; re: RegExp; keys: string[]; fn: Handler }[] = [];
-function route(method: string, path: string, fn: Handler) {
+const routes: { method: string; re: RegExp; keys: string[]; fn: Handler; scope: Scope }[] = [];
+function route(method: string, path: string, fn: Handler, scope: Scope = "org") {
   const keys: string[] = [];
   const re = new RegExp(`^${path.replace(/:(\w+)/g, (_, k) => { keys.push(k); return "([^/]+)"; })}$`);
-  routes.push({ method, re, keys, fn });
+  routes.push({ method, re, keys, fn, scope });
+}
+
+async function run(r: (typeof routes)[number], c: Omit<Ctx, "acc">): Promise<unknown> {
+  if (r.scope === "public") return r.fn({ ...c, acc: null as unknown as Account });
+  const acc = await account(c.req);
+  if (r.scope === "account") return r.fn({ ...c, acc });
+  if (r.scope === "platform") {
+    if (!acc.platform) throw new HttpError(403, "Sundays super admins only.");
+    return r.fn({ ...c, acc });
+  }
+  const e = await pickOrg(acc, c.req);
+  if (!e) throw new HttpError(403, "Create or join an organization first.", { status: "no-org" });
+  checkEntry(acc, e);
+  const user = await sessionUser(e.member, acc.platform);
+  await touch(e.member);
+  return inOrg(e, async () => { reqCtx()!.user = user; return r.fn({ ...c, acc }); });
 }
 
 export async function handle(req: Request): Promise<Response> {
@@ -55,7 +79,7 @@ export async function handle(req: Request): Promise<Response> {
     const params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(m[i + 1])]));
     try {
       let parsed: unknown;
-      const out = await r.fn({ req, url, params, body: async () => (parsed ??= await req.json().catch(() => ({}))) });
+      const out = await run(r, { req, url, params, body: async () => (parsed ??= await req.json().catch(() => ({}))) });
       return json(out ?? { ok: true });
     } catch (e) {
       if (e instanceof HttpError) return json({ error: e.message, ...e.extra }, e.status);
@@ -77,6 +101,7 @@ export async function handle(req: Request): Promise<Response> {
 
 const avl = async (req: Request, perm?: "QUOTE_APPROVE" | "AVL_PURCHASING") => {
   const u = await requireUser(req);
+  if (!hasModule("avl")) throw new HttpError(403, "AVL isn't part of this organization's plan.");
   if (!hasAvlAccess(u)) throw new HttpError(403, "AVL access required");
   if (perm && !can(u, perm)) throw new HttpError(403, "An AVL Manager has to do that.");
   return u;
@@ -102,6 +127,13 @@ const admin = async (req: Request) => {
   if (!isAdmin(u)) throw new HttpError(403, "System admin access required");
   return u;
 };
+/** Only with this module on the organization's plan. */
+const needModule = (k: ModuleKey, what: string) => { if (!hasModule(k)) throw new HttpError(403, `${what} isn't part of this organization's plan.`); };
+/** Campuses this organization works with: all of them with the Multiple campuses module, otherwise its first. */
+async function usableCampuses() {
+  const all = await sql`select id, name from ops.campuses where active order by sort_order, name`;
+  return hasModule("campuses") ? all : all.slice(0, 1);
+}
 const globalOnly = (u: U, what: string) => { if (!isGlobalManager(u)) throw new HttpError(403, `Only global managers and executives can ${what}.`); };
 
 const optStr = (max = 200) => z.string().max(max).nullish().transform((v) => (v ? v : null));
@@ -111,47 +143,65 @@ const id = z.string().min(1);
 
 async function brand() {
   const org = await getOrg();
-  const assets = await sql`select key, mime, data_b64 from ops.org_assets where key in ('logo', 'logo-dark')`;
+  const branded = hasModule("branding");
+  const assets = branded ? await sql`select key, mime, data_b64 from ops.org_assets where key in ('logo', 'logo-dark')` : [];
   const a = (k: string) => assets.find((x) => x.key === k);
-  return { name: org.name as string | null, logo: dataUrl(a("logo")), logoDark: dataUrl(a("logo-dark") ?? a("logo")) };
+  return {
+    id: org.id as string, name: org.name as string | null, logo: dataUrl(a("logo")), logoDark: dataUrl(a("logo-dark") ?? a("logo")),
+    status: org.status, trialEndsAt: org.trialEndsAt ? new Date(org.trialEndsAt).toISOString() : null, modules: reqCtx()!.modules,
+  };
 }
 const dataUrl = (x?: Record<string, any>) => (x ? `data:${x.mime};base64,${x.dataB64}` : null);
 /** AVL's letterhead: its own logo, else the church's. */
 async function avlLogo() {
+  if (!hasModule("branding")) return null;
   const assets = await sql`select key, mime, data_b64 from ops.org_assets where key in ('avl-logo', 'logo')`;
   return dataUrl(assets.find((x) => x.key === "avl-logo") ?? assets.find((x) => x.key === "logo"));
 }
 
 route("GET", "/me", async ({ req }) => {
-  const c = await caller(req);
+  const acc = await account(req, true);
+  const base = { email: acc.auth.email, orgs: myOrgs(acc), platform: acc.platform };
+  const e = await pickOrg(acc, req);
+  if (!e) return { ...base, status: "no-org" };
+  try { checkEntry(acc, e); } catch (err) {
+    const status = (err as HttpError).extra?.status;
+    return inOrg(e, async () => ({ ...base, status, name: e.member.name, org: await brand() }));
+  }
+  const user = await sessionUser(e.member, acc.platform);
+  await touch(e.member);
+  return inOrg(e, async () => { reqCtx()!.user = user; return { ...base, ...(await meInOrg()) }; });
+}, "account");
+
+async function meInOrg() {
+  const u = await requireUser();
   const org = await brand();
-  if (!c.row.active) return { status: c.row.pending ? "pending" : "inactive", name: c.row.name, email: c.row.email, org };
-  const u = await requireUser(req);
   const ops = hasOpsAccess(u);
+  const avlOn = hasModule("avl") && hasAvlAccess(u);
   const handles = ops && (await handlesRequests(u));
   const [[{ n: queueCount }], [{ n: pendingUsers }], [campus], [{ n: avlPending }], avl] = await Promise.all([
     handles ? sql`select count(*)::int as n from ops.requests r where ${workQueueWhere(u, { openOnly: true })}` : [{ n: 0 }],
     ops && atLeast(u, "MANAGER")
-      ? sql`select count(*)::int as n from ops.users where pending ${seesAllCampuses(u) ? sql`` : sql`and (campus_id = ${u.campusId} or campus_id is null)`}`
+      ? sql`select count(*)::int as n from ops.users where pending and source <> 'PLATFORM' ${seesAllCampuses(u) ? sql`` : sql`and (campus_id = ${u.campusId} or campus_id is null)`}`
       : [{ n: 0 }],
-    u.campusId ? sql`select name from ops.campuses where id = ${u.campusId}` : [],
-    isAvlManager(u) ? sql`select count(*)::int as n from ops.users where pending` : [{ n: 0 }],
-    hasAvlAccess(u) ? getAvl() : null,
+    u.campusId && hasModule("campuses") ? sql`select name from ops.campuses where id = ${u.campusId}` : [],
+    avlOn && isAvlManager(u) ? sql`select count(*)::int as n from ops.users where pending and source <> 'PLATFORM'` : [{ n: 0 }],
+    avlOn ? getAvl() : null,
   ]);
   return {
-    status: "ok", user: u, org,
+    status: "ok" as const, user: u, org,
     nav: {
       handlesRequests: handles, queueCount, pendingUsers, manager: ops && atLeast(u, "MANAGER"), admin: isAdmin(u), campusName: campus?.name ?? null,
-      ops, avl: hasAvlAccess(u), avlManager: isAvlManager(u), avlPending, avlName: avl?.name ?? null,
+      ops, avl: avlOn, avlManager: avlOn && isAvlManager(u), avlPending, avlName: avl?.name ?? null, modules: reqCtx()!.modules, platform: !!u.platform,
     },
   };
-});
+}
 
 /** Sundays fills in the church name from Planning Center the first time (only if it's still empty). */
 route("POST", "/bootstrap", async ({ req, body }) => {
   await requireUser(req);
   const { orgName } = z.object({ orgName: z.string().min(1).max(200) }).parse(await body());
-  await sql`update ops.organization set name = ${orgName.trim()}, updated_at = now() where id = 'org' and (name is null or name = '')`;
+  await sql`update ops.organization set name = ${orgName.trim()}, updated_at = now() where id = ${orgId()} and (name is null or name = '')`;
   return brand();
 });
 
@@ -228,11 +278,15 @@ route("GET", "/requests/new", async ({ req }) => {
     sql`select id, name, kind, workflow, description, icon, requires_location, allow_line_items, approval_threshold_cents
         from ops.request_categories where active order by sort_order, name`,
     sql`select id, category_id, name, unit, unit_cost_cents from ops.supply_items where active order by sort_order, name`,
-    sql`select id, name from ops.campuses where active order by sort_order, name`,
+    usableCampuses(),
   ]);
+  const mods = reqCtx()!.modules;
   return {
-    categories: cats.map((c) => ({ ...c, supplyItems: items.filter((i) => i.categoryId === c.id).map(({ categoryId: _c, ...i }) => i) })),
-    campuses, defaultCampusId: u.campusId,
+    categories: cats.filter((c) => kindAllowed(c.kind, mods)).map((c) => ({
+      ...c, allowLineItems: c.allowLineItems && hasModule("supplies"),
+      supplyItems: hasModule("supplies") ? items.filter((i) => i.categoryId === c.id).map(({ categoryId: _c, ...i }) => i) : [],
+    })),
+    campuses, defaultCampusId: campuses.some((c) => c.id === u.campusId) ? u.campusId : campuses[0]?.id ?? null,
   };
 });
 
@@ -287,7 +341,7 @@ route("GET", "/work", async ({ req, url }) => {
     requestRows(sql`${base} and ${tabWhere(tab)} ${filters}`,
       tab === "done" ? sql`r.updated_at desc` : sql`array_position(array['URGENT','HIGH','NORMAL','LOW'], r.priority), r.created_at`, 300),
     Promise.all(WORK_TABS.map(async (t) => (t === "done" ? null : (await sql`select count(*)::int as n from ops.requests r where ${base} and ${tabWhere(t)}`)[0].n))),
-    seesAllCampuses(u) ? sql`select id, name from ops.campuses where active order by sort_order, name` : [],
+    seesAllCampuses(u) && hasModule("campuses") ? sql`select id, name from ops.campuses where active order by sort_order, name` : [],
   ]);
   return {
     tab, rows, counts: Object.fromEntries(WORK_TABS.map((t, i) => [t, counts[i]])), campuses,
@@ -528,8 +582,8 @@ route("DELETE", "/contacts/:id", async ({ req, params }) => {
 route("GET", "/avl/people", async ({ req }) => {
   const me = await avlManager(req);
   const rows = await sql`select id, name, email, avl_level, synced_avl_level, ops_access, role, pending, active, last_login_at from ops.users
-    where pending or avl_level <> 'NONE' or synced_avl_level in ('TECH','MANAGER') or role = 'ADMIN' order by pending desc, name`;
-  const others = await sql`select id, name, email from ops.users where active and not pending and avl_level = 'NONE' and role <> 'ADMIN' order by name`;
+    where source <> 'PLATFORM' and (pending or avl_level <> 'NONE' or synced_avl_level in ('TECH','MANAGER') or role = 'ADMIN') order by pending desc, name`;
+  const others = await sql`select id, name, email from ops.users where active and not pending and avl_level = 'NONE' and role <> 'ADMIN' and source <> 'PLATFORM' order by name`;
   return {
     people: rows.map((r) => ({ id: r.id, name: r.name, email: r.email, avlLevel: effectiveAccess(r as never).avlLevel, opsAccess: r.opsAccess, role: r.role, pending: r.pending, active: r.active, lastLoginAt: r.lastLoginAt })),
     others, me: me.id,
@@ -575,14 +629,15 @@ route("PUT", "/avl/business", async ({ req, body }) => {
   const me = await avlManager(req);
   const input = BusinessSchema.parse(await body());
   await getAvl();
-  await sql`update ops.avl_business set ${sql({ ...input, updatedAt: new Date() })} where id = 'avl'`;
+  await sql`update ops.avl_business set ${sql({ ...input, updatedAt: new Date() })} where id = ${orgId()}`;
   await logActivity({ actorId: me.id, action: "Updated AVL business settings", area: "AVL", href: "/avl/settings" });
 });
 route("POST", "/avl/business/logo", async ({ req, body }) => {
   const me = await avlManager(req);
+  needModule("branding", "Custom branding");
   const { mime, dataB64 } = z.object({ mime: z.enum(["image/png", "image/jpeg", "image/svg+xml", "image/webp"]), dataB64: z.string().min(1).max(1_400_000) }).parse(await body());
   await sql`insert into ops.org_assets ${sql({ key: "avl-logo", mime, dataB64, updatedAt: new Date() })}
-    on conflict (key) do update set mime = excluded.mime, data_b64 = excluded.data_b64, updated_at = now()`;
+    on conflict (org_id, key) do update set mime = excluded.mime, data_b64 = excluded.data_b64, updated_at = now()`;
   await logActivity({ actorId: me.id, action: "Updated AVL logo", area: "AVL", href: "/avl/settings" });
 });
 route("DELETE", "/avl/business/logo", async ({ req }) => {
@@ -741,7 +796,7 @@ async function userRows(me: U, where: unknown): Promise<UserRow[]> {
   const rows = await sql`select u.*, c.name as campus_name,
       coalesce((select json_agg(json_build_object('id', t.id, 'name', t.name, 'synced', m.synced) order by t.name)
         from ops.team_members m join ops.teams t on t.id = m.team_id where m.user_id = u.id), '[]') as teams
-    from ops.users u left join ops.campuses c on c.id = u.campus_id where ${where as never} order by u.pending desc, u.name limit 500`;
+    from ops.users u left join ops.campuses c on c.id = u.campus_id where u.source <> 'PLATFORM' and ${where as never} order by u.pending desc, u.name limit 500`;
   return rows.map((u) => {
     const a = effectiveAccess(u as never);
     return {
@@ -773,7 +828,7 @@ route("GET", "/settings/users", async ({ req, url }) => {
     userRows(me, where),
     sql`select id, name from ops.campuses where active order by sort_order, name`,
     sql`select id, name, campus_id from ops.teams where active order by name`,
-    sql`select count(*)::int as n from ops.users u where u.pending ${global ? sql`` : sql`and (u.campus_id = ${me.campusId ?? "__none__"} or u.campus_id is null)`}`,
+    sql`select count(*)::int as n from ops.users u where u.pending and u.source <> 'PLATFORM' ${global ? sql`` : sql`and (u.campus_id = ${me.campusId ?? "__none__"} or u.campus_id is null)`}`,
   ]);
   return {
     users, campuses, pending, global, grantableRoles: grantableRoles(me), myCampusId: me.campusId, grantsAvl: isAvlManager(me),
@@ -890,7 +945,7 @@ route("GET", "/settings/teams/:id", async ({ req, params }) => {
       from ops.category_routings r join ops.request_categories c on c.id = r.category_id left join ops.campuses ca on ca.id = r.campus_id
       where r.handler_team_id = ${team.id} or r.approver_team_id = ${team.id} order by c.name`,
     sql`select id, name from ops.campuses where active order by sort_order, name`,
-    sql`select id, name from ops.users where active and ops_access and id not in (select user_id from ops.team_members where team_id = ${team.id})
+    sql`select id, name from ops.users where active and ops_access and source <> 'PLATFORM' and id not in (select user_id from ops.team_members where team_id = ${team.id})
       ${global ? sql`` : sql`and campus_id = ${me.campusId ?? "__none__"} and not all_campuses`} order by name`,
   ]);
   return { team, members, routing, campuses, users, global };
@@ -948,6 +1003,13 @@ const SupplyItemSchema = z.object({
   unitCostCents: z.number().int().min(0).nullish().transform((v) => v ?? null), sortOrder: z.number().int().nullish().transform((v) => v ?? 0), active: z.boolean().default(true),
 });
 
+/** A request type, checked against the organization's modules. */
+function categoryInput(body: unknown) {
+  const data = CategorySchema.parse(body);
+  if (!kindAllowed(data.kind, reqCtx()!.modules)) throw new HttpError(403, "That kind of request isn't part of this organization's plan.");
+  if (!hasModule("supplies")) data.allowLineItems = false;
+  return data;
+}
 route("GET", "/settings/request-types", async ({ req }) => {
   const me = await manager(req);
   const [cats, [{ n: campusCount }]] = await Promise.all([
@@ -960,7 +1022,11 @@ route("GET", "/settings/request-types", async ({ req }) => {
       from ops.request_categories c order by c.kind, c.sort_order, c.name`,
     sql`select count(*)::int as n from ops.campuses where active`,
   ]);
-  return { categories: cats, campusCount, global: isGlobalManager(me) };
+  const mods = reqCtx()!.modules;
+  return {
+    categories: cats.filter((c) => kindAllowed(c.kind, mods)), campusCount: hasModule("campuses") ? campusCount : Math.min(campusCount, 1),
+    global: isGlobalManager(me), modules: mods,
+  };
 });
 
 route("GET", "/settings/request-types/:id", async ({ req, params }) => {
@@ -975,7 +1041,9 @@ route("GET", "/settings/request-types/:id", async ({ req, params }) => {
     sql`select t.id, t.name, t.campus_id from ops.teams t where t.active
       ${global ? sql`` : sql`and (t.campus_id = ${me.campusId ?? "__none__"} or t.campus_id is null)`} order by t.name`,
   ]);
-  const rows = global
+  const rows = !hasModule("campuses")
+    ? [{ key: "ALL", label: "Everyone", campusId: null }]
+    : global
     ? [...campuses.map((c) => ({ key: c.id, label: c.name, campusId: c.id })), { key: "ALL", label: "All other campuses (fallback)", campusId: null }]
     : campuses.filter((c) => canManageCampus(me, c.id)).map((c) => ({ key: c.id, label: c.name, campusId: c.id }));
   return { category: cat, routings, supplyItems: items, rows, teams, global, hasFallback: routings.some((r) => !r.campusId) };
@@ -984,14 +1052,15 @@ route("GET", "/settings/request-types/:id", async ({ req, params }) => {
 route("POST", "/settings/request-types", async ({ req, body }) => {
   const me = await manager(req);
   globalOnly(me, "change request types");
-  const [c] = await sql`insert into ops.request_categories ${sql(CategorySchema.parse(await body()))} returning *`;
+  const data = categoryInput(await body());
+  const [c] = await sql`insert into ops.request_categories ${sql(data)} returning *`;
   await logActivity({ actorId: me.id, action: "Created request type", detail: c.name, area: "ADMIN", entityType: "RequestCategory", entityId: c.id, href: `/ops/settings/request-types/view?id=${c.id}` });
   return { id: c.id };
 });
 route("PUT", "/settings/request-types/:id", async ({ req, params, body }) => {
   const me = await manager(req);
   globalOnly(me, "change request types");
-  await sql`update ops.request_categories set ${sql(CategorySchema.parse(await body()))} where id = ${params.id}`;
+  await sql`update ops.request_categories set ${sql(categoryInput(await body()))} where id = ${params.id}`;
 });
 route("POST", "/settings/request-types/:id/items", async ({ req, params, body }) => {
   const me = await manager(req);
@@ -1056,6 +1125,8 @@ route("GET", "/settings/campuses", async ({ req }) => {
 route("POST", "/settings/campuses", async ({ req, body }) => {
   const me = await manager(req);
   globalOnly(me, "add campuses");
+  const [{ n }] = await sql`select count(*)::int as n from ops.campuses`;
+  if (n > 0) needModule("campuses", "More than one campus");
   const [c] = await sql`insert into ops.campuses ${sql(CampusSchema.parse(await body()))} returning *`;
   await logActivity({ actorId: me.id, action: "Added campus", detail: c.name, area: "ADMIN", entityType: "Campus", entityId: c.id, href: "/ops/settings/campuses" });
   return { id: c.id };
@@ -1107,17 +1178,18 @@ route("PUT", "/settings/organization", async ({ req, body }) => {
     taxExempt: z.boolean().optional(),
   }).parse(await body());
   await getOrg();
-  await sql`update ops.organization set ${sql({ ...defined(input), updatedAt: new Date() })} where id = 'org'`;
+  await sql`update ops.organization set ${sql({ ...defined(input), updatedAt: new Date() })} where id = ${orgId()}`;
   await logActivity({ actorId: me.id, action: "Updated organization settings", area: "ADMIN", href: "/ops/settings/organization" });
 });
 route("POST", "/settings/organization/logo", async ({ req, body }) => {
   const me = await admin(req);
+  needModule("branding", "Custom branding");
   const { variant, mime, dataB64 } = z.object({
     variant: z.enum(["light", "dark"]), mime: z.enum(["image/png", "image/jpeg", "image/svg+xml", "image/webp"]), dataB64: z.string().min(1).max(1_400_000),
   }).parse(await body());
   const key = variant === "dark" ? "logo-dark" : "logo";
   await sql`insert into ops.org_assets ${sql({ key, mime, dataB64, updatedAt: new Date() })}
-    on conflict (key) do update set mime = excluded.mime, data_b64 = excluded.data_b64, updated_at = now()`;
+    on conflict (org_id, key) do update set mime = excluded.mime, data_b64 = excluded.data_b64, updated_at = now()`;
   await logActivity({ actorId: me.id, action: "Updated logo", detail: variant === "dark" ? "Dark background logo" : "Light background logo", area: "ADMIN", href: "/ops/settings/organization" });
 });
 route("DELETE", "/settings/organization/logo/:variant", async ({ req, params }) => {
@@ -1125,3 +1197,266 @@ route("DELETE", "/settings/organization/logo/:variant", async ({ req, params }) 
   await sql`delete from ops.org_assets where key = ${params.variant === "dark" ? "logo-dark" : "logo"}`;
   await logActivity({ actorId: me.id, action: "Removed logo", detail: params.variant, area: "ADMIN" });
 });
+
+/* ═════════════ Sundays as a service: pricing, organizations, billing, super admins ═════════════ */
+
+const ORG_TYPES = ["CHURCH", "NONPROFIT", "SCHOOL", "BUSINESS"] as const;
+const ORG_STATUSES = ["TRIAL", "ACTIVE", "PAST_DUE", "SUSPENDED", "CANCELLED"] as const;
+
+async function catalog(includeHidden = false) {
+  const [plans, modules, [settings]] = await Promise.all([
+    raw`select * from ops.plans ${includeHidden ? raw`` : raw`where active and public`} order by sort_order, price_monthly_cents, name`,
+    raw`select * from ops.modules order by sort_order`,
+    raw`select * from ops.platform_settings where id = 'platform'`,
+  ]);
+  return { plans, modules, settings: settings ?? { churchDiscountBps: 1500, trialDays: 14, defaultPlanId: null } };
+}
+const iso = (d: unknown) => (d ? new Date(d as string).toISOString() : null);
+const billingOf = (o: Record<string, any>) => ({
+  orgType: o.orgType, planId: o.planId, billingInterval: o.billingInterval, fullLicense: o.fullLicense, moduleOverrides: o.moduleOverrides ?? {},
+  churchDiscount: o.churchDiscount, discountBps: o.discountBps, discountCents: o.discountCents, discountEndsAt: o.discountEndsAt,
+});
+
+/** Plans and add-ons for the pricing page and sign-up (whatever the super admins have set up). */
+route("GET", "/public/pricing", async () => {
+  const { plans, modules, settings } = await catalog();
+  return { plans, modules: modules.filter((m) => m.active), churchDiscountBps: settings.churchDiscountBps, trialDays: settings.trialDays };
+}, "public");
+
+/** Anyone signed in can start an organization; they become its System admin. */
+async function createOrg(input: { name: string; orgType: string; planId?: string | null; interval?: string; createdBy: string; fullLicense?: boolean; status?: string }) {
+  const { plans, settings } = await catalog(true);
+  const plan = plans.find((p) => p.id === input.planId && p.active) ?? plans.find((p) => p.id === settings.defaultPlanId) ?? plans[0] ?? null;
+  const trialDays = plan?.trialDays ?? settings.trialDays ?? 14;
+  return raw.begin(async (tx) => {
+    const [o] = await tx`insert into ops.organization ${tx({
+      name: input.name.trim(), orgType: input.orgType, planId: plan?.id ?? null, billingInterval: input.interval === "YEARLY" ? "YEARLY" : "MONTHLY",
+      status: input.status ?? (input.fullLicense ? "ACTIVE" : "TRIAL"), trialEndsAt: input.fullLicense ? null : new Date(Date.now() + trialDays * 86_400_000),
+      fullLicense: !!input.fullLicense, createdBy: input.createdBy, quotePrefix: input.name.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() || "ORG",
+    })} returning *`;
+    await tx`select ops.seed_org(${o.id})`;
+    await tx`insert into ops.avl_business (id, name, quote_prefix) values (${o.id}, ${o.name}, 'AV') on conflict (id) do nothing`;
+    return o;
+  });
+}
+
+route("POST", "/orgs", async ({ acc, body }) => {
+  const input = z.object({
+    name: z.string().trim().min(2).max(120), orgType: z.enum(ORG_TYPES), planId: z.string().nullish(), interval: z.enum(["MONTHLY", "YEARLY"]).default("MONTHLY"),
+  }).parse(await body());
+  const owned = acc.memberships.filter((m) => m.role === "ADMIN" && m.source !== "PLATFORM").length;
+  if (owned >= 5 && !acc.platform) throw new HttpError(429, "You already run five organizations. Contact Sundays to add more.");
+  const o = await createOrg({ ...input, createdBy: acc.auth.id });
+  await raw`insert into ops.users ${raw({
+    orgId: o.id, authId: acc.auth.id, email: acc.auth.email, name: acc.auth.name ?? acc.auth.email.split("@")[0], active: true, pending: false, registered: true,
+    role: "ADMIN", allCampuses: true, avlLevel: "MANAGER", opsAccess: true, approvedAt: new Date(),
+  })}`;
+  return { id: o.id };
+}, "account");
+
+/** This organization's plan, modules, what it pays and its invoices (System admins). */
+route("GET", "/billing", async ({ req }) => {
+  await admin(req);
+  const o = reqCtx()!.org;
+  const { plans, modules, settings } = await catalog(true);
+  const plan = plans.find((p) => p.id === o.planId) ?? null;
+  const [invoices, [{ n: members }], [{ n: campuses }]] = await Promise.all([
+    sql`select * from ops.invoices where status <> 'DRAFT' order by created_at desc limit 50`,
+    sql`select count(*)::int as n from ops.users where active and source <> 'PLATFORM'`,
+    sql`select count(*)::int as n from ops.campuses where active`,
+  ]);
+  return {
+    org: { id: o.id, name: o.name, orgType: o.orgType, status: o.status, trialEndsAt: iso(o.trialEndsAt), billingInterval: o.billingInterval, billingEmail: o.billingEmail, fullLicense: o.fullLicense },
+    plan, modules: modules.filter((m) => m.active), enabled: reqCtx()!.modules, bill: computeBill(billingOf(o), plan, modules, settings.churchDiscountBps),
+    invoices, members, campuses,
+  };
+});
+
+/* ───── Super-admin console (platform) ───── */
+
+async function orgRows(where = raw`true`) {
+  const { plans, modules, settings } = await catalog(true);
+  const rows = await raw`select o.*, (select count(*)::int from ops.users u where u.org_id = o.id and u.active and u.source <> 'PLATFORM') as members
+    from ops.organization o where ${where} order by o.created_at desc`;
+  return rows.map((o) => {
+    const plan = plans.find((p) => p.id === o.planId) ?? null;
+    const bill = computeBill(billingOf(o), plan, modules, settings.churchDiscountBps);
+    return {
+      id: o.id, name: o.name, orgType: o.orgType, status: o.status, planId: o.planId, planName: plan?.name ?? null, fullLicense: o.fullLicense,
+      members: o.members, createdAt: iso(o.createdAt), trialEndsAt: iso(o.trialEndsAt), totalCents: bill.totalCents, billingInterval: o.billingInterval,
+    };
+  });
+}
+const monthly = (r: { totalCents: number; billingInterval: string }) => (r.billingInterval === "YEARLY" ? Math.round(r.totalCents / 12) : r.totalCents);
+
+route("GET", "/platform/overview", async () => {
+  const rows = await orgRows();
+  const [[{ n: people }], [{ c: openInvoices }]] = await Promise.all([
+    raw`select count(distinct auth_id)::int as n from ops.users where auth_id is not null and source <> 'PLATFORM'`,
+    raw`select coalesce(sum(total_cents), 0)::bigint as c from ops.invoices where status = 'SENT'`,
+  ]);
+  const by = (s: string) => rows.filter((r) => r.status === s).length;
+  return {
+    orgs: rows.length, active: by("ACTIVE"), trial: by("TRIAL"), pastDue: by("PAST_DUE"), suspended: by("SUSPENDED") + by("CANCELLED"),
+    fullLicense: rows.filter((r) => r.fullLicense).length, people,
+    mrrCents: rows.filter((r) => r.status === "ACTIVE" || r.status === "PAST_DUE").reduce((s, r) => s + monthly(r), 0),
+    openInvoicesCents: Number(openInvoices), recent: rows.slice(0, 8),
+  };
+}, "platform");
+
+route("GET", "/platform/orgs", async ({ url }) => {
+  const q = url.searchParams.get("q")?.trim();
+  const status = ORG_STATUSES.find((s) => s === url.searchParams.get("status"));
+  return orgRows(raw`true ${q ? raw`and o.name ilike ${"%" + q + "%"}` : raw``} ${status ? raw`and o.status = ${status}` : raw``}`);
+}, "platform");
+
+route("POST", "/platform/orgs", async ({ acc, body }) => {
+  const input = z.object({
+    name: z.string().trim().min(2).max(120), orgType: z.enum(ORG_TYPES), planId: z.string().nullish(), fullLicense: z.boolean().default(false),
+    ownerEmail: z.string().email().nullish().or(z.literal("")).transform((v) => (v ? v.toLowerCase() : null)), ownerName: z.string().max(200).nullish(),
+  }).parse(await body());
+  const o = await createOrg({ ...input, createdBy: acc.auth.id });
+  if (input.ownerEmail) {
+    // Their System admin: straight in when they sign up (or sign in) with this email.
+    const [existing] = await raw`select id from auth.users where lower(email) = ${input.ownerEmail} limit 1`.catch(() => [] as any[]);
+    await raw`insert into ops.users ${raw({
+      orgId: o.id, email: input.ownerEmail, name: input.ownerName?.trim() || input.ownerEmail.split("@")[0], authId: existing?.id ?? null, registered: !!existing,
+      active: true, pending: false, role: "ADMIN", allCampuses: true, avlLevel: "MANAGER", opsAccess: true, approvedAt: new Date(),
+    })}`;
+  }
+  return { id: o.id };
+}, "platform");
+
+route("GET", "/platform/orgs/:id", async ({ params }) => {
+  const [o] = await raw`select * from ops.organization where id = ${params.id}`;
+  if (!o) throw new HttpError(404, "Organization not found");
+  const { plans, modules, settings } = await catalog(true);
+  const plan = plans.find((p) => p.id === o.planId) ?? null;
+  const [members, invoices] = await Promise.all([
+    raw`select id, name, email, role, avl_level, active, pending, registered, last_login_at from ops.users where org_id = ${o.id} and source <> 'PLATFORM' order by role = 'ADMIN' desc, name`,
+    raw`select * from ops.invoices where org_id = ${o.id} order by created_at desc limit 100`,
+  ]);
+  return {
+    org: {
+      id: o.id, name: o.name, orgType: o.orgType, status: o.status, planId: o.planId, billingInterval: o.billingInterval, billingEmail: o.billingEmail,
+      trialEndsAt: iso(o.trialEndsAt), fullLicense: o.fullLicense, moduleOverrides: o.moduleOverrides ?? {}, churchDiscount: o.churchDiscount,
+      discountBps: o.discountBps, discountCents: o.discountCents, discountEndsAt: iso(o.discountEndsAt), discountNote: o.discountNote, adminNotes: o.adminNotes, createdAt: iso(o.createdAt),
+    },
+    plans, modules, enabled: effectiveModules({ fullLicense: o.fullLicense, moduleOverrides: o.moduleOverrides ?? {} }, plan),
+    bill: computeBill(billingOf(o), plan, modules, settings.churchDiscountBps), churchDiscountBps: settings.churchDiscountBps, members, invoices,
+  };
+}, "platform");
+
+route("PUT", "/platform/orgs/:id", async ({ params, body }) => {
+  const input = z.object({
+    name: z.string().trim().min(2).max(120), orgType: z.enum(ORG_TYPES), status: z.enum(ORG_STATUSES), planId: z.string().nullish().transform((v) => v || null),
+    billingInterval: z.enum(["MONTHLY", "YEARLY"]), billingEmail: z.string().email().nullish().or(z.literal("")).transform((v) => v || null),
+    trialEndsAt: z.string().nullish().transform((v) => (v ? new Date(v) : null)), fullLicense: z.boolean(),
+    moduleOverrides: z.record(z.enum(MODULE_KEYS as [ModuleKey, ...ModuleKey[]]), z.boolean()).default({}), churchDiscount: z.boolean(),
+    discountBps: z.number().int().min(0).max(10_000), discountCents: z.number().int().min(0).max(100_000_000),
+    discountEndsAt: z.string().nullish().transform((v) => (v ? new Date(v) : null)), discountNote: z.string().max(500).nullish(), adminNotes: z.string().max(10_000).nullish(),
+  }).parse(await body());
+  const [o] = await raw`update ops.organization set ${raw({ ...input, moduleOverrides: raw.json(input.moduleOverrides), updatedAt: new Date() })} where id = ${params.id} returning id`;
+  if (!o) throw new HttpError(404, "Organization not found");
+}, "platform");
+
+/* Plans and add-on modules: changes show up on the pricing page and sign-up straight away. */
+const PlanSchema = z.object({
+  name: z.string().trim().min(1).max(80), tagline: z.string().max(200).nullish(), priceMonthlyCents: z.number().int().min(0).max(100_000_000),
+  priceYearlyCents: z.number().int().min(0).max(1_000_000_000), modules: z.array(z.enum(MODULE_KEYS as [ModuleKey, ...ModuleKey[]])).default([]),
+  maxUsers: z.number().int().min(1).nullish().transform((v) => v ?? null), maxCampuses: z.number().int().min(1).nullish().transform((v) => v ?? null),
+  trialDays: z.number().int().min(0).max(365).default(14), public: z.boolean().default(true), active: z.boolean().default(true),
+  highlight: z.boolean().default(false), sortOrder: z.number().int().default(0),
+});
+route("GET", "/platform/catalog", async () => {
+  const { plans, modules, settings } = await catalog(true);
+  const counts = await raw`select plan_id, count(*)::int as n from ops.organization group by plan_id`;
+  return { plans: plans.map((p) => ({ ...p, orgs: counts.find((c) => c.planId === p.id)?.n ?? 0 })), modules, settings };
+}, "platform");
+route("POST", "/platform/plans", async ({ body }) => {
+  const [p] = await raw`insert into ops.plans ${raw(PlanSchema.parse(await body()))} returning id`;
+  return p;
+}, "platform");
+route("PUT", "/platform/plans/:id", async ({ params, body }) => {
+  await raw`update ops.plans set ${raw({ ...PlanSchema.parse(await body()), updatedAt: new Date() })} where id = ${params.id}`;
+}, "platform");
+route("PUT", "/platform/modules/:key", async ({ params, body }) => {
+  const m = z.object({ name: z.string().min(1).max(80), description: z.string().max(300).nullish(), priceMonthlyCents: z.number().int().min(0), priceYearlyCents: z.number().int().min(0), active: z.boolean() }).parse(await body());
+  await raw`update ops.modules set ${raw(m)} where key = ${params.key}`;
+}, "platform");
+route("PUT", "/platform/settings", async ({ body }) => {
+  const s = z.object({ churchDiscountBps: z.number().int().min(0).max(10_000), trialDays: z.number().int().min(0).max(365), defaultPlanId: z.string().nullish() }).parse(await body());
+  await raw`update ops.platform_settings set ${raw({ ...s, defaultPlanId: s.defaultPlanId || null, updatedAt: new Date() })} where id = 'platform'`;
+}, "platform");
+
+/* Invoices: drafted from each organization's plan, sent, marked paid (Stripe takes over later). */
+async function invoiceNumber() {
+  const [{ n }] = await raw`select nextval('ops.invoice_seq')::int as n`;
+  return `SUN-${new Date().getFullYear()}-${String(n).padStart(5, "0")}`;
+}
+route("GET", "/platform/invoices", async ({ url }) => {
+  const status = ["DRAFT", "SENT", "PAID", "VOID"].find((s) => s === url.searchParams.get("status"));
+  return raw`select i.*, o.name as org_name from ops.invoices i join ops.organization o on o.id = i.org_id
+    where true ${status ? raw`and i.status = ${status}` : raw``} order by i.created_at desc limit 500`;
+}, "platform");
+
+/** Draft this period's invoice for every paying organization (skips full licenses, trials, $0 and ones already drafted). */
+route("POST", "/platform/invoices/generate", async ({ acc, body }) => {
+  const { period } = z.object({ period: z.string().regex(/^\d{4}-\d{2}$/) }).parse(await body());
+  const { plans, modules, settings } = await catalog(true);
+  const orgs = await raw`select * from ops.organization where status in ('ACTIVE','PAST_DUE') and not full_license`;
+  let created = 0, skipped = 0;
+  for (const o of orgs) {
+    const yearly = o.billingInterval === "YEARLY";
+    const per = yearly ? period.slice(0, 4) : period;
+    const plan = plans.find((p) => p.id === o.planId) ?? null;
+    const bill = computeBill(billingOf(o), plan, modules, settings.churchDiscountBps);
+    const [dupe] = await raw`select 1 from ops.invoices where org_id = ${o.id} and period = ${per} and status <> 'VOID'`;
+    if (dupe || bill.totalCents <= 0) { skipped++; continue; }
+    await raw`insert into ops.invoices ${raw({
+      orgId: o.id, number: await invoiceNumber(), period: per, description: `${plan?.name ?? "Sundays"} · ${yearly ? per : period}`,
+      lines: raw.json(bill.lines.map((l) => ({ label: l.label, amountCents: l.amountCents }))), subtotalCents: bill.subtotalCents, discountCents: bill.discountCents,
+      totalCents: bill.totalCents, dueAt: new Date(Date.now() + 15 * 86_400_000), createdBy: acc.auth.email,
+    })}`;
+    created++;
+  }
+  return { created, skipped };
+}, "platform");
+
+route("POST", "/platform/invoices", async ({ acc, body }) => {
+  const i = z.object({
+    orgId: z.string().min(1), description: z.string().min(1).max(200), period: z.string().max(10).nullish(),
+    lines: z.array(z.object({ label: z.string().min(1).max(200), amountCents: z.number().int() })).min(1).max(50),
+    dueAt: z.string().nullish(), notes: z.string().max(5000).nullish(),
+  }).parse(await body());
+  const subtotal = i.lines.filter((l) => l.amountCents > 0).reduce((s, l) => s + l.amountCents, 0);
+  const total = Math.max(0, i.lines.reduce((s, l) => s + l.amountCents, 0));
+  const [row] = await raw`insert into ops.invoices ${raw({
+    orgId: i.orgId, number: await invoiceNumber(), period: i.period || null, description: i.description, lines: raw.json(i.lines),
+    subtotalCents: subtotal, discountCents: subtotal - total, totalCents: total, dueAt: i.dueAt ? new Date(i.dueAt) : null, notes: i.notes ?? null, createdBy: acc.auth.email,
+  })} returning id`;
+  return row;
+}, "platform");
+
+route("PUT", "/platform/invoices/:id", async ({ params, body }) => {
+  const { status, notes } = z.object({ status: z.enum(["DRAFT", "SENT", "PAID", "VOID"]), notes: z.string().max(5000).nullish() }).parse(await body());
+  const [row] = await raw`update ops.invoices set ${raw({
+    status, ...(notes !== undefined ? { notes } : {}),
+    ...(status === "SENT" ? { sentAt: new Date() } : {}), ...(status === "PAID" ? { paidAt: new Date() } : {}),
+  })} where id = ${params.id} returning id`;
+  if (!row) throw new HttpError(404, "Invoice not found");
+}, "platform");
+
+/* Super admins. */
+route("GET", "/platform/admins", async () => raw`select * from ops.platform_admins order by created_at`, "platform");
+route("POST", "/platform/admins", async ({ acc, body }) => {
+  const { email } = z.object({ email: z.string().email().transform((e) => e.toLowerCase()) }).parse(await body());
+  const [existing] = await raw`select id from auth.users where lower(email) = ${email} limit 1`.catch(() => [] as any[]);
+  await raw`insert into ops.platform_admins ${raw({ email, authId: existing?.id ?? null, addedBy: acc.auth.email })} on conflict (email) do nothing`;
+}, "platform");
+route("DELETE", "/platform/admins/:id", async ({ acc, params }) => {
+  const [a] = await raw`select * from ops.platform_admins where id = ${params.id}`;
+  if (!a) throw new HttpError(404, "Not found");
+  if (a.authId === acc.auth.id) throw new HttpError(409, "You can't remove yourself. Another super admin can.");
+  await raw`delete from ops.platform_admins where id = ${params.id}`;
+}, "platform");

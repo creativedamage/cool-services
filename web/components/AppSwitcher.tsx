@@ -13,20 +13,20 @@ import { Logo } from "@/components/Logo";
 import { useOpsMe, useOpsSession } from "@/lib/ops";
 
 const LAST_APP = "cool:lastApp";
-const LAST = { sundays: "cool:lastSundays", ops: "cool:lastOps", avl: "cool:lastAvl" } as const;
+const LAST = { sundays: "cool:lastSundays", ops: "cool:lastOps", avl: "cool:lastAvl", admin: "cool:lastAdmin" } as const;
 export type AppSide = keyof typeof LAST;
-const HOME: Record<AppSide, string> = { sundays: "/dashboard", ops: "/ops", avl: "/avl" };
+const HOME: Record<AppSide, string> = { sundays: "/dashboard", ops: "/ops", avl: "/avl", admin: "/admin" };
 
 const get = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const set = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
 
 /** The side last used (for the start-up screen). */
-export const lastApp = (): AppSide => { const v = get(LAST_APP); return v === "ops" || v === "avl" ? v : "sundays"; };
+export const lastApp = (): AppSide => { const v = get(LAST_APP); return v === "ops" || v === "avl" || v === "admin" ? v : "sundays"; };
 /** Where you were last on a side. */
 export const lastHref = (side: AppSide) => { const v = get(LAST[side]); return v && side !== "sundays" && v.startsWith(HOME[side]) ? v : HOME[side]; };
 
 /** Which app a path belongs to. */
-export const sideOf = (path: string): AppSide => (path.startsWith("/avl") ? "avl" : path.startsWith("/ops") ? "ops" : "sundays");
+export const sideOf = (path: string): AppSide => (path.startsWith("/avl") ? "avl" : path.startsWith("/ops") ? "ops" : path.startsWith("/admin") ? "admin" : "sundays");
 
 /** Remember where you are on this side. */
 export function useRememberApp(side: AppSide, href: string) {
@@ -41,14 +41,16 @@ export function AppSwitcher({ side, sundays = true }: { side: AppSide; sundays?:
   const nav = me?.status === "ok" ? me.nav : null;
   useEffect(() => {
     const s = get(LAST.sundays);
-    setHrefs({ sundays: s && sideOf(s) === "sundays" ? s : HOME.sundays, ops: lastHref("ops"), avl: lastHref("avl") });
+    setHrefs({ sundays: s && sideOf(s) === "sundays" ? s : HOME.sundays, ops: lastHref("ops"), avl: lastHref("avl"), admin: HOME.admin });
   }, [side]);
   // Signed out (or still checking): show both so the sign-in is reachable from either.
   const showOps = !nav || nav.ops || side === "ops";
   const showAvl = !nav || nav.avl || side === "avl";
   const tabs = [sundays && "sundays", showOps && "ops", showAvl && "avl"].filter(Boolean) as AppSide[];
   if (tabs.length < 2) return null;
+  if (side === "admin" || me?.status === "no-org") return null;
   const meta: Record<AppSide, [string, React.ReactNode]> = {
+    admin: ["Admin", null],
     sundays: ["Sundays", <Logo key="l" size={14} />], ops: ["Operations", <Building2 key="o" size={13} />], avl: ["AVL", <AudioLines key="a" size={13} />],
   };
   return (

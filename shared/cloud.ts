@@ -9,3 +9,5 @@ export const CONFIRMED_URL = "https://sgfdzzgizrvemqczauhu.supabase.co/functions
 export const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_gE2iL8LyEZDBV54yKVKlRw_7Z3nMGKO";
 /** Settings sync base URL ("" turns sync off; COOL_SYNC_URL overrides it for testing). */
 export const SYNC_URL: string = (typeof process !== "undefined" ? process.env?.COOL_SYNC_URL : undefined) ?? SUPABASE_URL;
+/** The Sundays | Operations website (invitations point people here). */
+export const WEBSITE_URL = "https://sundays-ops.vercel.app";

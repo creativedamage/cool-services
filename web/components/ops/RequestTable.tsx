@@ -1,4 +1,5 @@
 "use client";
+import { useModule } from "@/components/ops/context";
 import { TypeIcon } from "./TypeIcon";
 import Link from "next/link";
 import { KIND_LABEL } from "@shared/ops/workflow";
@@ -6,7 +7,9 @@ import type { RequestRow } from "@shared/ops/types";
 import { fmtAge } from "@/lib/ops";
 import { Empty, PriorityBadge, RequestStatusBadge, Table } from "./OpsUi";
 
-export function RequestTable({ rows, show = {}, empty = "No requests." }: { rows: RequestRow[]; show?: { requester?: boolean; campus?: boolean; assignee?: boolean }; empty?: string }) {
+export function RequestTable({ rows, show: wanted = {}, empty = "No requests." }: { rows: RequestRow[]; show?: { requester?: boolean; campus?: boolean; assignee?: boolean }; empty?: string }) {
+  const multi = useModule("campuses");
+  const show = { ...wanted, campus: wanted.campus && multi };
   if (!rows.length) return <Empty>{empty}</Empty>;
   return (
     <Table min={820} head={

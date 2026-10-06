@@ -113,11 +113,13 @@ function RequestForm({ cat, campuses, defaultCampusId, onBack }: { cat: Category
             <input required className="input" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })}
               placeholder={isMaint ? "e.g. Leaking sink in the men's restroom" : isTech ? 'e.g. 13" MacBook Air for worship planning' : "Short summary"} />
           </Field>
-          <Field label="Campus">
-            <select className="input" value={f.campusId} onChange={(e) => setF({ ...f, campusId: e.target.value })}>
-              {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </Field>
+          {campuses.length > 1 && (
+            <Field label="Campus">
+              <select className="input" value={f.campusId} onChange={(e) => setF({ ...f, campusId: e.target.value })}>
+                {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+          )}
           <Field label={`Location ${cat.requiresLocation ? "*" : "(optional)"}`}>
             <input required={cat.requiresLocation} className="input" value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} placeholder="Building / room, e.g. Kids wing – room 104" />
           </Field>
