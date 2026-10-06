@@ -1,5 +1,5 @@
 "use client";
-/** The church's branding and details (System admins). AVL has its own under AVL → Business. */
+/** The church's plan, branding, details and emails (System admins). AVL has its own under AVL → Business. */
 import { useState } from "react";
 import { toast } from "sonner";
 import type { OrgSettings } from "@shared/ops/types";
@@ -8,6 +8,7 @@ import { Card, ErrorBox, Field, Loading, PageHeader } from "@/components/ops/Ops
 import { LogoPicker } from "@/components/ops/LogoPicker";
 import { PlanBilling } from "@/components/ops/PlanBilling";
 import { useModule } from "@/components/ops/context";
+import { OrgEmail } from "@/components/ops/OrgEmail";
 
 type Data = { org: OrgSettings; logo: string | null; logoDark: string | null };
 const TEXT: [keyof OrgSettings, string][] = [
@@ -36,7 +37,7 @@ function OrgForm({ data }: { data: Data }) {
   const remove = (variant: "light" | "dark") => () => ops(`/settings/organization/logo/${variant}`, { method: "DELETE" });
   return (
     <>
-      <PageHeader crumb="Settings" title="Organization & billing" description="Your plan, what you pay, and your organization's details." />
+      <PageHeader crumb="Settings" title="Organization & billing" description="Your plan, what you pay, your organization's details and its emails." />
       <div className="space-y-5">
         <PlanBilling />
         {!branded ? (
@@ -54,6 +55,7 @@ function OrgForm({ data }: { data: Data }) {
             </div>
           </Card>
         </form>
+        <OrgEmail orgName={o.name || "Your church"} />
       </div>
     </>
   );

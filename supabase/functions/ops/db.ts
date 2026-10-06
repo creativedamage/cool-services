@@ -28,7 +28,7 @@ export type Sql = typeof raw;
 export type Tx = postgres.TransactionSql;
 export { env };
 
-export interface OrgCtx { tx: Tx; orgId: string; org: Record<string, any>; modules: ModuleKey[]; user: OpsSessionUser | null }
+export interface OrgCtx { tx: Tx; orgId: string; org: Record<string, any>; modules: ModuleKey[]; user: OpsSessionUser | null; after: (() => Promise<void>)[] }
 const als = new AsyncLocalStorage<OrgCtx>();
 export const ctx = () => als.getStore() ?? null;
 export function org(): OrgCtx {
@@ -40,12 +40,29 @@ export const orgId = () => org().orgId;
 export const hasModule = (k: ModuleKey) => org().modules.includes(k);
 
 /** Run fn inside an organization: one transaction, as ops_app, with app.org_id set. */
-export function inOrg<T>(o: { id: string; row: Record<string, any>; modules: ModuleKey[] }, fn: () => Promise<T>): Promise<T> {
-  return raw.begin(async (tx) => {
+export async function inOrg<T>(o: { id: string; row: Record<string, any>; modules: ModuleKey[] }, fn: () => Promise<T>): Promise<T> {
+  const after: OrgCtx["after"] = [];
+  const out = await (raw.begin(async (tx) => {
     await tx`select set_config('app.org_id', ${o.id}, true)`;
     await tx`set local role ops_app`;
-    return als.run({ tx, orgId: o.id, org: o.row, modules: o.modules, user: null }, fn);
-  }) as Promise<T>;
+    return als.run({ tx, orgId: o.id, org: o.row, modules: o.modules, user: null, after }, fn);
+  }) as Promise<T>);
+  // Saved: now the things that wait for it (emails), without holding up the answer.
+  for (const f of after) background(f());
+  return out;
+}
+
+/** Run after this request's changes are saved (only if they are). */
+export function afterCommit(fn: () => Promise<void>) {
+  const c = als.getStore();
+  if (c) c.after.push(fn); else background(fn());
+}
+
+/** Keep working after the response has gone (Supabase's EdgeRuntime.waitUntil), logging failures. */
+export function background(p: Promise<unknown>) {
+  const guarded = p.catch((e) => console.error("background task failed", e));
+  const rt = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;
+  rt?.waitUntil(guarded);
 }
 
 /** The current request's connection (see the note at the top). */

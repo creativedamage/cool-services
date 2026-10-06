@@ -1,13 +1,15 @@
 /**
  * Request hub: submit, route, act, comment. Every status change goes through
  * performRequestAction (row-locked, audited). Ported from coolchurch-ops lib/server/requests.ts.
- * (Email notifications aren't sent yet; the work queue and badges in Sundays show what's waiting.)
+ * Each submission and status change also sends the emails Settings → Organization → Email asks for
+ * (notify.ts), once it's saved.
  */
 import { applyRequestAction, availableActions, initialStatus, OPEN_STATUSES, resolveRoute, type RequestAction, type RequestRole } from "./lib/workflow.ts";
 import { atLeast, canAccessCampus, isAdmin, seesAllCampuses } from "./lib/rbac.ts";
 import type { OpsSessionUser, RequestDetail, RequestRow, TimelineEntry } from "./lib/types.ts";
 import { ctx, getOrg, hasModule, HttpError, logActivity, nextNumber, sql, type Tx } from "./db.ts";
 import { kindAllowed } from "./lib/billing.ts";
+import { notifyRequest } from "./notify.ts";
 
 type U = OpsSessionUser;
 
@@ -159,6 +161,8 @@ export async function submitRequest(u: U, input: SubmitInput) {
     return row;
   });
   await logActivity({ actorId: u.id, action: "Submitted request", detail: `${r.number} · ${category.name} · ${campus.name}`, area: "REQUESTS", entityType: "InternalRequest", entityId: r.id, href: `/ops/requests/view?id=${r.id}`, campusId: campus.id });
+  const [full] = await requestRows(sql`r.id = ${r.id}`);
+  if (full) await notifyRequest("SUBMIT", full, { id: u.id, email: u.email });
   return r;
 }
 
@@ -197,6 +201,8 @@ export async function performRequestAction(u: U, id: string, input: { action: Re
     return row;
   });
   await logActivity({ actorId: u.id, action: `${actionVerb(input.action)} request`, detail: `${updated.number} · ${updated.title}`, area: "REQUESTS", entityType: "InternalRequest", entityId: id, href: `/ops/requests/view?id=${id}`, campusId: updated.campusId });
+  const [full] = await requestRows(sql`r.id = ${id}`);
+  if (full) await notifyRequest(input.action, full, { id: u.id, email: u.email }, input.note);
   return updated;
 }
 

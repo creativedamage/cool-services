@@ -4,6 +4,18 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.29.0
+Operations now emails the right people when requests come in and change, sent through Sundays or your own email account.
+- **Operations emails.** A new work order or supply request emails the team that handles it (or
+  its approvers, when it needs approval first). Whoever asked gets an email when it's approved,
+  declined (with the reason), put on hold, ordered or done, and people get an email when a request
+  is assigned to them. Nobody is emailed about something they did themselves.
+- **Email settings** in Operations → Settings → Organization → Email: send through Sundays (nothing
+  to set up), your own Brevo or Resend account, or turn emails off; choose the name and reply-to
+  address, which emails go out, send yourself a test, and see what was sent lately.
+- **Sundays' email relay** in the admin console (Admin → Email): one Brevo or Resend account that
+  every organization can send through, up to 300 emails a day each.
+
 ## 1.28.0
 Sundays is now seven Mac apps (Services, Workflows, Paging, FOH, Operations, AVL and the full Sundays app) that share your sign-in and open each other.
 - **Separate apps.** Sundays Services (services, run sheets, team check-ins, ProPresenter, the

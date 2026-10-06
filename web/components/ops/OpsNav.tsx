@@ -3,8 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
-  ArrowLeft, CreditCard, Gauge, Layers, ShieldHalf, Activity, AudioLines, Boxes, Briefcase, Building, Building2, ClipboardList, FileText, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Users, UsersRound,
-} from "lucide-react";
+  ArrowLeft, CreditCard, Gauge, Layers, ShieldHalf, Activity, AudioLines, Boxes, Briefcase, Building, Building2, ClipboardList, FileText, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Users, UsersRound, Mail } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { OpsMe } from "@shared/ops/types";
@@ -139,6 +138,7 @@ export function AdminNav() {
         ] },
         { title: "Setup", items: [
           { href: "/admin/plans", label: "Plans & modules", icon: Layers },
+          { href: "/admin/email", label: "Email", icon: Mail },
           { href: "/admin/admins", label: "Super admins", icon: ShieldHalf },
         ] },
         { items: [{ href: "/ops", label: "Back to Operations", icon: ArrowLeft, exact: true }] },

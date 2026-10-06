@@ -10,7 +10,7 @@
  *   /ops/me · /ops/overview
  *   /ops/requests… · /ops/work
  *   /ops/avl/overview · /ops/clients… · /ops/quotes… · /ops/catalog · /ops/vendors… · /ops/avl/{people,business}…
- *   /ops/settings/{users,teams,request-types,supply-items,campuses,activity,organization}…
+ *   /ops/settings/{users,teams,request-types,supply-items,campuses,activity,organization,email}…
  */
 import { z, ZodError } from "zod";
 import {
@@ -24,6 +24,8 @@ import type { AvlOverview, OpsSessionUser, OverviewData, QuoteRow, UserRow } fro
 import { ctx as reqCtx, defined, getAvl, getOrg, hasModule, inOrg, orgId, raw, HttpError, logActivity, sql } from "./db.ts";
 import { account, checkEntry, myOrgs, pickOrg, requireUser, sessionUser, touch, type Account } from "./auth.ts";
 import { addRequestComment, handlesRequests, performRequestAction, requestDetail, requestRows, submitRequest, workQueueWhere } from "./requests.ts";
+import { isEmail, keyUpdate, relayAvailable, render, send, senderFor, type MailChoice } from "./mail.ts";
+import { mailSettings } from "./notify.ts";
 import { applyEvent, createQuote, effectiveTotals, liveTotals, loadQuote, quoteDTO, saveQuote, toPublicQuote, type FullQuote } from "./quotes.ts";
 
 type U = OpsSessionUser;
@@ -1459,4 +1461,87 @@ route("DELETE", "/platform/admins/:id", async ({ acc, params }) => {
   if (!a) throw new HttpError(404, "Not found");
   if (a.authId === acc.auth.id) throw new HttpError(409, "You can't remove yourself. Another super admin can.");
   await raw`delete from ops.platform_admins where id = ${params.id}`;
+}, "platform");
+
+/* ───────────── Email ───────────── */
+
+const MailInput = z.object({
+  provider: z.enum(["sundays", "brevo", "resend", "off"]),
+  apiKey: z.string().max(300).nullish(), // undefined keeps the saved one, "" removes it
+  fromEmail: z.string().max(200).nullish(),
+  fromName: z.string().max(120).nullish(),
+  replyTo: z.string().max(200).nullish(),
+});
+const cleanEmail = (v: string | null | undefined, what: string) => {
+  const t = v?.trim() || null;
+  if (t && !isEmail(t)) throw new HttpError(422, `The ${what} doesn’t look like an email address.`);
+  return t;
+};
+
+/** Settings → Organization → Email. */
+route("GET", "/settings/email", async ({ req }) => {
+  await admin(req);
+  const m = await mailSettings();
+  const relayInfo = await relayAvailable();
+  const recent = await sql`select kind, recipient, subject, status, error, created_at from ops.mail_log order by created_at desc limit 20`;
+  return {
+    provider: m.provider, hasKey: Boolean(m.apiKeyEnc), fromEmail: m.fromEmail, fromName: m.fromName, replyTo: m.replyTo,
+    notifyTeam: m.notifyTeam, notifyApprovers: m.notifyApprovers, notifyAssignee: m.notifyAssignee, notifyRequester: m.notifyRequester,
+    relay: { available: relayInfo.available }, recent,
+  };
+});
+route("PUT", "/settings/email", async ({ req, body }) => {
+  const me = await admin(req);
+  const b = MailInput.extend({ notifyTeam: z.boolean(), notifyApprovers: z.boolean(), notifyAssignee: z.boolean(), notifyRequester: z.boolean() }).parse(await body());
+  const cur = await mailSettings();
+  const apiKeyEnc = await keyUpdate(b.apiKey, cur.apiKeyEnc ?? null);
+  const fromEmail = cleanEmail(b.fromEmail, "sending address");
+  if ((b.provider === "brevo" || b.provider === "resend") && (!apiKeyEnc || !fromEmail)) throw new HttpError(422, "Add the API key and the sending address from your email service.");
+  const row = {
+    provider: b.provider, apiKeyEnc, fromEmail, fromName: b.fromName?.trim() || null, replyTo: cleanEmail(b.replyTo, "reply-to address"),
+    notifyTeam: b.notifyTeam, notifyApprovers: b.notifyApprovers, notifyAssignee: b.notifyAssignee, notifyRequester: b.notifyRequester,
+    updatedBy: me.name, updatedAt: new Date(),
+  };
+  await sql`insert into ops.mail_settings ${sql(row)} on conflict (org_id) do update set ${sql(row)}`;
+  await logActivity({ actorId: me.id, action: "Updated email settings", detail: b.provider === "sundays" ? "Sent by Sundays" : b.provider === "off" ? "Off" : `Own ${b.provider} account`, area: "ADMIN", href: "/ops/settings/organization" });
+});
+/** Send a test to yourself (straight away, so you see what went wrong). */
+route("POST", "/settings/email/test", async ({ req }) => {
+  const me = await admin(req);
+  const m = await mailSettings();
+  const org = await getOrg();
+  const name = (org.name as string) || "Your church";
+  const { sender, why } = await senderFor(m, m.fromName || name);
+  const { html, text } = render({ org: name, heading: "Sundays email works", intro: [`This is a test from Sundays, sent by ${me.name}. Request emails for ${name} will look like this and come from the same address.`] });
+  const err = await send(sender, { to: { email: me.email, name: me.name }, subject: "Test email from Sundays", html, text, replyTo: m.replyTo ?? null }, { orgId: orgId(), kind: "test" }, why);
+  if (err) throw new HttpError(422, err);
+  return { ok: true, to: me.email };
+});
+
+/** Sundays' relay (admin console): the email service every organization can send through. */
+route("GET", "/platform/email", async () => {
+  const [p] = await raw`select * from ops.platform_mail where id = 'platform'`;
+  const recent = await raw`select l.kind, l.recipient, l.subject, l.status, l.error, l.created_at, o.name as who
+    from ops.mail_log l left join ops.organization o on o.id = l.org_id
+    order by l.created_at desc limit 30`;
+  const [{ today }] = await raw`select count(*)::int as today from ops.mail_log where status = 'SENT' and created_at > now() - interval '1 day'`;
+  return { provider: p?.provider ?? "brevo", hasKey: Boolean(p?.apiKeyEnc), fromEmail: p?.fromEmail ?? null, fromName: p?.fromName ?? "Sundays", updatedBy: p?.updatedBy ?? null, today, recent };
+}, "platform");
+route("PUT", "/platform/email", async ({ acc, body }) => {
+  const b = z.object({ provider: z.enum(["brevo", "resend"]), apiKey: z.string().max(300).nullish(), fromEmail: z.string().max(200).nullish(), fromName: z.string().max(120).nullish() }).parse(await body());
+  const [cur] = await raw`select api_key_enc from ops.platform_mail where id = 'platform'`;
+  const row = {
+    id: "platform", provider: b.provider, apiKeyEnc: await keyUpdate(b.apiKey, cur?.apiKeyEnc ?? null), fromEmail: cleanEmail(b.fromEmail, "sending address"),
+    fromName: b.fromName?.trim() || "Sundays", updatedBy: acc.auth.email, updatedAt: new Date(),
+  };
+  await raw`insert into ops.platform_mail ${raw(row)} on conflict (id) do update set ${raw(row, "provider", "apiKeyEnc", "fromEmail", "fromName", "updatedBy", "updatedAt")}`;
+}, "platform");
+route("POST", "/platform/email/test", async ({ acc }) => {
+  const to = acc.auth.email;
+  if (!to) throw new HttpError(422, "Your account has no email address.");
+  const { sender, why } = await senderFor({ provider: "sundays" as MailChoice }, "Sundays");
+  const { html, text } = render({ org: "Sundays", heading: "Sundays’ email relay works", intro: ["Every organization that hasn’t set up its own email service now sends through this one."] });
+  const err = await send(sender, { to: { email: to }, subject: "Test of Sundays’ email relay", html, text }, { kind: "test" }, why);
+  if (err) throw new HttpError(422, err);
+  return { ok: true, to };
 }, "platform");
