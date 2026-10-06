@@ -7,6 +7,7 @@ import { routes } from "@/lib/routes";
 import { pickWeekendService } from "@/lib/weekend";
 import { lastApp, lastHref } from "@/components/AppSwitcher";
 import { Logo } from "@/components/Logo";
+import { APPS, appFromUserAgent } from "@shared/apps";
 
 export default function StartPage() {
   const router = useRouter();
@@ -17,6 +18,9 @@ export default function StartPage() {
         const { mode } = await Api.appMode().catch(() => ({ mode: "full" as const }));
         if (mode === null) return router.replace("/setup-mode");
         if (mode === "companion") return router.replace("/companion");
+        // A separate Sundays app (Services, Workflows, Paging) opens on its own home.
+        const app = appFromUserAgent(navigator.userAgent);
+        if (app && app !== "sundays") return router.replace(APPS[app].home);
         // Sundays | Operations was open last: back to it (Full Mode only).
         if (mode === "full" && lastApp() !== "sundays") return router.replace(lastHref(lastApp()));
         const s = await Api.settings();

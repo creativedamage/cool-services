@@ -14,7 +14,9 @@ import { extras, logEvent } from "./db.js";
 interface Pin { salt: string; hash: string }
 const hashPin = (pin: string, salt: string) => crypto.scryptSync(pin, salt, 32).toString("hex");
 
-export const appMode = (): AppMode | null => extras.get<AppMode | null>("appMode", null);
+/** Sundays FOH is always an FOH companion (SUNDAYS_APP_MODE, set by the app). */
+const FORCED = ((m) => (m === "full" || m === "service" || m === "companion" ? m : null))(process.env.SUNDAYS_APP_MODE);
+export const appMode = (): AppMode | null => FORCED ?? extras.get<AppMode | null>("appMode", null);
 const pinStored = () => extras.get<Pin | null>("serviceModePin", null);
 
 let unlockedUntil = 0;
@@ -47,6 +49,7 @@ export const serviceLocked = () => appMode() === "service" && unlockedUntil <= D
  */
 export function setAppMode(mode: AppMode | null, opts: { pin?: string; newPin?: string } = {}) {
   const cur = appMode();
+  if (FORCED && mode !== FORCED) throw Object.assign(new Error("This app always works this way. Use the full Sundays app for the other modes."), { status: 400 });
   if (cur === "service" && mode !== "service" && serviceLocked()) checkPin(opts.pin);
   if (mode === "service") {
     if (opts.newPin) {

@@ -25,7 +25,7 @@ concurrency:
 jobs:
   mac:
     runs-on: macos-14
-    timeout-minutes: 60
+    timeout-minutes: 150
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
       MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
@@ -67,14 +67,15 @@ jobs:
           echo "COOL_SIGN_IDENTITY=$SHA" >> "$GITHUB_ENV"
           echo "COOL_SIGN_KEYCHAIN=$KC" >> "$GITHUB_ENV"
 
-      - name: Build the Mac app
+      # Every Sundays app (shared/apps.ts): the full app, Services, Workflows, Paging, FOH, Operations, AVL.
+      - name: Build the Mac apps
         run: npm run dist:mac
 
       - name: Checksums
         working-directory: desktop/release
         run: |
           ls -la
-          shasum -a 256 Sundays-*.dmg Sundays-*-mac.zip > SHA256SUMS.txt
+          shasum -a 256 Sundays*.dmg Sundays*-mac.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Release notes from CHANGELOG.md
@@ -91,6 +92,8 @@ jobs:
           '
           cat release-notes.md
 
+      # The full app's files go up first: Sundays 1.27 and older update from the first "-mac.zip" in
+      # the release, so it must be the full app's. (Newer versions look for their own by name.)
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
@@ -98,6 +101,14 @@ jobs:
           name: Sundays ${{ env.VERSION }} — ${{ env.SUMMARY }}
           body_path: release-notes.md
           files: |
-            desktop/release/Sundays-${{ env.VERSION }}.dmg
             desktop/release/Sundays-${{ env.VERSION }}-mac.zip
+            desktop/release/Sundays-${{ env.VERSION }}.dmg
             desktop/release/SHA256SUMS.txt
+
+      - name: Add the separate apps
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          files: |
+            desktop/release/Sundays-*-${{ env.VERSION }}.dmg
+            desktop/release/Sundays-*-${{ env.VERSION }}-mac.zip

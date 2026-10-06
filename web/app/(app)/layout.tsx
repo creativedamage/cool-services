@@ -22,6 +22,8 @@ import { AdminBrand, AdminNav, AvlBrand, AvlNav, OpsBrand, OpsNav } from "@/comp
 import { OrgSwitcher } from "@/components/ops/OrgSwitcher";
 import { AppSwitcher, sideOf, useRememberApp } from "@/components/AppSwitcher";
 import { APP_MODE_KEY, PinDialog, serviceLocked, serviceModeAllows, useAppMode, useUnlock } from "@/lib/appMode";
+import { ElsewherePage, OtherApps, isSingle, useCurrentApp } from "@/components/AppLinks";
+import { APPS, appFor, appHas } from "@shared/apps";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return <Suspense><Shell>{children}</Shell></Suspense>;
@@ -60,8 +62,13 @@ function Shell({ children }: { children: React.ReactNode }) {
     if (path.startsWith("/services") && st && openPlan) void Api.boardOpenPlan(st, openPlan).catch(() => undefined);
   }, [path, st, openPlan]);
 
+  // The separate Sundays apps (Sundays Services, Workflows, Paging) show only their own screens;
+  // a link to another app's screen offers to open it there.
+  const appId = useCurrentApp();
+  const single = isSingle(appId) ? appId : null;
+  const elsewhere = Boolean(single && !appHas(single, path));
   // Sundays, Sundays | Operations and Sundays | AVL are separate apps in one window (switcher at the top of the sidebar).
-  const side = sideOf(path);
+  const side = elsewhere ? "sundays" : sideOf(path);
   const inOps = side !== "sundays";
   useRememberApp(side, qs ? `${path}?${qs}` : path);
 
@@ -84,18 +91,18 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2.5 px-4 py-4">
             <Logo size={30} />
             <div className="leading-tight">
-              <div className="text-sm font-semibold">Sundays</div>
+              <div className="text-sm font-semibold">{single ? APPS[single].name : "Sundays"}</div>
               <div className="truncate text-[11px] text-ink-muted">{me.data?.orgName ?? "\u00a0"}</div>
             </div>
           </div>
         )}
-        {mode?.mode === "full" && <AppSwitcher side={side} />}
+        {mode?.mode === "full" && !single && <AppSwitcher side={side} />}
         {inOps && side !== "admin" && <OrgSwitcher />}
         {!inOps && <CampusSwitcher />}
-        {!inOps && <WeekendPicker />}
+        {!inOps && (!single || single === "services") && <WeekendPicker />}
 
         {!inOps && <nav className="space-y-0.5 px-2">
-          {(locked ? nav.filter((n) => serviceModeAllows(n.href)) : nav).map(({ href, to, label, icon: Icon }: { href: string; to?: string; label: string; icon: typeof CalendarDays }) => (
+          {(locked ? nav.filter((n) => serviceModeAllows(n.href)) : nav).filter((n) => !single || appHas(single, n.href)).map(({ href, to, label, icon: Icon }: { href: string; to?: string; label: string; icon: typeof CalendarDays }) => (
             <Link key={href} href={to ?? href}
               className={clsx("flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition",
                 path.startsWith(href) ? "bg-hover text-ink" : "text-ink-muted hover:bg-hover/60 hover:text-ink-soft")}>
@@ -106,7 +113,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
         {mode?.mode === "service" && <ServiceModeBox locked={locked} unlockedUntil={mode.unlockedUntil} />}
 
-        {closed ? (
+        {closed || elsewhere ? (
           <div className="flex-1" />
         ) : path.startsWith("/services") ? (
           <ServicesNav activeSt={search.get("st")} activePlan={search.get("plan")} tab={path} />
@@ -141,6 +148,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           </>
         )}
 
+        {single && <OtherApps current={single} />}
         {me.data && (
           <div className="flex items-center gap-2.5 border-t border-line p-3">
             <Avatar name={me.data.name} src={me.data.avatarUrl} size={30} />
@@ -167,8 +175,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="pointer-events-none absolute bottom-3 right-4 z-10"><Badge tone="violet">Demo data</Badge></div>
         )}
         <PageRequestsBar />
-        {!locked && mode && <WorkflowWatcher />}
-        <div className="relative flex min-h-0 flex-1 flex-col">{closed ? <ClosedInServiceMode /> : children}</div>
+        {!locked && mode && (!single || single === "workflows") && <WorkflowWatcher />}
+        <div className="relative flex min-h-0 flex-1 flex-col">{elsewhere && single ? <ElsewherePage current={single} target={appFor(path) ?? (sideOf(path) === "admin" ? "ops" : null)} page={qs ? `${path}?${qs}` : path} /> : closed ? <ClosedInServiceMode /> : children}</div>
       </main>
 
       <ScheduleModal />

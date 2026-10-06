@@ -1,27 +1,23 @@
 /**
- * /api/desktop: things only the Mac app can do, registered by desktop/src/main.ts.
- * Right now: showing Planning Center Chat inside the window.
+ * /api/desktop: things only the Mac apps can do. Each window asks its own app (lib/engine.ts):
+ * Planning Center Chat inside the window, Preferences in their own window, and which Sundays apps
+ * are on this Mac (the apps open each other themselves: sundays-open:// links).
  */
 import { Router } from "express";
 import { z } from "zod";
-import type { EmbedBridge } from "../../../shared/embed.js";
-
-let embed: EmbedBridge | null = null;
-export const setEmbedBridge = (b: EmbedBridge) => { embed = b; };
-
-
-let prefs: ((section: string) => void) | null = null;
-/** The Mac app opens Preferences in their own window. */
-export const setPrefsOpener = (fn: (section: string) => void) => { prefs = fn; };
+import { appFromUserAgent } from "../../../shared/apps.js";
+import { appCall, appCan, appListing } from "../lib/engine.js";
 
 export const desktopRouter = Router();
+const appOf = (req: { get(h: string): string | undefined }) => appFromUserAgent(req.get("user-agent"));
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
-desktopRouter.post("/preferences", (req, res) => {
-  if (!prefs) return res.status(404).json({ error: "unavailable" });
+desktopRouter.post("/preferences", h(async (req, res) => {
   const { section } = z.object({ section: z.string().regex(/^[a-z-]{1,30}$/).default("about") }).parse(req.body ?? {});
-  prefs(section);
+  const r = await appCall(appOf(req), "prefs.open", section);
+  if (!r) return res.status(404).json({ error: "unavailable" });
   res.json({ ok: true });
-});
+}));
 
 const Req = z.object({
   action: z.enum(["show", "hide", "reload", "home"]),
@@ -30,8 +26,12 @@ const Req = z.object({
   bounds: z.object({ x: z.number(), y: z.number(), width: z.number().min(0), height: z.number().min(0) }).optional(),
 });
 
-desktopRouter.get("/embed", (_req, res) => res.json({ available: Boolean(embed) }));
-desktopRouter.post("/embed", (req, res) => {
-  if (!embed) return res.status(404).json({ error: "unavailable", message: "Only in the Sundays Mac app." });
-  res.json(embed.apply(Req.parse(req.body)));
-});
+desktopRouter.get("/embed", (req, res) => res.json({ available: appCan(appOf(req), "embed") }));
+desktopRouter.post("/embed", h(async (req, res) => {
+  const r = await appCall(appOf(req), "embed.apply", Req.parse(req.body));
+  if (!r) return res.status(404).json({ error: "unavailable", message: "Only in the Sundays Mac app." });
+  res.json(r);
+}));
+
+/** The Sundays apps: which are on this Mac, and which is asking. */
+desktopRouter.get("/apps", (req, res) => res.json({ current: appOf(req), apps: appListing(appOf(req)) }));

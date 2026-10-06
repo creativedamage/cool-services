@@ -11,6 +11,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { useOpsMe, useOpsSession } from "@/lib/ops";
+import { isSingle, openIn, useCurrentApp } from "@/components/AppLinks";
+import type { AppId } from "@shared/apps";
 
 const LAST_APP = "cool:lastApp";
 const LAST = { sundays: "cool:lastSundays", ops: "cool:lastOps", avl: "cool:lastAvl", admin: "cool:lastAdmin" } as const;
@@ -36,6 +38,10 @@ export function useRememberApp(side: AppSide, href: string) {
 /** `sundays`: include the Sundays tab (the Mac app); the website only has Operations and AVL. */
 export function AppSwitcher({ side, sundays = true }: { side: AppSide; sundays?: boolean }) {
   const [hrefs, setHrefs] = useState(HOME);
+  // In the separate Operations or AVL app, the other one's tab opens that app.
+  const cur = useCurrentApp();
+  const appOfSide: Record<AppSide, AppId> = { sundays: "sundays", ops: "ops", avl: "avl", admin: "ops" };
+  const hrefFor = (k: AppSide) => (isSingle(cur) && appOfSide[k] !== cur ? openIn(appOfSide[k], hrefs[k]) : hrefs[k]);
   const { session } = useOpsSession();
   const me = useOpsMe(Boolean(session)).data;
   const nav = me?.status === "ok" ? me.nav : null;
@@ -56,7 +62,7 @@ export function AppSwitcher({ side, sundays = true }: { side: AppSide; sundays?:
   return (
     <div className="mx-3 mb-3 flex rounded-lg border border-line p-0.5">
       {tabs.map((key) => (
-        <Link key={key} href={side === key ? "#" : hrefs[key]} onClick={(e) => side === key && e.preventDefault()}
+        <Link key={key} href={side === key ? "#" : hrefFor(key)} onClick={(e) => side === key && e.preventDefault()}
           className={clsx("flex flex-1 items-center justify-center rounded-md font-medium transition",
             tabs.length > 2 ? "flex-col gap-0.5 py-1.5 text-[10.5px]" : "gap-1.5 py-1.5 text-xs",
             side === key ? "bg-accent-soft text-accent" : "text-ink-muted hover:bg-hover hover:text-ink-soft")}>

@@ -15,8 +15,10 @@ import { servicesRouter } from "./routes/services.js";
 import { micsRouter } from "./routes/mics.js";
 import { settingsRouter } from "./routes/settings.js";
 import { pagingRouter } from "./routes/paging.js";
-import { setUpdateBridge, updatesRouter } from "./routes/updates.js";
-import { desktopRouter, setEmbedBridge, setPrefsOpener } from "./routes/desktop.js";
+import { updatesRouter } from "./routes/updates.js";
+import { desktopRouter } from "./routes/desktop.js";
+import { engineRouter } from "./routes/engine.js";
+import { registerLocalApp } from "./lib/engine.js";
 import { runSheetViewsRouter } from "./routes/runsheetViews.js";
 import { proRouter } from "./routes/pro.js";
 import { smaartRouter, startSmaart } from "./routes/smaart.js";
@@ -53,6 +55,7 @@ export function createApp(webDir?: string) {
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, version: process.env.APP_VERSION ?? "dev" }));
   app.use("/api/auth", authRouter);
+  app.use("/api/engine", engineRouter); // the other Sundays apps on this Mac using this server
   app.use(serviceModeGuard); // Service Mode: Workflows, Check-Ins, Dashboard and Chat are closed
   app.use("/api/board-out", boardOutRouter); // the stage display (mic board / clock)
   app.use("/api/clock-out", clockOutRouter); // clock outputs (NDI window, second display) and control links
@@ -150,8 +153,8 @@ export function startServer(opts: { port: number; webDir?: string }): Promise<Se
 process.on("exit", flush);
 
 
-/** Used by the Mac app to plug its updater into /api/updates. */
-export { setUpdateBridge, setEmbedBridge, setPrefsOpener, setAttentionBridge, setCompanionWindowBridge, setFolderOpener };
+/** Used by the Mac app: its updater, Chat and Preferences (registerLocalApp), and the FOH companion's windows. */
+export { registerLocalApp, setAttentionBridge, setCompanionWindowBridge, setFolderOpener };
 /** The Mac app's NDI sender and second-display window read clock output settings here. */
 export { clockOutputs } from "./lib/clock.js";
 /** …and the stage display's second-display window. */

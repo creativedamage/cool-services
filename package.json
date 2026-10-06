@@ -13,7 +13,7 @@
     "app": "npm run start -w desktop",
     "dist:mac": "npm run dist -w desktop",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w web && npm run typecheck -w desktop && npm run typecheck -w ops-web",
-    "dist:mac:arm": "cd desktop && node build.mjs --dist && npx electron-builder --mac dmg zip --arm64 --publish never",
+    "dist:mac:arm": "cd desktop && node build.mjs --dist && SUNDAYS_ARCH=arm64 node dist.mjs",
     "set-repo": "node scripts/set-repo.mjs",
     "release": "node scripts/release.mjs",
     "micboard:update": "git subtree pull --prefix vendor/micboard https://github.com/creativedamage/micboard.git main --squash",

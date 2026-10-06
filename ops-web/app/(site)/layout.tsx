@@ -11,6 +11,8 @@ import { AppSwitcher, sideOf, useRememberApp } from "@/components/AppSwitcher";
 import { AdminBrand, AdminNav, AvlBrand, AvlNav, OpsBrand, OpsNav } from "@/components/ops/OpsNav";
 import { OrgSwitcher } from "@/components/ops/OrgSwitcher";
 import { currentTheme, setTheme } from "@/lib/theme";
+import { ElsewherePage, isSingle, useCurrentApp } from "@/components/AppLinks";
+import { appHas } from "@shared/apps";
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return <Suspense><Shell>{children}</Shell></Suspense>;
@@ -24,6 +26,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   useRememberApp(side, qs ? `${path}?${qs}` : path);
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [path, qs]);
+  // The Sundays Operations / Sundays AVL Mac apps: only their own screens.
+  const cur = useCurrentApp();
+  const elsewhere = isSingle(cur) && !appHas(cur, path);
   const brand = side === "admin" ? <AdminBrand /> : side === "avl" ? <AvlBrand /> : <OpsBrand fallback={null} />;
   return (
     <div className={clsx("flex h-[100dvh] flex-col overflow-hidden md:flex-row", side === "ops" ? "app-ops" : side === "avl" ? "app-avl" : "app-admin")}>
@@ -46,7 +51,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         {side === "admin" ? <AdminNav /> : side === "avl" ? <AvlNav /> : <OpsNav />}
         <ThemeToggle />
       </aside>
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</main>
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col">{elsewhere && isSingle(cur) ? <ElsewherePage current={cur} target={s0 === "avl" ? "avl" : "ops"} page={qs ? `${path}?${qs}` : path} /> : children}</main>
     </div>
   );
 }

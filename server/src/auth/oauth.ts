@@ -55,6 +55,17 @@ async function startSession(res: Response, userId: string, demo = false) {
   res.cookie(SID, id, { ...cookieOpts, expires: expiresAt });
 }
 
+/**
+ * Another Sundays app on this Mac opens a window here: it starts signed in as whoever signed in
+ * last (the same person, in a new session). False when nobody is signed in.
+ */
+export async function handoffSession(res: Response): Promise<boolean> {
+  const s = sessions.newest();
+  if (!s || !users.get(s.userId)) return false;
+  await startSession(res, s.userId, s.demo);
+  return true;
+}
+
 async function saveTokens(userId: string, t: TokenSet) {
   tokenStore.save({
     userId,
@@ -159,7 +170,9 @@ authRouter.get("/demo", h(async (_req, res) => {
 
 authRouter.post("/logout", h(async (req, res) => {
   const sid = req.cookies?.[SID];
-  if (sid) sessions.delete(sid);
+  // Signing out signs you out of every Sundays app on this Mac (they share the sign-in).
+  const s = sid ? sessions.get(sid) : null;
+  if (s) sessions.deleteForUser(s.userId); else if (sid) sessions.delete(sid);
   res.clearCookie(SID, cookieOpts);
   res.json({ ok: true });
 }));

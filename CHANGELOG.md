@@ -4,6 +4,26 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.28.0
+Sundays is now seven Mac apps (Services, Workflows, Paging, FOH, Operations, AVL and the full Sundays app) that share your sign-in and open each other.
+- **Separate apps.** Sundays Services (services, run sheets, team check-ins, ProPresenter, the
+  Clock, the Mic board and the Dashboard), Sundays Workflows (workflows and Chat), Sundays Paging
+  (parent paging and the Kids & Nursery iPads), Sundays FOH (the FOH companion), Sundays Operations
+  and Sundays AVL. Each has its own icon, Dock name and updates. The full Sundays app still has
+  everything.
+- **They share one Sundays.** Open more than one on the same Mac and they use the same sign-in,
+  settings, weekend and Micboard. Whichever opens first runs Sundays in the background; if it quits,
+  another app takes over without you noticing.
+- **They link to each other.** A link to a screen another app has (a workflow card from the
+  Dashboard, say) offers to open it in that app. The new Apps menu and "Sundays apps" in the sidebar
+  open the others. Apps you don't have open in the full Sundays app instead, and Operations and AVL
+  open on the website.
+- **Signing out** in any of them signs you out of all of them on that Mac.
+- **Sundays FOH** is always an FOH companion, with its own settings, so it can run on the same Mac
+  as the main Sundays.
+- **Sundays Operations and Sundays AVL** on the Mac: the same screens as the website, in their own
+  app, each linking to the other.
+
 ## 1.27.1
 The Mic board (and everywhere else that lists service types) now finds service types kept in Planning Center folders.
 - **All your service types.** Service types filed in folders in Planning Center now show up in the

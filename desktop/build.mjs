@@ -1,5 +1,6 @@
 // Builds everything the Mac app needs into desktop/app/:
 //   web/out (static UI)  →  app/web
+//   ops-web/out          →  app/site       (Sundays Operations / AVL)
 //   server (API)         →  app/server.cjs   (one bundled file, no node_modules)
 //   src/main.ts          →  app/main.cjs
 //   koffi (ready-built)  →  app/native/koffi  (calls the NDI library; nothing is compiled)
@@ -27,6 +28,15 @@ fs.mkdirSync(out, { recursive: true });
 console.log("• Building the web UI (static export)…");
 execSync("npm run build -w web", { cwd: root, stdio: "inherit" });
 fs.cpSync(path.join(root, "web", "out"), path.join(out, "web"), { recursive: true });
+
+// Sundays Operations and Sundays AVL show the website's screens (ops-web, a static export).
+if (process.env.COOL_SKIP_SITE === "1") {
+  console.log("• Skipping the Operations/AVL screens (COOL_SKIP_SITE=1)");
+} else {
+  console.log("• Building the Operations/AVL screens (ops-web)…");
+  execSync("npm run build -w ops-web", { cwd: root, stdio: "inherit" });
+  fs.cpSync(path.join(root, "ops-web", "out"), path.join(out, "site"), { recursive: true });
+}
 
 console.log("• Bundling the server…");
 await esbuild.build({

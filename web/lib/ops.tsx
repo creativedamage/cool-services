@@ -32,8 +32,8 @@ function testToken(): string | null {
   return t || null;
 }
 
-/** Where the "confirm your email" link lands: the website itself, or (from the Mac app) Sundays' confirmation page. */
-export const confirmRedirect = () => (STANDALONE && typeof window !== "undefined" ? `${window.location.origin}/` : CONFIRMED_URL);
+/** Where the "confirm your email" link lands: the website itself, or (from a Mac app) Sundays' confirmation page. */
+export const confirmRedirect = () => (STANDALONE && typeof window !== "undefined" && /^https?:$/.test(window.location.protocol) ? `${window.location.origin}/` : CONFIRMED_URL);
 
 let client: SupabaseClient | null = null;
 export async function supabase(): Promise<SupabaseClient> {

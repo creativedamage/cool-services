@@ -9,7 +9,7 @@
   "scripts": {
     "build": "node build.mjs",
     "start": "node build.mjs && electron .",
-    "dist": "node build.mjs --dist && electron-builder --mac --publish never",
+    "dist": "node build.mjs --dist && node dist.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

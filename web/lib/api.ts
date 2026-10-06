@@ -5,6 +5,7 @@ import type {
   DashboardWidget, HomeService, TeamCheckIns, TeamPhonesView, TeamPhoneRole, VolunteerCheckInConfig, VolunteerCheckInSetup, TeamGroup, AppMode, AppModeView, ResiSettingsView, ResiStatus, CompanionState, CompanionStrip, CompanionTuning, DisplayInfo, CompanionInfo, Campus, CampusSettings, PersonProfile, ConsoleSettingsView, ConsolePreview, SmaartSettingsView, SmaartStatusView, ProAction, ProControlState, ProMachine, Matrix, RunSheetData, RunSheetLive, RunSheetView, ItemInput, ItemTimes, NoteCategory, PlanItem, SongArrangement, SongHit, CheckInLocation, KioskAddresses, KioskChild, Ministry, MinistryPaging, PageEvent, PagingConfig, PagingStatus, ProMessageOption, ProPresenterMachine, ProThemeOption,
 } from "@shared/types";
 import type { UpdateStatus } from "@shared/updates";
+import type { AppId } from "@shared/apps";
 import type { ClockOutputSettings, ClockPreset, ClockState, ClockView } from "@shared/clock";
 import type { BoardMic, BoardSettings, DisplayState } from "@shared/board";
 
@@ -56,7 +57,11 @@ async function lowLane<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /** Typed endpoint map — the only place the frontend knows URLs. */
+export interface SundaysAppListing { id: AppId; name: string; short: string; blurb: string; installed: boolean; running: boolean; current: boolean }
+
 export const Api = {
+  /** The Sundays apps on this Mac (Mac apps only). */
+  sundaysApps: () => api<{ current: AppId | null; apps: SundaysAppListing[] }>("/desktop/apps"),
   me: () => api<StaffMe>("/auth/me"),
   settings: () => api<AppSettings>("/settings"),
   saveSettings: (patch: SettingsPatch) =>

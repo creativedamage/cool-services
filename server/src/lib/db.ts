@@ -188,9 +188,19 @@ export const sessions = {
     const s = load().sessions.find((x) => x.id === id);
     return s && s.expiresAt > now() ? s : null;
   },
+  /** The session signed in most recently (another Sundays app on this Mac starts as that person). */
+  newest(): Session | null {
+    const n = now();
+    return load().sessions.filter((x) => x.expiresAt > n).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+  },
   delete(id: string) {
     const d = load();
     d.sessions = d.sessions.filter((x) => x.id !== id);
+    save();
+  },
+  deleteForUser(userId: string) {
+    const d = load();
+    d.sessions = d.sessions.filter((x) => x.userId !== userId);
     save();
   },
 };

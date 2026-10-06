@@ -23,10 +23,14 @@ import { promisify } from "node:util";
 import type { UpdateBridge, UpdateStatus } from "../../shared/updates";
 
 const run = promisify(execFile);
-const APP_ID = "org.coolchurch.coolservices";
 
 export interface UpdaterOptions {
   currentVersion: string;
+  /** Which Sundays app this is (shared/apps.ts): its bundle id, name and release file names. */
+  appId?: string;
+  appName?: string;
+  /** Release files are <artifact>-<version>-mac.zip */
+  artifact?: string;
   /** "owner/repo", or null until it's set (npm run set-repo). */
   repo: string | null;
   /** Path of the running "Sundays.app". */
@@ -97,7 +101,11 @@ export function createUpdater(o: UpdaterOptions): UpdateBridge & { start(): void
     return (await res.json()) as T;
   }
 
-  const zipOf = (r: GhRelease) => r.assets.find((a) => /-mac\.zip$/i.test(a.name));
+  const appId = o.appId ?? "org.coolchurch.coolservices";
+  const appName = o.appName ?? "Sundays";
+  const artifact = o.artifact ?? "Sundays";
+  // Every Sundays app is in each release: only this app's download.
+  const zipOf = (r: GhRelease) => r.assets.find((a) => a.name.toLowerCase() === `${artifact}-${r.tag_name.replace(/^v/, "")}-mac.zip`.toLowerCase());
   const sumsOf = (r: GhRelease) => r.assets.find((a) => /^SHA256SUMS(\.txt)?$/i.test(a.name));
 
   function check(): Promise<UpdateStatus> {
@@ -179,20 +187,20 @@ export function createUpdater(o: UpdaterOptions): UpdateBridge & { start(): void
         let newApp: string;
         if (macChecks) {
           await run("/usr/bin/ditto", ["-x", "-k", zipPath, stage]);
-          const found = fs.readdirSync(stage).find((f) => f.endsWith(".app"));
+          const found = fs.readdirSync(stage).find((f) => f === `${appName}.app`) ?? fs.readdirSync(stage).find((f) => f.endsWith(".app"));
           if (!found) throw new Error("The update doesn’t contain the app.");
           newApp = path.join(stage, found);
-          if ((await plist(newApp, "CFBundleIdentifier")) !== APP_ID) throw new Error("The update isn’t Sundays.");
+          if ((await plist(newApp, "CFBundleIdentifier")) !== appId) throw new Error(`The update isn’t ${appName}.`);
           const v = await plist(newApp, "CFBundleShortVersionString");
           if (v !== version) throw new Error(`The update says it's version ${v}, expected ${version}.`);
           await run("/usr/bin/codesign", ["--verify", "--deep", "--strict", newApp]).catch(() => { throw new Error("The update’s code signature isn’t valid."); });
         } else {
-          newApp = path.join(stage, "Sundays.app");
+          newApp = path.join(stage, `${appName}.app`);
           fs.mkdirSync(newApp);
         }
 
         const script = path.join(work, "install.sh");
-        fs.writeFileSync(script, installScript({ pid: process.pid, app: o.appBundle, newApp, work, logFile: path.join(os.homedir(), "Library", "Logs", "Sundays update.log") }), { mode: 0o700 });
+        fs.writeFileSync(script, installScript({ pid: process.pid, app: o.appBundle, newApp, work, logFile: path.join(os.homedir(), "Library", "Logs", `${appName} update.log`) }), { mode: 0o700 });
         log(`installing ${version}: ${script}`);
         spawn("/bin/bash", [script], { detached: true, stdio: "ignore" }).unref();
         setTimeout(o.quit, 300);
