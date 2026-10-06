@@ -347,7 +347,17 @@ export class LivePco implements PcoApi {
   /* ───────────── Services ───────────── */
 
   async listServiceTypes(): Promise<ServiceType[]> {
-    const rows = await cache.swr(this.k("service_types"), 3600, () => this.c.list(`${S}/service_types?order=sequence`));
+    // Service types filed in folders in Planning Center don't always come back from the top-level
+    // list, so each folder's are added too (in the list's order, then by folder).
+    const rows = await cache.swr(this.k("service_types:all"), 3600, async () => {
+      const [top, folders] = await Promise.all([
+        this.c.list(`${S}/service_types?order=sequence`),
+        this.c.list(`${S}/folders`, 5).catch(() => [] as Flat[]),
+      ]);
+      const inFolders = await mapLimit(folders, 3, (f) => this.c.list(`${S}/folders/${f.id}/service_types?order=sequence`, 5).catch(() => [] as Flat[]));
+      const seen = new Set<string>();
+      return [...top, ...inFolders.flat()].filter((r) => !seen.has(r.id) && Boolean(seen.add(r.id)));
+    });
     return rows
       .filter((r) => !r.archived_at && !r.deleted_at) // hide archived service types
       .map((r) => ({ id: r.id, name: r.name }));

@@ -4,6 +4,11 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.27.1
+The Mic board (and everywhere else that lists service types) now finds service types kept in Planning Center folders.
+- **All your service types.** Service types filed in folders in Planning Center now show up in the
+  Mic board's service type list, the Clock presets and Services, not just the top-level ones.
+
 ## 1.27.0
 Sundays | Operations is now a service any church or team can sign up for, with plans, add-on modules, church pricing and a Sundays admin console.
 - **Anyone can start an organization.** Sign up, pick a plan and you get your own organization with a
