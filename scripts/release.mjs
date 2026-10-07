@@ -38,6 +38,14 @@ if (ver !== pkg.version) {
   fs.writeFileSync("desktop/package.json", JSON.stringify(pkg, null, 2) + "\n");
   git("add", "desktop/package.json");
 }
+// package-lock.json keeps its own copy of the app's version; keep it in step, or the next
+// npm install changes it and the next release stops at "Commit or stash your changes first".
+const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+if (lock.packages?.desktop && lock.packages.desktop.version !== ver) {
+  lock.packages.desktop.version = ver;
+  fs.writeFileSync("package-lock.json", JSON.stringify(lock, null, 2) + "\n");
+  git("add", "package-lock.json");
+}
 // The release commit (also when nothing changed) is what GitHub Actions shows as the run's name.
 git("commit", "--allow-empty", "-m", title);
 git("tag", "-a", `v${ver}`, "-m", title);
