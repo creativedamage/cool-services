@@ -15,7 +15,7 @@ import type { PcoApi } from "../pco/api.js";
 import { cache, extras, mics } from "./db.js";
 import { readReceiver } from "./shure.js";
 import { weekend, weekendPlan, onWeekendChange } from "./weekend.js";
-import { backgroundsRev, micboardData, micboardRunning, micboardStatus, setMicboardPlanSource, statusesFromMicboard } from "./micboard.js";
+import { backgroundsRev, micboardData, micboardRunning, micboardStatus, personGroup, setMicboardLayoutSource, setMicboardPlanSource, statusesFromMicboard } from "./micboard.js";
 
 interface Stored { settings: BoardSettings; owner: { userId: string; demo: boolean } | null; open?: { serviceTypeId: string; planId: string } | null }
 const KEY = "board";
@@ -178,10 +178,17 @@ setMicboardPlanSource(async () => {
   };
 });
 
-/** Micboard's #hash: group, TV view and info drawer, backgrounds (see Micboard's js/app.js). */
-function micboardHash(m: BoardSettings["micboard"]) {
+setMicboardLayoutSource(() => ({ stack: stored.settings.stack ?? true, group: stored.settings.micboard?.group ?? 0 }));
+
+/**
+ * Micboard's #hash: group, TV view and info drawer, backgrounds (see Micboard's js/app.js). With
+ * One tile per person, the group is Sundays' own (micboard.ts → syncPersonGroup), built from yours.
+ */
+function micboardHash(m: BoardSettings["micboard"], stack: boolean) {
   const parts: string[] = [];
-  if (m.group) parts.push(`group=${m.group}`);
+  const pg = stack ? personGroup() : null;
+  const group = pg?.group ?? m.group;
+  if (group) parts.push(`group=${group}`);
   if (m.view !== "desk") { parts.push(`tvmode=${m.view}`); if (m.backgrounds !== "NONE") parts.push(`bgmode=${m.backgrounds}`); }
   return parts.length ? `#${parts.join("&")}` : "";
 }
@@ -250,9 +257,11 @@ async function build(): Promise<DisplayState> {
   return {
     view, mode: s.mode, reason, settings: { banner: s.banner, columns: s.columns, imageStyle: s.imageStyle },
     micboard: mb.run === "off" || mb.run === "companion" ? null : {
-      running: micboardRunning(), port: mb.port, hash: micboardHash(s.micboard ?? DEFAULT_BOARD.micboard), error: mb.error,
-      // Micboard reads its list of pictures when its page loads: a new picture reloads the display.
-      rev: mbData ? crypto.createHash("sha1").update([...mbData.jpg, ...mbData.mp4].sort().join("|") + `#${backgroundsRev()}`).digest("hex").slice(0, 12) : "",
+      running: micboardRunning(), port: mb.port, hash: micboardHash(s.micboard ?? DEFAULT_BOARD.micboard, s.stack ?? true), error: mb.error,
+      // Micboard reads its pictures when its page loads, and doesn't redraw a group it was opened
+      // on when that group changes: a new picture, or a change to who's on the board, reloads it.
+      rev: mbData ? crypto.createHash("sha1").update([...mbData.jpg, ...mbData.mp4].sort().join("|") + `#${backgroundsRev()}`
+        + ((s.stack ?? true) ? `#${personGroup()?.slots.join(",") ?? ""}` : "")).digest("hex").slice(0, 12) : "",
     },
     service: plan ? {
       planId: plan.id, serviceTypeId: plan.serviceTypeId, title: plan.title, serviceTypeName: plan.serviceTypeName,

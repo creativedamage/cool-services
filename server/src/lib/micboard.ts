@@ -342,6 +342,50 @@ export function syncSetup(d: MbData): Map<number, string> {
 type PlanInfo = { assignments: { channelId: string; personId: string; name: string }[]; photos: Map<string, string | null> } | null;
 let planSource: (() => Promise<PlanInfo>) | null = null;
 export const setMicboardPlanSource = (fn: () => Promise<PlanInfo>) => { planSource = fn; };
+/** Set by board.ts: the Mic board's "One tile per person" and the Micboard group it shows. */
+type Layout = { stack: boolean; group: number };
+let layoutSource: (() => Layout) | null = null;
+export const setMicboardLayoutSource = (fn: () => Layout) => { layoutSource = fn; };
+
+/**
+ * One per person on Micboard. Micboard (unchanged) shows one tile per transmitter, so someone on
+ * a vocal mic and their guitar's pack would show up twice. Sundays keeps a Micboard group of its
+ * own with the person's other mics left out, and names all their mics on the one tile that stays
+ * ("Vox 1 + AG Pack"). A left-out mic comes back as its own tile while its battery is low (3 bars
+ * or fewer, Micboard's yellow or red), so a dying pack is never hidden.
+ */
+const PERSON_GROUP_TITLE = "Sundays · one per person";
+let personGroupNow: { group: number; slots: number[] } | null = null;
+export const personGroup = () => personGroupNow;
+/**
+ * A folded-in mic needs its own tile when its transmitter is on and its battery is at 3 bars or
+ * fewer (Micboard's yellow "replace" and red "critical"). Judged by the bars, not Micboard's status:
+ * an audio peak replaces the status for a moment and would make the tile flicker.
+ */
+const needsAttention = (t: MbTx | undefined) =>
+  Boolean(t && !["TX_COM_ERROR", "RX_COM_ERROR", "UNASSIGNED"].includes(t.status) && t.battery != null && t.battery >= 0 && t.battery <= 3);
+const KIND_ORDER: Record<MicKind, number> = { vocal: 0, other: 1, pack: 2 };
+
+async function syncPersonGroup(d: MbData, chosen: number, stacked: Set<number>, port: number) {
+  const groups = d.config.groups ?? [];
+  let g = groups.find((x) => x.title === PERSON_GROUP_TITLE)?.group ?? null;
+  for (let n = 9; g == null && n >= 1; n--) if (!groups.some((x) => Number(x.group) === n)) g = n; // Micboard has groups 1–9
+  if (g == null) { personGroupNow = null; return; } // all nine are yours: show the chosen group as it is
+  const base = chosen && chosen !== g ? groups.find((x) => Number(x.group) === chosen)?.slots : undefined;
+  const tx = new Map(d.receivers.flatMap((rx) => rx.tx.map((t) => [t.slot, t] as const)));
+  const slots = (base ?? (d.config.slots ?? []).map((x) => x.slot))
+    .filter((x) => !stacked.has(x) || needsAttention(tx.get(x)));
+  const cur = groups.find((x) => Number(x.group) === g);
+  if (!cur || cur.title !== PERSON_GROUP_TITLE || cur.slots.join(",") !== slots.join(",")) {
+    const r = await fetch(`http://127.0.0.1:${port}/api/group`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ group: g, title: PERSON_GROUP_TITLE, slots, hide_charts: false }),
+    });
+    if (!r.ok) throw new Error(`Micboard didn’t take the group (HTTP ${r.status})`);
+    memo = null;
+  }
+  personGroupNow = { group: g, slots };
+}
 
 /** Micboard's background file for a name: it shows "<name, lower case>.jpg" behind "Mollie". */
 export const bgFileFor = (name: string, ext: "jpg" | "mp4" = "jpg") =>
@@ -467,24 +511,53 @@ export async function syncNow() {
     const want = new Map<number, { name: string; personId: string }>();
     if (s.names !== "off") for (const a of assigned) want.set(chanToSlot.get(a.channelId)!, { name: display(a.name), personId: a.personId });
 
+    // One per person: each person's main mic (a vocal before a pack) keeps its tile and the
+    // others fold into it (syncPersonGroup).
+    const layout = layoutSource?.() ?? { stack: true, group: 0 };
+    const channels = new Map(mics.setup().channels.map((c) => [c.id, c]));
+    const others = new Map<number, number[]>(); // main slot → the same person's other slots
+    const stacked = new Set<number>();
+    if (layout.stack) {
+      const byPerson = new Map<string, number[]>();
+      for (const [slot, w] of want) byPerson.set(w.personId, [...(byPerson.get(w.personId) ?? []), slot]);
+      const rank = (slot: number) => KIND_ORDER[channels.get(slotOf.get(slot) ?? "")?.kind ?? "other"];
+      for (const list of byPerson.values()) {
+        if (list.length < 2) continue;
+        const [main, ...rest] = [...list].sort((a, b) => rank(a) - rank(b) || a - b);
+        others.set(main, rest);
+        rest.forEach((x) => stacked.add(x));
+      }
+    }
+
     // Names: set ours, clear the ones we set that nobody's on now; leave names you typed in Micboard.
     // A mic whose receiver name has no ID in it ("VOX 1" rather than "H01 VOX") gets its Mic setup
-    // name as Micboard's extended ID, so the board still says which mic it is.
+    // name as Micboard's extended ID, so the board still says which mic it is. A person's main mic
+    // gets all their mics as its ID ("Vox 1 + AG Pack"); the ID it had before comes back after.
     const pushed = extras.get<Record<string, string>>("micboardPushed", {});
+    const pushedIds = extras.get<Record<string, { id: string; prev: string }>>("micboardPushedIds", {});
     const updates: { slot: number; extended_id?: string; extended_name?: string }[] = [];
     const txBySlot = new Map(d.receivers.flatMap((r) => r.tx.map((t) => [t.slot, t] as const)));
-    const labels = new Map(mics.setup().channels.map((c) => [c.id, c.label]));
+    const labelOf = (slot: number) => channels.get(slotOf.get(slot) ?? "")?.label;
     for (const sl of d.config.slots ?? []) {
       const w = want.get(sl.slot)?.name;
       const ours = pushed[sl.slot];
+      const mine = pushedIds[sl.slot];
+      const ownId = mine && sl.extended_id === mine.id ? mine.prev : sl.extended_id ?? "";
       if (w) {
-        const label = labels.get(slotOf.get(sl.slot) ?? "");
-        const id = sl.extended_id || (!txBySlot.get(sl.slot)?.id && label && label.toLowerCase() !== w.toLowerCase() ? label : "");
-        if (sl.extended_name !== w || (id && sl.extended_id !== id)) updates.push({ slot: sl.slot, ...(id ? { extended_id: id } : {}), extended_name: w });
+        const label = labelOf(sl.slot);
+        let id = ownId || (!txBySlot.get(sl.slot)?.id && label && label.toLowerCase() !== w.toLowerCase() ? label : "");
+        const rest = others.get(sl.slot);
+        if (rest) {
+          id = [label || id || `Slot ${sl.slot}`, ...rest.map((x) => labelOf(x) || `Slot ${x}`)].join(" + ");
+          pushedIds[sl.slot] = { id, prev: ownId };
+        } else delete pushedIds[sl.slot];
+        if (sl.extended_name !== w || (sl.extended_id ?? "") !== id) updates.push({ slot: sl.slot, ...(id ? { extended_id: id } : {}), extended_name: w });
         pushed[sl.slot] = w;
-      } else if (ours) {
-        if (sl.extended_name === ours) updates.push({ slot: sl.slot, ...(sl.extended_id ? { extended_id: sl.extended_id } : {}) });
+      } else if (ours || mine) {
+        const keepName = !ours || sl.extended_name !== ours ? sl.extended_name : undefined;
+        updates.push({ slot: sl.slot, ...(ownId ? { extended_id: ownId } : {}), ...(keepName ? { extended_name: keepName } : {}) });
         delete pushed[sl.slot];
+        delete pushedIds[sl.slot];
       }
     }
     if (updates.length) {
@@ -492,6 +565,9 @@ export async function syncNow() {
       memo = null;
     }
     extras.set("micboardPushed", pushed);
+    extras.set("micboardPushedIds", pushedIds);
+    if (layout.stack) await syncPersonGroup(d, layout.group, stacked, s.port);
+    else personGroupNow = null;
 
     // Planning Center photos (never over a picture of yours).
     let photos = 0;

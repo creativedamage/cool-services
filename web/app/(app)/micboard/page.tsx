@@ -253,9 +253,7 @@ function MicsSection({ s, mics, onSave }: {
   return (
     <section className="space-y-2">
       <h3 className="label">FOH companion mic strip</h3>
-      <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5" checked={s.stack ?? true} onChange={(e) => onSave({ stack: e.target.checked })} />
-        <span>One tile per person <span className="block text-[11px] text-ink-faint">Someone on more than one mic (a vocal and their acoustic guitar’s pack) gets one tile, with the other mics stacked under their mic name.</span></span>
-      </label>
+      <p className="text-[11px] text-ink-faint">One tile per person (under Mic board above) stacks a person’s other mics under their mic name here too.</p>
       <div className="divide-y divide-line rounded-lg border border-line">
         {mics.length === 0 && <p className="px-3 py-2 text-xs text-ink-muted">No mics yet. Add receivers in Settings → Mic setup, or add a mic below.</p>}
         {mics.map((m) => (
@@ -286,6 +284,9 @@ function MicsSection({ s, mics, onSave }: {
   );
 }
 
+/** The Micboard group Sundays keeps for One tile per person (server/src/lib/micboard.ts). */
+const PERSON_GROUP_TITLE = "Sundays · one per person";
+
 /** How the display shows Micboard: group, TV view and info drawer, backgrounds. */
 function MicboardDisplaySection({ s, onSave }: { s: BoardSettings; onSave: (p: Parameters<typeof Api.saveBoard>[0]) => void }) {
   const mb = useQuery({ queryKey: ["micboard"], queryFn: Api.micboard, refetchInterval: 5000 });
@@ -301,8 +302,16 @@ function MicboardDisplaySection({ s, onSave }: { s: BoardSettings; onSave: (p: P
       <label className="block"><span className="text-xs text-ink-muted">Group</span>
         <select className="input mt-1" value={m.group} onChange={(e) => set({ group: Number(e.target.value) })}>
           <option value={0}>All mics</option>
-          {(mb.data?.groups ?? []).map((g) => <option key={g.group} value={g.group}>{g.group}: {g.title || "Untitled"} ({g.slots})</option>)}
+          {(mb.data?.groups ?? []).filter((g) => g.title !== PERSON_GROUP_TITLE).map((g) => <option key={g.group} value={g.group}>{g.group}: {g.title || "Untitled"} ({g.slots})</option>)}
         </select>
+      </label>
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5" checked={s.stack ?? true} onChange={(e) => onSave({ stack: e.target.checked })} />
+        <span>One tile per person
+          <span className="block text-[11px] text-ink-faint">
+            Someone on more than one mic (a vocal and their acoustic guitar’s pack) shows once, on their vocal mic, named “Vox 1 + AG Pack”.
+            A folded-in pack comes back as its own tile while its battery is low (3 bars or fewer), so a dying pack is never hidden.
+            Sundays keeps this as its own Micboard group (“{PERSON_GROUP_TITLE}”), made from the group above.
+          </span></span>
       </label>
       <label className="block"><span className="text-xs text-ink-muted">View</span>
         <select className="input mt-1" value={m.view} onChange={(e) => set({ view: e.target.value as BoardSettings["micboard"]["view"] })}>

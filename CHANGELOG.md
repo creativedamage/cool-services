@@ -4,6 +4,15 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.31.1
+On Micboard, someone on a vocal mic and a pack shows up once, with both mics named on their tile.
+- **One tile per person on Micboard.** Someone on more than one mic (a vocal and their acoustic
+  guitar's pack) now shows once, on their vocal mic, labelled "Vox 1 + AG Pack". If the folded-in
+  pack's battery gets low (3 bars or fewer), it comes back as its own tile until it's changed. The
+  setting is under Mic board → Mic board (Micboard) → One tile per person, and it's on by default.
+- Sundays keeps this as its own Micboard group ("Sundays · one per person"), made from the group
+  you picked. Screens pointed straight at Micboard's address need a reload to see changes.
+
 ## 1.31.0
 Names on Micboard stay readable on bright background pictures.
 - **Readable names.** Micboard writes names in light text, which got lost on bright photos.
