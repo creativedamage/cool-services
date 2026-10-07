@@ -15,7 +15,7 @@ import type { PcoApi } from "../pco/api.js";
 import { cache, extras, mics } from "./db.js";
 import { readReceiver } from "./shure.js";
 import { weekend, weekendPlan, onWeekendChange } from "./weekend.js";
-import { micboardData, micboardRunning, micboardStatus, setMicboardPlanSource, statusesFromMicboard } from "./micboard.js";
+import { backgroundsRev, micboardData, micboardRunning, micboardStatus, setMicboardPlanSource, statusesFromMicboard } from "./micboard.js";
 
 interface Stored { settings: BoardSettings; owner: { userId: string; demo: boolean } | null; open?: { serviceTypeId: string; planId: string } | null }
 const KEY = "board";
@@ -252,7 +252,7 @@ async function build(): Promise<DisplayState> {
     micboard: mb.run === "off" || mb.run === "companion" ? null : {
       running: micboardRunning(), port: mb.port, hash: micboardHash(s.micboard ?? DEFAULT_BOARD.micboard), error: mb.error,
       // Micboard reads its list of pictures when its page loads: a new picture reloads the display.
-      rev: mbData ? crypto.createHash("sha1").update([...mbData.jpg, ...mbData.mp4].sort().join("|")).digest("hex").slice(0, 12) : "",
+      rev: mbData ? crypto.createHash("sha1").update([...mbData.jpg, ...mbData.mp4].sort().join("|") + `#${backgroundsRev()}`).digest("hex").slice(0, 12) : "",
     },
     service: plan ? {
       planId: plan.id, serviceTypeId: plan.serviceTypeId, title: plan.title, serviceTypeName: plan.serviceTypeName,

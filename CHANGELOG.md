@@ -4,6 +4,13 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.31.0
+Names on Micboard stay readable on bright background pictures.
+- **Readable names.** Micboard writes names in light text, which got lost on bright photos.
+  Sundays now darkens bright pictures (yours and Planning Center's) just enough for the names to
+  stand out, and leaves dark ones exactly as they are. Your originals are kept. Switch it off in
+  Preferences → Micboard ("Keep names readable on bright pictures"). Videos aren't changed.
+
 ## 1.30.0
 Each service type can have its own mic assignment filter, and the Dashboard's widgets can be dragged into place.
 - **Mic filter per service type.** In Services → Mics & packs → Set up mics, tick "Use different

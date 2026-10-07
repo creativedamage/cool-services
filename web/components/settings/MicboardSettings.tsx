@@ -105,6 +105,9 @@ export function MicboardSettings() {
         </label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={s.pcoPhotos} onChange={(e) => save.mutate({ pcoPhotos: e.target.checked })} />
           Use Planning Center photos as backgrounds (when you haven’t added your own for that name)</label>
+        <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5" checked={s.readable} onChange={(e) => save.mutate({ readable: e.target.checked })} />
+          <span>Keep names readable on bright pictures
+            <span className="block text-xs text-ink-muted">Micboard writes names in light text. Bright pictures (yours and Planning Center’s) are darkened just enough for the names to stand out; dark ones are left as they are. Your originals are kept. Videos aren’t changed.</span></span></label>
         {q.data.sync.at && (
           <p className="text-[11px] text-ink-faint">
             {q.data.sync.error ? `Last update failed: ${q.data.sync.error}` : `Updated ${new Date(q.data.sync.at).toLocaleTimeString()}: ${q.data.sync.names} name${q.data.sync.names === 1 ? "" : "s"}, ${q.data.sync.photos} Planning Center photo${q.data.sync.photos === 1 ? "" : "s"}.`}

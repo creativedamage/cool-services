@@ -302,7 +302,7 @@ export const planQuery = (st: string, plan: string) => ({
 
 /* Micboard inside Sundays (Preferences → Micboard). */
 export interface MicboardView {
-  settings: { enabled: boolean; port: number; names: "first" | "full" | "off"; pcoPhotos: boolean };
+  settings: { enabled: boolean; port: number; names: "first" | "full" | "off"; pcoPhotos: boolean; readable: boolean };
   status: { run: "off" | "starting" | "running" | "error" | "missing" | "companion"; error: string | null; version: string | null; port: number; log: string[]; folder: string };
   sync: { at: string; error: string | null; names: number; photos: number };
   urls: string[];

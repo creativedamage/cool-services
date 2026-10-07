@@ -14,6 +14,8 @@
  *   • sends who's on each mic as Micboard extended names (POST /api/slot);
  *   • puts pictures in Micboard's backgrounds folder: your own (Preferences → Micboard) and,
  *     if you like, Planning Center photos. Micboard shows <name>.jpg (or .mp4) behind each name.
+ *     Bright pictures go in darkened just enough for Micboard's light names to read
+ *     (readableBg.ts); the originals are kept in backgrounds-originals.
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
@@ -22,6 +24,7 @@ import path from "node:path";
 import type { MicChannel, MicKind, MicSetup, Receiver, ReceiverStatus, ShureModel } from "../../../shared/types.js";
 import { config } from "../config.js";
 import { extras, logEvent, mics } from "./db.js";
+import { readableBackground } from "./readableBg.js";
 
 /* ───────────── Settings ───────────── */
 
@@ -32,13 +35,16 @@ export interface MicboardSettings {
   names: "first" | "full" | "off";
   /** Planning Center photos as backgrounds when you haven't added your own. */
   pcoPhotos: boolean;
+  /** Darken bright pictures just enough for Micboard's light names to read. */
+  readable: boolean;
 }
-const DEFAULTS: MicboardSettings = { enabled: true, port: 8058, names: "first", pcoPhotos: true };
+const DEFAULTS: MicboardSettings = { enabled: true, port: 8058, names: "first", pcoPhotos: true, readable: true };
 export const micboardSettings = (): MicboardSettings => ({ ...DEFAULTS, ...extras.get<Partial<MicboardSettings>>("micboard", {}) });
 export function saveMicboardSettings(p: Partial<MicboardSettings>) {
   const before = micboardSettings();
   const next = { ...before, ...p };
   extras.set("micboard", next);
+  if (before.readable !== next.readable) refreshReadable();
   if (before.port !== next.port || before.enabled !== next.enabled) restartMicboard();
   else void syncNow();
   return next;
@@ -65,6 +71,8 @@ const paths = () => {
 };
 export const micboardDir = () => path.resolve(process.cwd(), config.dataDir, "micboard");
 export const backgroundsDir = () => path.join(micboardDir(), "backgrounds");
+/** The pictures as they came (yours and Planning Center's); Micboard gets readable copies. */
+const originalsDir = () => path.join(micboardDir(), "backgrounds-originals");
 
 export function micboardVersion(): string | null {
   try { return JSON.parse(fs.readFileSync(path.join(paths().app, "package.json"), "utf8")).version ?? null; } catch { return null; }
@@ -355,13 +363,60 @@ export function listBackgrounds() {
   });
 }
 
+/** Changes whenever a picture's contents change, so displays load Micboard's page again. */
+let bgRev = 0;
+export const backgroundsRev = () => bgRev;
+
+const writeAtomic = (dir: string, file: string, data: Buffer) => {
+  fs.mkdirSync(dir, { recursive: true });
+  const tmp = path.join(dir, `.${file}.tmp`);
+  fs.writeFileSync(tmp, data);
+  fs.renameSync(tmp, path.join(dir, file));
+};
+
+/** A picture for Micboard: the original kept aside, and Micboard's copy (darkened if it needs it). */
+function writePicture(file: string, original: Buffer) {
+  writeAtomic(originalsDir(), file, original);
+  const shown = micboardSettings().readable ? readableBackground(original).data : original;
+  writeAtomic(backgroundsDir(), file, shown);
+  readableState()[file] = micboardSettings().readable ? "on" : "off";
+  extras.set("micboardReadable", readableState());
+  bgRev++;
+}
+const readableState = (() => {
+  let cache: Record<string, "on" | "off"> | null = null;
+  return () => (cache ??= extras.get<Record<string, "on" | "off">>("micboardReadable", {}));
+})();
+
+/**
+ * Bring Micboard's copies of Sundays' pictures (yours and Planning Center's) in line with the
+ * Readable names setting. The first time, the picture in the folder is the original, so it's kept
+ * aside first. Pictures put in the folder some other way are never changed.
+ */
+export function refreshReadable() {
+  const m = manifest();
+  const want = micboardSettings().readable ? "on" : "off";
+  const state = readableState();
+  let changed = false;
+  for (const file of [...m.custom, ...Object.keys(m.pco)]) {
+    if (!/\.jpg$/i.test(file) || state[file] === want) continue;
+    const shown = path.join(backgroundsDir(), file), kept = path.join(originalsDir(), file);
+    try {
+      if (!fs.existsSync(kept)) { if (!fs.existsSync(shown)) continue; writeAtomic(originalsDir(), file, fs.readFileSync(shown)); }
+      const original = fs.readFileSync(kept);
+      writeAtomic(backgroundsDir(), file, want === "on" ? readableBackground(original).data : original);
+      state[file] = want;
+      changed = true;
+    } catch (e) { logEvent(`micboard: couldn’t update the picture ${file}: ${(e as Error).message}`); }
+  }
+  if (changed) { extras.set("micboardReadable", state); bgRev++; memo = null; }
+}
+
 export function saveBackground(name: string, ext: "jpg" | "mp4", data: Buffer) {
   const file = bgFileFor(name, ext);
   if (!file.replace(/\.\w+$/, "")) throw new Error("Enter the name it’s for");
-  fs.mkdirSync(backgroundsDir(), { recursive: true });
-  const tmp = path.join(backgroundsDir(), `.${file}.tmp`);
-  fs.writeFileSync(tmp, data);
-  fs.renameSync(tmp, path.join(backgroundsDir(), file));
+  if (ext === "jpg") writePicture(file, data);
+  else { writeAtomic(backgroundsDir(), file, data); bgRev++; }
   const m = manifest();
   delete m.pco[file];
   m.custom = [...new Set([...m.custom, file])];
@@ -373,6 +428,9 @@ export function saveBackground(name: string, ext: "jpg" | "mp4", data: Buffer) {
 export function removeBackground(file: string) {
   if (!/^[^/\\]+\.(jpg|mp4|gif)$/i.test(file)) throw new Error("Not a background file");
   fs.rmSync(path.join(backgroundsDir(), file), { force: true });
+  fs.rmSync(path.join(originalsDir(), file), { force: true });
+  const state = readableState();
+  if (state[file]) { delete state[file]; extras.set("micboardReadable", state); }
   const m = manifest();
   delete m.pco[file];
   m.custom = m.custom.filter((f) => f !== file);
@@ -449,8 +507,7 @@ export async function syncNow() {
         try {
           const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
           if (!r.ok || !/^image\//.test(r.headers.get("content-type") ?? "image/")) throw new Error(`HTTP ${r.status}`);
-          fs.mkdirSync(backgroundsDir(), { recursive: true });
-          fs.writeFileSync(path.join(backgroundsDir(), file), Buffer.from(await r.arrayBuffer()));
+          writePicture(file, Buffer.from(await r.arrayBuffer()));
           m.pco[file] = url;
           photos++;
         } catch { photoRetry.set(url, Date.now() + 5 * 60_000); } // try that one again in a few minutes
@@ -466,6 +523,7 @@ export async function syncNow() {
 let loop: NodeJS.Timeout | null = null;
 /** Start Micboard (if it's on) and keep names and pictures in step every few seconds. */
 export function initMicboard() {
+  try { refreshReadable(); } catch (e) { logEvent(`micboard: couldn’t check the pictures: ${(e as Error).message}`); }
   void startMicboard();
   if (!loop) { loop = setInterval(() => void syncNow(), 5000); loop.unref(); }
 }

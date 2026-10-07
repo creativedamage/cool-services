@@ -41,7 +41,7 @@ micboardRouter.get("/", h(async (_req, res) => {
 micboardRouter.put("/settings", (req, res) => {
   const p = z.object({
     enabled: z.boolean(), port: z.number().int().min(1024).max(65535).refine((n) => ![3000, 3001, 47123, 47124, 47125].includes(n), "That port is taken by Sundays"),
-    names: z.enum(["first", "full", "off"]), pcoPhotos: z.boolean(),
+    names: z.enum(["first", "full", "off"]), pcoPhotos: z.boolean(), readable: z.boolean(),
   }).partial().parse(req.body);
   res.json(saveMicboardSettings(p));
 });
