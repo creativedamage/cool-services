@@ -254,6 +254,16 @@ export interface MicChannel {
 export interface MicSetup {
   receivers: Receiver[];
   channels: MicChannel[];
+  /** Per service type (by Planning Center id): its own mic assignment filter. */
+  serviceTypes?: Record<string, MicFilter>;
+}
+
+/** How one service type picks people for mics. Missing fields use the setup's own. */
+export interface MicFilter {
+  /** channelId → the positions that mic is for in this service type (replaces the channel's own). */
+  positions?: Record<string, string[]>;
+  /** Leave people who already have a mic of that kind out of each mic's list (default on). */
+  hideAssigned?: boolean;
 }
 
 /** Live status of one receiver channel, read from the receiver (never written). */

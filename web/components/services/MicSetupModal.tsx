@@ -1,5 +1,9 @@
 "use client";
-/** Set up mics: the Shure receivers on the network and the channels (Vox 1, AG Pack…) on them. */
+/**
+ * Set up mics: the Shure receivers on the network and the channels (Vox 1, AG Pack…) on them, plus
+ * the service type's own mic assignment filter (its own "for positions", and hiding people who
+ * already have a mic).
+ */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus, Trash2, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -11,14 +15,29 @@ import { Modal, Spinner } from "@/components/ui";
 
 const uid = (p: string) => `${p}-${Math.random().toString(36).slice(2, 9)}`;
 
-export function MicSetupModal({ setup, positions, onClose }: { setup: MicSetup; positions: string[]; onClose: () => void }) {
+export function MicSetupModal({ setup, serviceType, positions, onClose }: {
+  setup: MicSetup; serviceType: { id: string; name: string }; positions: string[]; onClose: () => void;
+}) {
   const qc = useQueryClient();
   const [rxs, setRxs] = useState<Receiver[]>(setup.receivers);
   const [chs, setChs] = useState<MicChannel[]>(setup.channels);
+  const filter = setup.serviceTypes?.[serviceType.id] ?? {};
+  /** This service type uses its own "for positions" instead of the ones every service type shares. */
+  const [own, setOwn] = useState(Boolean(filter.positions));
+  const [ownPos, setOwnPos] = useState<Record<string, string[]>>(filter.positions ?? {});
+  const [hide, setHide] = useState(filter.hideAssigned !== false);
+  const posOf = (c: MicChannel) => (own ? ownPos[c.id] ?? c.positions : c.positions);
+  const setPos = (c: MicChannel, p: string[]) => (own ? setOwnPos((x) => ({ ...x, [c.id]: p })) : upCh(c.id, { positions: p }));
   const [tests, setTests] = useState<Record<string, { busy?: boolean; ok?: boolean; msg?: string }>>({});
 
   const save = useMutation({
-    mutationFn: () => Api.saveMicSetup({ receivers: rxs, channels: chs }),
+    mutationFn: () => Api.saveMicSetup({
+      receivers: rxs, channels: chs,
+      serviceTypes: {
+        ...setup.serviceTypes,
+        [serviceType.id]: { positions: own ? Object.fromEntries(chs.map((c) => [c.id, posOf(c)])) : undefined, hideAssigned: hide },
+      },
+    }),
     onSuccess: (s) => { qc.setQueryData(qk.micSetup, s); toast.success("Mic setup saved"); onClose(); },
     onError: (e) => toast.error("Couldn’t save", { description: (e as Error).message }),
   });
@@ -83,6 +102,22 @@ export function MicSetupModal({ setup, positions, onClose }: { setup: MicSetup; 
             People go back on the same mic they had last time when it fits.
             <b> Console</b> sends the person’s name to that Allen &amp; Heath input (a second input for a double patch, e.g. in-ears).
           </p>
+          <div className="mb-3 space-y-1.5 rounded-lg border border-line bg-raised px-3 py-2.5 text-xs">
+            <div className="font-semibold text-ink">Mic assignment filter for {serviceType.name}</div>
+            <label className="flex items-center gap-2 text-ink-soft">
+              <input type="checkbox" checked={own} onChange={(e) => {
+                if (e.target.checked) setOwnPos(Object.fromEntries(chs.map((c) => [c.id, ownPos[c.id] ?? c.positions])));
+                setOwn(e.target.checked);
+              }} />
+              Use different “For positions” for {serviceType.name}
+              <span className="text-ink-faint">{own ? "(the positions below are only for this service type)" : "(the positions below are shared by every service type without their own)"}</span>
+            </label>
+            <label className="flex items-center gap-2 text-ink-soft">
+              <input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} />
+              Hide people who already have a mic
+              <span className="text-ink-faint">(someone on Vox 1 isn’t offered for Vox 2, but can still get a pack)</span>
+            </label>
+          </div>
           <datalist id="cs-positions">{positions.map((p) => <option key={p} value={p} />)}</datalist>
           <div className="space-y-2">
             {chs.map((c) => {
@@ -100,9 +135,10 @@ export function MicSetupModal({ setup, positions, onClose }: { setup: MicSetup; 
                   <select className="input py-1.5" value={c.channel} disabled={!rx} onChange={(e) => upCh(c.id, { channel: Number(e.target.value) })}>
                     {Array.from({ length: rx?.channels ?? 1 }, (_, i) => <option key={i} value={i + 1}>Ch {i + 1}</option>)}
                   </select>
-                  <input className="input py-1.5" list="cs-positions" value={c.positions.join(", ")} placeholder="For positions (comma-separated)"
-                    onChange={(e) => upCh(c.id, { positions: e.target.value.split(",").map((s) => s.trimStart()).filter((s, i, a) => s || i === a.length - 1) })}
-                    onBlur={(e) => upCh(c.id, { positions: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
+                  <input className={`input py-1.5 ${own ? "border-accent/50" : ""}`} list="cs-positions" value={posOf(c).join(", ")}
+                    placeholder={own ? `For positions at ${serviceType.name}` : "For positions (comma-separated)"}
+                    onChange={(e) => setPos(c, e.target.value.split(",").map((s) => s.trimStart()).filter((s, i, a) => s || i === a.length - 1))}
+                    onBlur={(e) => setPos(c, e.target.value.split(",").map((s) => s.trim()).filter(Boolean))} />
                   <ConsoleCell c={c} onChange={(consoleInputs) => upCh(c.id, { consoleInputs })} />
                   <button className="btn-ghost p-1.5" title="Remove" onClick={() => setChs(chs.filter((x) => x.id !== c.id))}><Trash2 size={14} /></button>
                 </div>

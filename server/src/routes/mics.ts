@@ -21,6 +21,10 @@ const Setup = z.object({
     positions: z.array(z.string().max(60)).max(20),
     consoleInputs: z.array(z.number().int().min(1).max(128)).max(2).optional(),
   })),
+  serviceTypes: z.record(z.object({
+    positions: z.record(z.array(z.string().max(60)).max(20)).optional(),
+    hideAssigned: z.boolean().optional(),
+  })).optional(),
 });
 
 micsRouter.get("/setup", h(async (_req, res) => res.json(mics.setup())));

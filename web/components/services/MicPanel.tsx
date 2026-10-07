@@ -7,12 +7,12 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { AlertTriangle, ChevronDown, Mic, MicOff, Radio, Settings2, Sparkles, Waves } from "lucide-react";
+import { AlertTriangle, ChevronDown, Eye, EyeOff, Mic, MicOff, Radio, Settings2, Sparkles, Waves } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { ChannelStatus, MicAssignment, MicKind, PlanDetail, PlanMics } from "@shared/types";
 import { Api, qk } from "@/lib/api";
-import { assignChannel, autoAssign, fitsChannel, servingPeople } from "@/lib/mics";
+import { assignChannel, autoAssign, fitsChannel, hidesAssigned, servingPeople, setupFor } from "@/lib/mics";
 import { Avatar, Skeleton } from "@/components/ui";
 import { MicSetupModal } from "./MicSetupModal";
 import { ConsoleSendButton } from "./ConsoleSend";
@@ -47,18 +47,37 @@ export function MicPanel({ plan }: { plan: PlanDetail }) {
     onError: (e) => { toast.error("Couldn’t save mic assignments", { description: (e as Error).message }); void mics.refetch(); },
   });
 
+  // Saving the filter switch (Hide assigned) for this service type.
+  const saveSetup = useMutation({
+    mutationFn: Api.saveMicSetup,
+    onMutate: (s) => qc.setQueryData(qk.micSetup, s),
+    onSuccess: (s) => qc.setQueryData(qk.micSetup, s),
+    onError: (e) => { toast.error("Couldn’t save", { description: (e as Error).message }); void setup.refetch(); },
+  });
+
   const people = useMemo(() => servingPeople(plan.roster), [plan.roster]);
   const assignments = mics.data?.assignments ?? [];
   const byChannel = new Map(assignments.map((a) => [a.channelId, a]));
-  const channels = setup.data?.channels ?? [];
+  // This service type's view of the setup: its own "for positions" on each mic.
+  const mine = useMemo(() => setup.data && setupFor(setup.data, plan.serviceTypeId), [setup.data, plan.serviceTypeId]);
+  const channels = mine?.channels ?? [];
+  const hide = setup.data ? hidesAssigned(setup.data, plan.serviceTypeId) : true;
+  const kindOf = new Map(channels.map((c) => [c.id, c.kind]));
+  /** "<kind>:<personId>" → the mic they have in this service. */
+  const holding = new Map(assignments.map((a) => [`${kindOf.get(a.channelId)}:${a.personId}`, a.channelId]));
+  const toggleHide = () => {
+    if (!setup.data) return;
+    const st = setup.data.serviceTypes ?? {};
+    saveSetup.mutate({ ...setup.data, serviceTypes: { ...st, [plan.serviceTypeId]: { ...st[plan.serviceTypeId], hideAssigned: !hide } } });
+  };
   const receivers = new Map((setup.data?.receivers ?? []).map((r) => [r.id, r]));
   const rxStatus = new Map((status.data ?? []).map((r) => [r.receiverId, r]));
   const assignedCount = channels.filter((c) => byChannel.has(c.id)).length;
   const offline = (status.data ?? []).filter((r) => !r.ok);
 
   function runAuto() {
-    if (!setup.data || !mics.data) return;
-    const next = autoAssign(setup.data, plan.roster, assignments, mics.data.usual);
+    if (!mine || !mics.data) return;
+    const next = autoAssign(mine, plan.roster, assignments, mics.data.usual);
     const added = next.filter((n) => !assignments.some((a) => a.channelId === n.channelId && a.personId === n.personId)).length;
     save.mutate(next);
     toast(added > 0 ? `Assigned ${added} mic${added === 1 ? "" : "s"}` : "Nothing to add. Every matching mic is already assigned.");
@@ -82,6 +101,13 @@ export function MicPanel({ plan }: { plan: PlanDetail }) {
         )}
         <div className="ml-auto flex items-center gap-1.5">
           {channels.some((c) => c.consoleInputs?.length) && <ConsoleSendButton planId={plan.id} />}
+          {channels.length > 0 && (
+            <button className={clsx("btn-ghost py-1 text-xs", hide && "text-accent")} onClick={toggleHide} disabled={saveSetup.isPending}
+              title={hide ? `People who already have a mic are left out of the other mics’ lists (${plan.serviceTypeName}). Click to show everyone.`
+                : `Everyone serving is in every mic’s list (${plan.serviceTypeName}). Click to leave out people who already have a mic.`}>
+              {hide ? <EyeOff size={13} /> : <Eye size={13} />} {hide ? "Hiding assigned" : "Showing assigned"}
+            </button>
+          )}
           <button className="btn-outline py-1 text-xs" onClick={runAuto} disabled={!channels.length || save.isPending}>
             <Sparkles size={13} /> Auto-assign
           </button>
@@ -108,8 +134,10 @@ export function MicPanel({ plan }: { plan: PlanDetail }) {
                       {list.map((c) => {
                         const a = byChannel.get(c.id);
                         const rx = c.receiverId ? receivers.get(c.receiverId) : undefined;
-                        const fits = people.filter((p) => fitsChannel(c, p));
-                        const others = people.filter((p) => !fits.includes(p));
+                        // Hide assigned: drop people who already have a mic of this kind elsewhere (the person on this mic stays).
+                        const pickable = hide ? people.filter((p) => { const h = holding.get(`${c.kind}:${p.personId}`); return !h || h === c.id; }) : people;
+                        const fits = pickable.filter((p) => fitsChannel(c, p));
+                        const others = pickable.filter((p) => !fits.includes(p));
                         const person = a && people.find((p) => p.personId === a.personId);
                         const rs = rx ? rxStatus.get(rx.id) : undefined;
                         const live = rs?.ok ? rs.channels.find((x) => x.channel === c.channel) : undefined;
@@ -125,7 +153,7 @@ export function MicPanel({ plan }: { plan: PlanDetail }) {
                               {person ? <Avatar name={person.name} src={person.avatarUrl} size={26} />
                                 : <span className="grid h-[26px] w-[26px] place-items-center rounded-full border border-dashed border-line-strong text-ink-faint"><Icon size={12} /></span>}
                               <select value={a?.personId ?? ""}
-                                onChange={(e) => setup.data && save.mutate(assignChannel(setup.data, assignments, c.id, people.find((p) => p.personId === e.target.value) ?? null))}
+                                onChange={(e) => mine && save.mutate(assignChannel(mine, assignments, c.id, people.find((p) => p.personId === e.target.value) ?? null))}
                                 className="min-w-0 flex-1 truncate rounded-md border border-transparent bg-transparent py-1 text-[13px] text-ink hover:border-line focus:border-accent/60 focus:outline-none">
                                 <option value="">Unassigned</option>
                                 {fits.length > 0 && (
@@ -158,7 +186,7 @@ export function MicPanel({ plan }: { plan: PlanDetail }) {
       )}
 
       {editing && setup.data && (
-        <MicSetupModal setup={setup.data} positions={[...new Set(plan.teams.flatMap((t) => t.positions.map((p) => p.name)))]}
+        <MicSetupModal setup={setup.data} serviceType={{ id: plan.serviceTypeId, name: plan.serviceTypeName }} positions={[...new Set(plan.teams.flatMap((t) => t.positions.map((p) => p.name)))]}
           onClose={() => setEditing(false)} />
       )}
     </section>

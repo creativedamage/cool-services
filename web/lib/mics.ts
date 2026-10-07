@@ -1,4 +1,4 @@
-import type { MicAssignment, MicChannel, MicSetup, ShureModel, TeamMember } from "@shared/types";
+import type { MicAssignment, MicChannel, MicFilter, MicSetup, ShureModel, TeamMember } from "@shared/types";
 
 export const MODEL_LABEL: Record<ShureModel, string> = { ULXD: "ULX-D", QLXD: "QLX-D", SLXD: "SLX-D", AD: "Axient Digital", UHFR: "UHF-R" };
 const norm = (s: string) => s.trim().toLowerCase();
@@ -23,6 +23,21 @@ export function servingPeople(roster: TeamMember[]): Serving[] {
   }
   return [...map.values()];
 }
+
+/** A service type's filter (empty when it has none). */
+export const filterFor = (setup: MicSetup, serviceTypeId: string | null | undefined): MicFilter =>
+  (serviceTypeId && setup.serviceTypes?.[serviceTypeId]) || {};
+
+/** The setup as one service type sees it: each mic's positions from that service type's filter. */
+export function setupFor(setup: MicSetup, serviceTypeId: string | null | undefined): MicSetup {
+  const pos = filterFor(setup, serviceTypeId).positions;
+  if (!pos) return setup;
+  return { ...setup, channels: setup.channels.map((c) => (pos[c.id] ? { ...c, positions: pos[c.id] } : c)) };
+}
+
+/** Hide people who already have a mic of that kind? On unless the service type turned it off. */
+export const hidesAssigned = (setup: MicSetup, serviceTypeId: string | null | undefined) =>
+  filterFor(setup, serviceTypeId).hideAssigned !== false;
 
 export const fitsChannel = (ch: MicChannel, p: Serving) => ch.positions.some((x) => p.positions.some((y) => norm(x) === norm(y)));
 

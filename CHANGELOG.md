@@ -4,6 +4,18 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.30.0
+Each service type can have its own mic assignment filter, and the Dashboard's widgets can be dragged into place.
+- **Mic filter per service type.** In Services → Mics & packs → Set up mics, tick "Use different
+  'For positions' for …" to give that service type its own positions on each mic (Auto-assign and
+  each mic's list use them). Other service types keep the shared ones.
+- **Hide people who already have a mic.** Someone on Vox 1 isn't offered for Vox 2 (they can still
+  get a pack). On by default; switch it per service type with "Hiding assigned" in Mics & packs or
+  in Set up mics.
+- **Drag and drop on the Dashboard.** Click Edit and drag any widget to where you want it; the
+  others move out of the way as you go. There's also a new "Move to the top" button. Press Escape
+  while dragging to put it back.
+
 ## 1.29.0
 Operations now emails the right people when requests come in and change, sent through Sundays or your own email account.
 - **Operations emails.** A new work order or supply request emails the team that handles it (or

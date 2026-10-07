@@ -2,12 +2,12 @@
 /**
  * Dashboard: widgets for running a service. Tuning keys, ProPresenter control, SPL from
  * Smaart, Shure wireless, Planning Center Live, a clock, ProPresenter control, and Resi. Arrange them with
- * Edit; the layout is saved on this Mac.
+ * Edit (drag a widget to move it); the layout is saved on this Mac.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { ArrowLeft, ArrowRight, LayoutDashboard, Pencil, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowLeft, ArrowRight, ArrowUpToLine, GripVertical, LayoutDashboard, Pencil, Plus, Trash2 } from "lucide-react";
+import { type DragEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { DashboardWidget, WidgetType } from "@shared/types";
 import { Api, qk } from "@/lib/api";
@@ -49,6 +49,35 @@ export default function DashboardPage() {
   const update = (next: DashboardWidget[]) => { setWidgets(next); save.mutate(next); };
   const list = widgets ?? [];
   const move = (i: number, d: -1 | 1) => { const n = [...list]; const j = i + d; if (j < 0 || j >= n.length) return; [n[i], n[j]] = [n[j], n[i]]; update(n); };
+  const toTop = (i: number) => { if (i > 0) update([list[i], ...list.filter((_, k) => k !== i)]); };
+
+  // Drag and drop (while editing): the dragged widget moves into place as it passes over the
+  // others, and the new order is saved when it's dropped. Escape / dropping outside puts it back.
+  const [dragId, setDragId] = useState<string | null>(null);
+  const before = useRef<DashboardWidget[] | null>(null);
+  const dropped = useRef(false);
+  const dragOver = (overId: string, e: DragEvent<HTMLElement>) => {
+    if (!dragId || overId === dragId) return;
+    // Over the later half of a widget (below/right of its diagonal) → go after it, else before it.
+    // The pointer stays in the same half once things move, so widgets don't flip back and forth.
+    const r = e.currentTarget.getBoundingClientRect();
+    const after = (e.clientY - r.top) / r.height + (e.clientX - r.left) / r.width > 1;
+    setWidgets((cur) => {
+      if (!cur) return cur;
+      const w = cur.find((x) => x.id === dragId);
+      if (!w) return cur;
+      const n = cur.filter((x) => x.id !== dragId);
+      const at = n.findIndex((x) => x.id === overId);
+      if (at < 0) return cur;
+      n.splice(at + (after ? 1 : 0), 0, w);
+      return n.every((x, i) => x.id === cur[i].id) ? cur : n;
+    });
+  };
+  const dragEnd = () => {
+    if (dropped.current) { if (widgets && before.current && widgets.some((w, i) => w.id !== before.current![i].id)) save.mutate(widgets); }
+    else if (before.current) setWidgets(before.current);
+    before.current = null; dropped.current = false; setDragId(null);
+  };
 
   return (
     <div className="h-full overflow-y-auto">
@@ -61,12 +90,23 @@ export default function DashboardPage() {
           <button className={clsx("btn-ghost py-1 text-xs", editing && "bg-accent-soft text-accent")} onClick={() => setEditing(!editing)}><Pencil size={13} /> {editing ? "Done" : "Edit"}</button>
         </div>
       </header>
-      <div className="grid auto-rows-[minmax(190px,auto)] grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid auto-rows-[minmax(190px,auto)] grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-4"
+        onDragOver={(e) => { if (dragId) e.preventDefault(); }} onDrop={(e) => { if (dragId) { e.preventDefault(); dropped.current = true; } }}>
         {list.map((w, i) => (
-          <div key={w.id} className={clsx("relative", w.size === "m" && "md:col-span-2", w.size === "l" && "md:col-span-2 xl:col-span-4", editing && "rounded-xl ring-1 ring-accent/40")}>
-            <Widget w={w} />
+          <div key={w.id}
+            draggable={editing}
+            onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", w.id); before.current = list; dropped.current = false; setDragId(w.id); }}
+            onDragEnter={(e) => { if (dragId) e.preventDefault(); }}
+            onDragOver={(e) => { if (dragId) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; dragOver(w.id, e); } }}
+            onDragEnd={dragEnd}
+            className={clsx("relative", w.size === "m" && "md:col-span-2", w.size === "l" && "md:col-span-2 xl:col-span-4",
+              editing && "cursor-grab rounded-xl ring-1 ring-accent/40 active:cursor-grabbing", dragId === w.id && "opacity-40 ring-2 ring-accent")}>
+            {/* While editing, the widget itself doesn't take clicks, so grabbing anywhere on it drags it. */}
+            <div className={clsx("h-full", editing && "pointer-events-none select-none")}><Widget w={w} /></div>
             {editing && (
               <div className="absolute right-2 top-1.5 z-10 flex items-center gap-0.5 rounded-lg border border-line bg-surface p-0.5 shadow">
+                <span className="flex items-center gap-0.5 px-1 text-[11px] text-ink-muted" title="Drag the widget to move it"><GripVertical size={12} /> Drag</span>
+                <button className="btn-ghost p-1" title="Move to the top" disabled={i === 0} onClick={() => toTop(i)}><ArrowUpToLine size={12} /></button>
                 <button className="btn-ghost p-1" title="Move earlier" onClick={() => move(i, -1)}><ArrowLeft size={12} /></button>
                 <button className="btn-ghost p-1" title="Move later" onClick={() => move(i, 1)}><ArrowRight size={12} /></button>
                 <select className="rounded bg-transparent px-1 text-[11px] text-ink-muted" value={w.size} onChange={(e) => update(list.map((x) => (x.id === w.id ? { ...x, size: e.target.value as DashboardWidget["size"] } : x)))}>
