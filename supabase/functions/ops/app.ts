@@ -33,6 +33,8 @@ import { applyEvent, createQuote, effectiveTotals, liveTotals, loadQuote, quoteD
 import { BudgetSchema, budgetOf, createJob, jobDetail, jobDocuments, jobFromQuote, jobRows, JobSchema, saveBudget } from "./jobs.ts";
 import { emailProposal, notifyAnswer } from "./avlmail.ts";
 import { activityRows, ActivitySchema, clientActivityWhere, createLead, dueAtDate, ensureClient, followUps, leadDetail, leadGetsJob, leadRows, LeadSchema, moveLead, sourceReport, sourcesInUse } from "./crm.ts";
+import { kitDetail, kitLines, kitRows, KitSchema, laborRates, LaborRatesSchema, markupRules, MarkupRulesSchema, saveKit, saveLaborRates, saveMarkupRules } from "./estimating.ts";
+import { applySelections, optionGroups } from "./lib/estimating.ts";
 import { OPEN_STAGES, stageLabel, type LeadPage, type LeadReport, type LeadsBoard } from "./lib/crm.ts";
 import type { ClientProposalPage, JobPage, JobsList, JobStatus } from "./lib/jobs.ts";
 
@@ -399,7 +401,11 @@ route("GET", "/quotes/:id", async ({ req, params }) => {
     sql`select id, name from ops.campuses where active order by sort_order, name`,
     getAvl(),
   ]);
-  return { quote, customers, vendors, campuses, defaultMarginBps: org.defaultMarginBps, laborRateCents: org.laborRateCents, canApprove: can(u, "QUOTE_APPROVE") };
+  const [rates, rules, kits] = await Promise.all([laborRates(true), markupRules(), kitRows()]);
+  return {
+    quote, customers, vendors, campuses, defaultMarginBps: org.defaultMarginBps, laborRateCents: org.laborRateCents, canApprove: can(u, "QUOTE_APPROVE"),
+    laborRates: rates, markupRules: rules, kits: kits.filter((k) => k.active),
+  };
 });
 
 const cents = z.number().int().min(0).max(1_000_000_000);
@@ -413,6 +419,7 @@ route("PUT", "/quotes/:id", async ({ req, params, body }) => {
       productId: z.string().nullish(), isCustom: z.boolean(), section: z.string().max(80).nullish(), sku: z.string().max(120).nullish(),
       name: z.string().min(1).max(300), description: z.string().max(5000).nullish(), quantity: z.number().int().min(1).max(100_000),
       unitCostCents: cents, unitPriceCents: cents, taxable: z.boolean(),
+      optionGroup: z.string().trim().max(80).nullish(), optionChoice: z.string().trim().max(80).nullish(), selected: z.boolean().optional(), kitName: z.string().max(200).nullish(),
     })).max(500),
   }).parse(await body());
   await saveQuote(params.id, u.id, input);
@@ -559,6 +566,64 @@ route("DELETE", "/jobs/:id", async ({ req, params }) => {
   if (!j) throw new HttpError(404, "Job not found");
   // Its proposal can make a new job again.
   await logActivity({ actorId: u.id, action: "Deleted job", detail: `${j.number} · ${j.name}`, area: "AVL" });
+});
+
+/* ───────────── AVL: estimating (labor rates, markup rules, kits) ───────────── */
+
+route("GET", "/avl/pricing", async ({ req }) => {
+  await avl(req);
+  const [rates, rules, biz, vendors] = await Promise.all([laborRates(), markupRules(), getAvl(), sql`select id, name from ops.vendors where active order by name`]);
+  return { laborRates: rates, markupRules: rules, defaultMarginBps: biz.defaultMarginBps, vendors };
+});
+route("PUT", "/avl/labor-rates", async ({ req, body }) => {
+  const u = await avlManager(req);
+  const { rates } = z.object({ rates: LaborRatesSchema }).parse(await body());
+  const out = await saveLaborRates(rates);
+  await logActivity({ actorId: u.id, action: "Updated labor rates", detail: `${rates.filter((r) => r.active).length} rates`, area: "AVL", href: "/avl/settings/pricing" });
+  return out;
+});
+route("PUT", "/avl/markup-rules", async ({ req, body }) => {
+  const u = await avlManager(req);
+  const { rules } = z.object({ rules: MarkupRulesSchema }).parse(await body());
+  const out = await saveMarkupRules(rules);
+  await logActivity({ actorId: u.id, action: "Updated markup rules", detail: `${rules.length} rules`, area: "AVL", href: "/avl/settings/pricing" });
+  return out;
+});
+
+route("GET", "/kits", async ({ req }) => { await avl(req); return kitRows(); });
+route("GET", "/kits/:id", async ({ req, params }) => {
+  await avl(req);
+  const [kit, rates] = await Promise.all([kitDetail(params.id), laborRates()]);
+  return { kit, laborRates: rates };
+});
+route("GET", "/kits/:id/lines", async ({ req, params }) => { await avl(req); return kitLines(params.id); });
+route("POST", "/kits", async ({ req, body }) => {
+  const u = await avl(req);
+  const input = KitSchema.parse(await body());
+  const kid = await saveKit(null, input, u.id);
+  await logActivity({ actorId: u.id, action: "Created kit", detail: input.name, area: "AVL", entityType: "Kit", entityId: kid, href: `/avl/kits/view?id=${kid}` });
+  return { id: kid };
+});
+route("PUT", "/kits/:id", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const input = KitSchema.parse(await body());
+  await saveKit(params.id, input, u.id);
+  await logActivity({ actorId: u.id, action: "Updated kit", detail: input.name, area: "AVL", entityType: "Kit", entityId: params.id, href: `/avl/kits/view?id=${params.id}` });
+  return kitDetail(params.id);
+});
+route("DELETE", "/kits/:id", async ({ req, params }) => {
+  const u = await avlManager(req);
+  const [k] = await sql`delete from ops.assemblies where id = ${params.id} returning name`;
+  if (!k) throw new HttpError(404, "Kit not found");
+  await logActivity({ actorId: u.id, action: "Deleted kit", detail: k.name, area: "AVL" });
+});
+
+/** What the client saw in an earlier version of a proposal. */
+route("GET", "/quotes/:id/versions/:v", async ({ req, params }) => {
+  await avl(req);
+  const [v] = await sql`select v.*, u.name as sent_by from ops.quote_versions v left join ops.users u on u.id = v.sent_by_id where v.quote_id = ${params.id} and v.version = ${Number(params.v) || 0}`;
+  if (!v) throw new HttpError(404, "That version isn't here.");
+  return { version: v.version, sentAt: new Date(v.sentAt).toISOString(), sentBy: v.sentBy ?? null, totalCents: Number(v.totalCents), quote: v.snapshot };
 });
 
 /* ───────────── AVL: leads (CRM) ───────────── */
@@ -772,15 +837,40 @@ const SignSchema = z.object({
   /** The total the client saw: if the proposal changed since, they have to look again. */
   totalCents: z.number().int(),
   agree: z.literal(true),
+  /** The client's choices on optional add-ons and alternates (group → in/out, or the chosen choice). */
+  selections: z.record(z.string().max(80), z.union([z.boolean(), z.string().max(80)])).default({}),
 });
 const clientIp = (req: Request) => (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim().slice(0, 64) || null;
+
+/**
+ * The client's picks on a sent proposal: which add-ons are in and which alternate in each group.
+ * Prices stay as sent; only what's in the total changes, so the sent totals are worked out again.
+ */
+async function chooseOptions(quoteId: string, selections: Record<string, boolean | string>) {
+  const q = await loadQuote(quoteId);
+  const groups = optionGroups(q.items as { optionGroup?: string | null; optionChoice?: string | null; selected?: boolean }[]);
+  if (!groups.length) return;
+  for (const [g, v] of Object.entries(selections)) {
+    const grp = groups.find((x) => x.group === g);
+    if (!grp) continue;
+    if (grp.kind === "ALTERNATES" ? typeof v !== "string" || !grp.choices.some((c) => c.choice === v) : typeof v !== "boolean") {
+      throw new HttpError(422, `Pick one of the choices for “${g}”.`);
+    }
+  }
+  const items = applySelections(q.items as unknown as (Record<string, unknown> & { id: string; optionGroup?: string | null; optionChoice?: string | null; selected?: boolean })[], selections);
+  for (const i of items) await sql`update ops.quote_items set selected = ${i.selected !== false} where id = ${i.id}`;
+  const t = liveTotals({ ...q, items: items as never });
+  await sql`update ops.quotes set ${sql({ sentSubtotalCents: t.subtotalCents, sentTaxCents: t.taxCents, sentTotalCents: t.totalCents, sentDepositCents: t.depositCents, updatedAt: new Date() })} where id = ${quoteId}`;
+}
 
 route("POST", "/public/proposals/:token/sign", async ({ req, params, body }) => {
   const input = SignSchema.parse(await body());
   return inProposal(params.token, async (id) => {
     const page = await clientProposal(id);
     if (!page.canAnswer) throw new HttpError(409, page.expired ? "This proposal has expired. Ask for a new one." : "This proposal can’t be signed any more.");
-    if (page.quote.totals.totalCents !== input.totalCents) throw new HttpError(409, "The proposal changed while you had it open. Look it over again, then sign.", { status: "changed" });
+    await chooseOptions(id, input.selections);
+    const chosen = await clientProposal(id);
+    if (chosen.quote.totals.totalCents !== input.totalCents) throw new HttpError(409, "The proposal changed while you had it open. Look it over again, then sign.", { status: "changed" });
     await sql`delete from ops.quote_signatures where quote_id = ${id}`;
     await sql`insert into ops.quote_signatures ${sql({
       quoteId: id, signerName: input.name, signerEmail: input.email, signerTitle: input.title, imageDataUrl: input.signature,

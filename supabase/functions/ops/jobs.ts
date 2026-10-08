@@ -106,7 +106,8 @@ export async function jobFromQuote(quoteId: string, userId: string, db: Db = sql
   const rows: Record<string, unknown>[] = [];
   const groups = new Map<string, string>();
   let order = 0;
-  for (const it of q.items as Record<string, any>[]) {
+  // Options the client didn't choose aren't part of the job.
+  for (const it of (q.items as Record<string, any>[]).filter((i) => i.selected !== false)) {
     const section = (it.section as string | null)?.trim() || "General";
     let gid = groups.get(section);
     if (!gid) {

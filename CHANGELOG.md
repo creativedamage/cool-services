@@ -4,6 +4,24 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.36.0
+Sundays AVL estimating: labor rates, markup rules, kits, options the client picks, and proposal versions.
+- **Labor rates.** Set up install, programming, travel and other rates with what each costs you and
+  what you charge (AVL → Labor & markup). Add them to a proposal from the Labor menu.
+- **Markup rules.** Give products a margin by manufacturer, category or vendor. A product added from a
+  price list gets the rule that fits it best, or your default margin; you can try it out on the page.
+- **Kits.** Save the products, labor and custom lines you use together (a stage-left IEM rig, a
+  classroom display) and add them to a proposal in one click, as separate lines or as one line.
+  Kits price themselves from today's price lists, markup rules and labor rates.
+- **Options the client picks.** Mark proposal lines as an optional add-on, or as alternates where the
+  client chooses one (Good / Better / Best). On the proposal link they tick what they want, the total
+  follows, and they sign for exactly that. The job is made from what they chose.
+- **Proposal versions.** Each time a proposal is sent, what the client saw is kept: v1, v2… with the
+  total and date. Open any version from the proposal.
+- **Profit view for jobs.** A job's new Profit tab shows price, cost, profit and margin by cost group
+  and by kind of cost (materials, labor, subcontract).
+- **Kits in job budgets.** Add a kit to a job's budget as its own cost group.
+
 ## 1.35.0
 Sundays AVL gets a leads board, notes and follow-ups on every lead, client and job, and a report on where work comes from.
 - **Leads.** A board of every church you might work with: New, Contacted, Site visit, Proposal

@@ -4,9 +4,14 @@
  * by section, totals and terms. Never cost, margin or internal notes.
  */
 import type { PrintData, PublicQuote } from "@shared/ops/types";
+import { isOption, optionGroups } from "@shared/ops/estimating";
 import { fmtMoney } from "@/lib/ops";
 
-export function ProposalDoc({ data: { quote, org, logo }, signature }: { data: PrintData; signature?: React.ReactNode }) {
+/** On the client's page the options can be chosen; printed, they show what's chosen. */
+export interface Chooser { addOn: (group: string, on: boolean) => void; pick: (group: string, choice: string) => void }
+
+export function ProposalDoc({ data: { quote, org, logo }, signature, chooser }: { data: PrintData; signature?: React.ReactNode; chooser?: Chooser }) {
+  const groups = optionGroups(quote.items);
   const addr = [org.addressLine1, org.addressLine2, [org.city, org.state, org.postalCode].filter(Boolean).join(", ")].filter(Boolean);
   return (
     <article>
@@ -21,7 +26,7 @@ export function ProposalDoc({ data: { quote, org, logo }, signature }: { data: P
         </div>
         <div className="sm:text-right">
           <div className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">Proposal</div>
-          <div className="font-mono text-lg">{quote.number}</div>
+          <div className="font-mono text-lg">{quote.number}{quote.version > 1 && <span className="ml-1 text-sm text-[#94a3b8]">v{quote.version}</span>}</div>
           <div className="mt-2 text-sm text-[#475569]">
             <div>Date: {new Date(quote.sentAt ?? quote.createdAt).toLocaleDateString()}</div>
             {quote.validUntil && <div>Valid until: {new Date(quote.validUntil).toLocaleDateString()}</div>}
@@ -36,7 +41,7 @@ export function ProposalDoc({ data: { quote, org, logo }, signature }: { data: P
       <h1 className="mt-6 text-2xl font-semibold">{quote.title}</h1>
       {quote.introNotes && <p className="mt-2 whitespace-pre-wrap text-[#475569]">{quote.introNotes}</p>}
       <div className="mt-6 space-y-6">
-        {groupBySection(quote.items).map(([section, items]) => (
+        {groupBySection(quote.items.filter((i) => !isOption(i))).map(([section, items]) => (
           <section key={section} className="break-inside-avoid">
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#0b6bcb]">{section}</h2>
             <table className="w-full text-sm">
@@ -55,6 +60,43 @@ export function ProposalDoc({ data: { quote, org, logo }, signature }: { data: P
           </section>
         ))}
       </div>
+      {groups.length > 0 && (
+        <div className="mt-8 space-y-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[#0b6bcb]">Options{chooser ? ": choose what you'd like" : ""}</h2>
+          {groups.map((g) => (
+            <section key={g.group} className="break-inside-avoid rounded-lg border border-[#e2e8f0] p-3">
+              <div className="mb-2 flex items-baseline justify-between gap-3">
+                <div className="font-semibold">{g.group}</div>
+                <div className="text-xs text-[#64748b]">{g.kind === "ADD_ON" ? "Optional" : "Choose one"}</div>
+              </div>
+              <div className="space-y-2">
+                {g.choices.map((c) => {
+                  const amount = c.items.reduce((t, i) => t + i.quantity * i.unitPriceCents, 0);
+                  const control = g.kind === "ADD_ON"
+                    ? <input type="checkbox" className="mt-1 h-4 w-4 accent-[#0f766e]" checked={c.selected} disabled={!chooser} onChange={(e) => chooser?.addOn(g.group, e.target.checked)} />
+                    : <input type="radio" name={`opt-${g.group}`} className="mt-1 h-4 w-4 accent-[#0f766e]" checked={c.selected} disabled={!chooser} onChange={() => chooser?.pick(g.group, c.choice!)} />;
+                  return (
+                    <label key={c.choice ?? "addon"} className={`flex gap-3 rounded-md p-2 ${c.selected ? "bg-[#f0fdfa] ring-1 ring-[#99f6e4]" : "bg-[#f8fafc]"} ${chooser ? "cursor-pointer" : ""}`}>
+                      <span className="no-print">{control}</span>
+                      <span className="print-only w-4 shrink-0 pt-0.5 text-[#0f766e]">{c.selected ? "✓" : ""}</span>
+                      <span className="min-w-0 flex-1">
+                        {c.choice && <span className="block font-medium">{c.choice}</span>}
+                        {c.items.map((i) => (
+                          <span key={i.id} className="block text-sm text-[#334155]">{i.quantity > 1 ? `${i.quantity} × ` : ""}{i.name}{i.description && <span className="block text-xs text-[#64748b]">{i.description}</span>}</span>
+                        ))}
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block tabular-nums">{g.kind === "ADD_ON" ? "+" : ""}{fmtMoney(amount)}</span>
+                        <span className={`block text-[11px] ${c.selected ? "text-[#0f766e]" : "text-[#94a3b8]"}`}>{c.selected ? (g.kind === "ADD_ON" ? "Included" : "Chosen") : "Not included"}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
       <div className="mt-8 flex justify-end">
         <dl className="w-full max-w-xs space-y-1 text-sm">
           <T l="Subtotal" v={fmtMoney(quote.totals.subtotalCents)} />

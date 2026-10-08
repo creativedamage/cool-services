@@ -6,10 +6,13 @@
  */
 import clsx from "clsx";
 import { CheckCircle2, MessageSquareText, PenLine, Printer, XCircle } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { applySelections, optionGroups, selectionsOf, type Selections } from "@shared/ops/estimating";
+import { computeTotals } from "@shared/ops/math";
+import type { PublicQuote } from "@shared/ops/types";
 import type { ClientProposalPage } from "@shared/ops/jobs";
 import { fmtMoney, OpsError, opsPublic } from "@/lib/ops";
-import { ProposalDoc } from "./ProposalDoc";
+import { ProposalDoc, type Chooser } from "./ProposalDoc";
 
 type Load = { page: ClientProposalPage } | { error: string; draft?: boolean } | null;
 const when = (d: string) => new Date(d).toLocaleString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
@@ -17,6 +20,16 @@ const when = (d: string) => new Date(d).toLocaleString("en-US", { month: "long",
 export function ClientProposal({ token }: { token: string }) {
   const [load, setLoad] = useState<Load>(null);
   const [sheet, setSheet] = useState<"sign" | "changes" | "decline" | null>(null);
+  const [sel, setSel] = useState<Selections>({});
+  const pageQuote = load && "page" in load ? load.page.quote : null;
+  useEffect(() => { if (pageQuote) setSel(selectionsOf(pageQuote.items)); }, [pageQuote]);
+  // The client's choices: which options are in, and the total that follows.
+  const shown = useMemo<PublicQuote | null>(() => {
+    if (!pageQuote || !(load && "page" in load && load.page.canAnswer) || !optionGroups(pageQuote.items).length) return pageQuote;
+    const items = applySelections(pageQuote.items, sel);
+    const t = computeTotals(items.map((i) => ({ ...i, unitCostCents: 0 })), pageQuote.pricing);
+    return { ...pageQuote, items, totals: { subtotalCents: t.subtotalCents, discountCents: t.discountCents, taxCents: t.taxCents, totalCents: t.totalCents, depositCents: t.depositCents } };
+  }, [pageQuote, sel, load]);
   const fetchPage = useCallback(async () => {
     if (!token) return setLoad({ error: "This link is missing part of its address. Open it again from the email." });
     try { setLoad({ page: await opsPublic<ClientProposalPage>(`/public/proposals/${encodeURIComponent(token)}`) }); }
@@ -36,7 +49,9 @@ export function ClientProposal({ token }: { token: string }) {
     );
   }
   const p = load.page;
-  const { quote, org } = p;
+  const { org } = p;
+  const quote = shown ?? p.quote;
+  const chooser: Chooser | undefined = p.canAnswer ? { addOn: (g, on) => setSel((x) => ({ ...x, [g]: on })), pick: (g, c) => setSel((x) => ({ ...x, [g]: c })) } : undefined;
   const done = quote.status === "ACCEPTED" || quote.status === "CONVERTED";
   const answered = (page: ClientProposalPage) => { setLoad({ page }); setSheet(null); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
@@ -70,7 +85,7 @@ export function ClientProposal({ token }: { token: string }) {
         </div>
 
         <div className="ops-proposal mt-3 rounded-xl bg-white p-5 text-[#111] shadow-sm ring-1 ring-[#e2e8f0] sm:p-10 print:rounded-none print:p-0 print:shadow-none print:ring-0">
-          <ProposalDoc data={{ quote, org, logo: p.logo }} signature={p.signature ? <SignedBlock p={p} /> : p.canAnswer ? null : undefined} />
+          <ProposalDoc data={{ quote, org, logo: p.logo }} chooser={chooser} signature={p.signature ? <SignedBlock p={p} /> : p.canAnswer ? null : undefined} />
         </div>
       </div>
 
@@ -85,7 +100,7 @@ export function ClientProposal({ token }: { token: string }) {
         </div>
       )}
 
-      {sheet === "sign" && <SignSheet token={token} page={p} onClose={() => setSheet(null)} onDone={answered} onStale={() => { setSheet(null); void fetchPage(); }} />}
+      {sheet === "sign" && <SignSheet token={token} page={p} quote={quote} selections={sel} onClose={() => setSheet(null)} onDone={answered} onStale={() => { setSheet(null); void fetchPage(); }} />}
       {(sheet === "changes" || sheet === "decline") && <AnswerSheet token={token} kind={sheet} page={p} onClose={() => setSheet(null)} onDone={answered} />}
     </Shell>
   );
@@ -137,7 +152,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 const input = "w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2.5 text-[16px] text-[#0f172a] placeholder:text-[#94a3b8] focus:border-[#0f766e] focus:outline-none focus:ring-2 focus:ring-[#0f766e]/20";
 const label = "mb-1 block text-sm font-medium text-[#334155]";
 
-function SignSheet({ token, page, onClose, onDone, onStale }: { token: string; page: ClientProposalPage; onClose: () => void; onDone: (p: ClientProposalPage) => void; onStale: () => void }) {
+function SignSheet({ token, page, quote, selections, onClose, onDone, onStale }: { token: string; page: ClientProposalPage; quote: PublicQuote; selections: Selections; onClose: () => void; onDone: (p: ClientProposalPage) => void; onStale: () => void }) {
   const [name, setName] = useState(page.quote.customer.contactName ?? "");
   const [title, setTitle] = useState("");
   const [email, setEmail] = useState(page.quote.customer.email ?? "");
@@ -147,7 +162,7 @@ function SignSheet({ token, page, onClose, onDone, onStale }: { token: string; p
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pad = useRef<HTMLCanvasElement>(null);
-  const t = page.quote.totals;
+  const t = quote.totals;
 
   useEffect(() => {
     const c = pad.current; if (!c) return;
@@ -180,7 +195,7 @@ function SignSheet({ token, page, onClose, onDone, onStale }: { token: string; p
     setBusy(true);
     try {
       const signature = flatten(pad.current!);
-      onDone(await opsPublic<ClientProposalPage>(`/public/proposals/${encodeURIComponent(token)}/sign`, { name, title, email, signature, totalCents: t.totalCents, agree }));
+      onDone(await opsPublic<ClientProposalPage>(`/public/proposals/${encodeURIComponent(token)}/sign`, { name, title, email, signature, totalCents: t.totalCents, agree, selections }));
     } catch (err) {
       if (err instanceof OpsError && err.body.status === "changed") { onStale(); return; }
       setError((err as Error).message); setBusy(false);

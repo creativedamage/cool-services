@@ -82,6 +82,10 @@ export interface QuoteRow {
 export interface LineItemDraft {
   key: string; productId: string | null; isCustom: boolean; section: string | null; sku: string | null; name: string; description: string | null;
   quantity: number; unitCostCents: number; unitPriceCents: number; taxable: boolean;
+  /** Options (estimating.ts): a group with no choice is an optional add-on; with a choice, an alternate. */
+  optionGroup?: string | null; optionChoice?: string | null; selected?: boolean;
+  /** The kit the line came from, if any (a label for the team). */
+  kitName?: string | null;
 }
 export interface QuoteDTO {
   id: string; number: string; title: string; status: QuoteStatus; customerId: string; campusId: string | null;
@@ -96,15 +100,27 @@ export interface QuoteDTO {
   viewedAt: string | null;
   /** The job made from this proposal, once it's accepted and a job is created. */
   job: { id: string; number: string } | null;
+  /** 1 until it's sent again after a revision. */
+  version: number;
+  versions: import("./estimating").QuoteVersionRow[];
 }
 export interface CustomerOption { id: string; name: string; email: string | null; taxExempt: boolean }
-export interface QuotePage { quote: QuoteDTO; customers: CustomerOption[]; vendors: Ref[]; campuses: Ref[]; defaultMarginBps: number; laborRateCents: number; canApprove: boolean }
+export interface QuotePage {
+  quote: QuoteDTO; customers: CustomerOption[]; vendors: Ref[]; campuses: Ref[]; defaultMarginBps: number; laborRateCents: number; canApprove: boolean;
+  laborRates: import("./estimating").LaborRate[]; markupRules: import("./estimating").MarkupRule[]; kits: import("./estimating").KitRow[];
+}
 
 export interface PublicQuote {
   number: string; title: string; status: QuoteStatus; introNotes: string | null; terms: string | null; validUntil: string | null; sentAt: string | null; createdAt: string;
   customer: { name: string; contactName: string | null; email: string | null };
-  items: { id: string; section: string | null; sku: string | null; name: string; description: string | null; quantity: number; unitPriceCents: number; taxable: boolean }[];
+  items: {
+    id: string; section: string | null; sku: string | null; name: string; description: string | null; quantity: number; unitPriceCents: number; taxable: boolean;
+    optionGroup: string | null; optionChoice: string | null; selected: boolean;
+  }[];
   totals: { subtotalCents: number; discountCents: number; taxCents: number; totalCents: number; depositCents: number };
+  /** What the totals are worked out from, so the client page can show its choices' total. */
+  pricing: { taxBps: number; discountCents: number; depositBps: number; taxExempt: boolean };
+  version: number;
 }
 export interface OrgSettings {
   name: string | null; legalName: string | null; addressLine1: string | null; addressLine2: string | null; city: string | null; state: string | null;

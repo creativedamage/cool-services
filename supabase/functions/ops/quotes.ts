@@ -5,6 +5,7 @@
  */
 import { leadFollowsQuote } from "./crm.ts";
 import { computeTotals } from "./lib/math.ts";
+import { normalizeOptions } from "./lib/estimating.ts";
 import { isEditable, transition, type Actor, type QuoteEventType, type QuoteGuardContext, type QuoteStatus } from "./lib/state-machine.ts";
 import type { PublicQuote, QuoteDTO } from "./lib/types.ts";
 import { getAvl, HttpError, nextNumber, sql, type Tx } from "./db.ts";
@@ -72,6 +73,9 @@ export async function applyEvent(opts: { quoteId: string; event: QuoteEventType;
       case "SEND": {
         const t = liveTotals(q);
         const org = await getAvl(tx);
+        // Each send is a version the client saw: v1, then v2 after a revision…
+        const [{ n }] = await tx`select count(*)::int as n from ops.quote_versions where quote_id = ${q.id}`;
+        data.version = n + 1;
         Object.assign(data, {
           sentAt: now, sentSubtotalCents: t.subtotalCents, sentTaxCents: t.taxCents, sentTotalCents: t.totalCents, sentDepositCents: t.depositCents,
           validUntil: q.validUntil ?? new Date(now.getTime() + org.quoteValidDays * 86_400_000), declinedAt: null,
@@ -90,7 +94,12 @@ export async function applyEvent(opts: { quoteId: string; event: QuoteEventType;
     await tx`update ops.quotes set ${tx(data)} where id = ${q.id}`;
     await tx`insert into ops.quote_events ${tx({ quoteId: q.id, type: opts.event, fromStatus: q.status, toStatus: res.to, actorId: opts.actorId ?? null, actorLabel: opts.actorLabel ?? null, note: opts.note ?? null })}`;
     await leadFollowsQuote(tx, q.id, opts.event, q.number);
-    return loadQuote(q.id, tx);
+    const after = await loadQuote(q.id, tx);
+    if (opts.event === "SEND") {
+      const pub = toPublicQuote(after);
+      await tx`insert into ops.quote_versions ${tx({ quoteId: q.id, version: after.version, sentById: opts.actorId ?? null, totalCents: pub.totals.totalCents, snapshot: tx.json(pub as never) })}`;
+    }
+    return after;
   });
 }
 
@@ -110,6 +119,7 @@ export async function createQuote(input: { title: string; customerId: string; cr
 export interface QuoteItemInput {
   productId?: string | null; isCustom: boolean; section?: string | null; sku?: string | null; name: string; description?: string | null;
   quantity: number; unitCostCents: number; unitPriceCents: number; taxable: boolean;
+  optionGroup?: string | null; optionChoice?: string | null; selected?: boolean; kitName?: string | null;
 }
 
 export async function saveQuote(id: string, actorId: string, input: {
@@ -127,10 +137,11 @@ export async function saveQuote(id: string, actorId: string, input: {
       depositBps: input.depositBps, validUntil: input.validUntil ? new Date(input.validUntil) : null, updatedAt: new Date(),
     })} where id = ${id}`;
     if (input.items.length) {
-      await tx`insert into ops.quote_items ${tx(input.items.map((it, i) => ({
+      await tx`insert into ops.quote_items ${tx(normalizeOptions(input.items).map((it, i) => ({
         quoteId: id, productId: it.isCustom ? null : it.productId ?? null, isCustom: it.isCustom, section: it.section ?? null, sku: it.sku ?? null,
         name: it.name, description: it.description ?? null, quantity: it.quantity, unitCostCents: it.unitCostCents, unitPriceCents: it.unitPriceCents,
-        taxable: it.taxable, sortOrder: i,
+        taxable: it.taxable, sortOrder: i, optionGroup: it.optionGroup ?? null, optionChoice: it.optionChoice ?? null, selected: it.selected ?? true,
+        kitName: it.kitName ?? null,
       })))}`;
     }
     await tx`insert into ops.quote_events ${tx({ quoteId: id, type: "EDIT", actorId })}`;
@@ -140,10 +151,11 @@ export async function saveQuote(id: string, actorId: string, input: {
 
 export async function quoteDTO(id: string): Promise<QuoteDTO> {
   const q = await loadQuote(id);
-  const [events, [job]] = await Promise.all([
+  const [events, [job], versions] = await Promise.all([
     sql`select e.*, a.name as actor_name from ops.quote_events e left join ops.users a on a.id = e.actor_id
       where e.quote_id = ${id} order by e.created_at desc limit 50`,
     sql`select id, number from ops.jobs where quote_id = ${id}`,
+    sql`select v.version, v.sent_at, v.total_cents, u.name as sent_by from ops.quote_versions v left join ops.users u on u.id = v.sent_by_id where v.quote_id = ${id} order by v.version desc`,
   ]);
   return {
     id: q.id, number: q.number, title: q.title, status: q.status, customerId: q.customerId, campusId: q.campusId,
@@ -152,6 +164,7 @@ export async function quoteDTO(id: string): Promise<QuoteDTO> {
     items: q.items.map((i: Record<string, any>) => ({
       key: i.id, productId: i.productId, isCustom: i.isCustom, section: i.section, sku: i.sku, name: i.name, description: i.description,
       quantity: i.quantity, unitCostCents: i.unitCostCents, unitPriceCents: i.unitPriceCents, taxable: i.taxable,
+      optionGroup: i.optionGroup ?? null, optionChoice: i.optionChoice ?? null, selected: i.selected !== false, kitName: i.kitName ?? null,
     })),
     events: events.map((e) => ({ id: e.id, type: e.type, fromStatus: e.fromStatus, toStatus: e.toStatus, actorLabel: e.actorLabel ?? e.actorName ?? null, note: e.note, createdAt: new Date(e.createdAt).toISOString() })),
     signature: q.signature ? {
@@ -162,6 +175,8 @@ export async function quoteDTO(id: string): Promise<QuoteDTO> {
     clientUrl: proposalUrl(q.publicToken),
     viewedAt: q.viewedAt ? new Date(q.viewedAt).toISOString() : null,
     job: job ? { id: job.id, number: job.number } : null,
+    version: q.version ?? 1,
+    versions: versions.map((v) => ({ version: v.version, sentAt: new Date(v.sentAt).toISOString(), sentBy: v.sentBy ?? null, totalCents: Number(v.totalCents) })),
   };
 }
 
@@ -173,7 +188,12 @@ export function toPublicQuote(q: FullQuote): PublicQuote {
     number: q.number, title: q.title, status: q.status, introNotes: q.introNotes, terms: q.terms,
     validUntil: iso(q.validUntil), sentAt: iso(q.sentAt), createdAt: iso(q.createdAt)!,
     customer: { name: q.customer.name, contactName: q.customer.contactName, email: q.customer.email },
-    items: q.items.map((i: Record<string, any>) => ({ id: i.id, section: i.section, sku: i.sku, name: i.name, description: i.description, quantity: i.quantity, unitPriceCents: i.unitPriceCents, taxable: i.taxable })),
+    items: q.items.map((i: Record<string, any>) => ({
+      id: i.id, section: i.section, sku: i.sku, name: i.name, description: i.description, quantity: i.quantity, unitPriceCents: i.unitPriceCents, taxable: i.taxable,
+      optionGroup: i.optionGroup ?? null, optionChoice: i.optionChoice ?? null, selected: i.selected !== false,
+    })),
+    pricing: { taxBps: q.taxBps, discountCents: q.discountCents, depositBps: q.depositBps, taxExempt: !!q.customer?.taxExempt },
+    version: q.version ?? 1,
     totals: { subtotalCents: t.subtotalCents, discountCents: t.discountCents, taxCents: t.taxCents, totalCents: t.totalCents, depositCents: t.depositCents },
   };
 }

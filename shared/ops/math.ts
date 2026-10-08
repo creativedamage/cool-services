@@ -5,6 +5,8 @@ export interface LineInput {
   unitCostCents: number;
   unitPriceCents: number;
   taxable: boolean;
+  /** An option the client hasn't chosen (estimating.ts) isn't in the total. */
+  selected?: boolean;
 }
 
 export interface QuoteTotals {
@@ -43,6 +45,7 @@ export function computeTotals(
   let taxableBase = 0;
   let cost = 0;
   for (const l of lines) {
+    if (l.selected === false) continue;
     const t = lineTotals(l);
     subtotal += t.priceCents;
     cost += t.costCents;

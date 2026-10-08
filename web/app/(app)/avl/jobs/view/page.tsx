@@ -4,8 +4,10 @@
  * items, edited like a spreadsheet) and its documents (the signed proposal it came from).
  */
 import { ActivityFeed } from "@/components/avl/ActivityFeed";
+import { KitPicker } from "@/components/avl/KitPicker";
+import type { KitLine, KitRow } from "@shared/ops/estimating";
 import clsx from "clsx";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronRight, FileSignature, FolderPlus, Pencil, Plus, Printer, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronRight, FileSignature, FolderPlus, Package, Pencil, Plus, Printer, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -13,19 +15,19 @@ import { toast } from "sonner";
 import { budgetRows, budgetTotals, COST_TYPES, itemMoney, JOB_STATUSES, type BudgetItem, type CostType, type JobDetail, type JobPage, type JobStatus } from "@shared/ops/jobs";
 import { priceForMargin } from "@shared/ops/math";
 import { fmtDate, fmtDateTime, fmtMoney, fmtPct, money0, ops, useOps, useOpsMe, useOpsRefresh } from "@/lib/ops";
-import { ErrorBox, Field, JobStatusBadge, Loading, MoneyInput, PercentInput, QuoteStatusBadge } from "@/components/ops/OpsUi";
+import { Card, Empty, ErrorBox, Field, JobStatusBadge, KpiRow, Loading, MoneyInput, PercentInput, QuoteStatusBadge, Table } from "@/components/ops/OpsUi";
 import { Modal, Spinner } from "@/components/ui";
 import type { QuoteStatus } from "@shared/ops/state-machine";
 
 export default function Page() { return <Suspense><JobView /></Suspense>; }
 
-type Tab = "dashboard" | "budget" | "documents";
+type Tab = "dashboard" | "budget" | "profit" | "documents";
 
 function JobView() {
   const sp = useSearchParams();
   const router = useRouter();
   const id = sp.get("id") ?? "";
-  const tab = (["dashboard", "budget", "documents"].includes(sp.get("tab") ?? "") ? sp.get("tab") : "dashboard") as Tab;
+  const tab = (["dashboard", "budget", "profit", "documents"].includes(sp.get("tab") ?? "") ? sp.get("tab") : "dashboard") as Tab;
   const d = useOps<JobPage>(id ? `/jobs/${id}` : null);
   const [editing, setEditing] = useState(false);
   if (!d.data) return <><ErrorBox error={d.error} />{!d.error && <Loading />}</>;
@@ -49,12 +51,13 @@ function JobView() {
         <button className="btn-outline" onClick={() => setEditing(true)}><Pencil size={14} /> Edit job</button>
       </div>
       <div className="flex gap-1 border-b border-line">
-        {([["dashboard", "Dashboard"], ["budget", "Budget"], ["documents", "Documents"]] as const).map(([k, label]) => (
+        {([["dashboard", "Dashboard"], ["budget", "Budget"], ...(church ? [] : [["profit", "Profit"]]), ["documents", "Documents"]] as [Tab, string][]).map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)} className={clsx("-mb-px border-b-2 px-4 py-2.5 text-sm font-semibold transition", tab === k ? "border-accent text-ink" : "border-transparent text-ink-muted hover:text-ink")}>{label}</button>
         ))}
       </div>
       {tab === "dashboard" && <Dashboard page={d.data} church={church} onTab={setTab} />}
       {tab === "budget" && <Budget key={job.id} page={d.data} church={church} onSaved={() => void d.refetch()} />}
+      {tab === "profit" && <Profit page={d.data} />}
       {tab === "documents" && <Documents page={d.data} />}
       {editing && <EditJob page={d.data} church={church} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); void d.refetch(); }} />}
     </div>
@@ -166,6 +169,17 @@ function Budget({ page, church, onSaved }: { page: JobPage; church: boolean; onS
   const [error, setError] = useState<string | null>(null);
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const [focus, setFocus] = useState<string | null>(null);
+  const [kitOpen, setKitOpen] = useState(false);
+  const kits = useOps<KitRow[]>(kitOpen ? "/kits" : null);
+  /** A kit as a cost group of its own: its products as materials, its labor as labor. */
+  const addKit = (kit: KitRow, kl: KitLine[]) => {
+    const gid = uid();
+    const group: BudgetItem = { ...blankItem(null, items.length), id: gid, kind: "GROUP", name: kit.name, costType: "OTHER", quantity: 0, unit: null };
+    const lines: BudgetItem[] = kl.map((l, i) => ({ ...blankItem(gid, items.length + i + 1), name: l.name, description: l.description, costType: l.labor ? "LABOR" : "MATERIAL", quantity: l.quantity,
+      unit: l.labor ? "hr" : "ea", unitCostCents: l.unitCostCents, unitPriceCents: l.unitPriceCents, taxable: l.taxable, productId: l.productId }));
+    change([...items, group, ...lines]);
+    toast.success(`${kit.name} added to the budget`);
+  };
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } };
     window.addEventListener("beforeunload", warn);
@@ -301,6 +315,7 @@ function Budget({ page, church, onSaved }: { page: JobPage; church: boolean; onS
                   <div className="flex gap-2">
                     <button className="btn-primary py-1.5 text-xs" onClick={() => addItem(items.find((x) => x.id === focus && x.kind === "GROUP")?.id ?? [...items].reverse().find((x) => x.kind === "GROUP" && !x.parentId)?.id ?? null)}><Plus size={13} /> Add cost item</button>
                     <button className="btn-outline py-1.5 text-xs" onClick={addGroup}><FolderPlus size={13} /> Add cost group</button>
+                    <button className="btn-outline py-1.5 text-xs" onClick={() => setKitOpen(true)}><Package size={13} /> Add kit</button>
                   </div>
                 </td>
                 <td colSpan={3} />
@@ -318,6 +333,7 @@ function Budget({ page, church, onSaved }: { page: JobPage; church: boolean; onS
           <button className="btn-primary" disabled={saving} onClick={save}>{saving && <Spinner />}Save changes</button>
         </div>
       </div>
+      {kitOpen && kits.data && <KitPicker kits={kits.data.filter((k) => k.active)} allowOne={false} onAdd={(k, l) => addKit(k, l)} onClose={() => setKitOpen(false)} />}
       {!church && <p className="text-[11px] text-ink-faint">Prices here are what was sold (a proposal's prices before tax). Purchase orders, bills and invoices will add committed, actual and invoiced columns to this budget in later updates.</p>}
     </div>
   );
@@ -402,5 +418,52 @@ function EditJob({ page, church, onClose, onSaved }: { page: JobPage; church: bo
         </div>
       </form>
     </Modal>
+  );
+}
+
+/* ───────────── Profit ───────────── */
+
+/** Where the job makes its money: by cost group and by kind of cost. */
+function Profit({ page }: { page: JobPage }) {
+  const { byId, total } = budgetTotals(page.budget);
+  const groups = page.budget.filter((i) => !i.parentId).map((g) => ({ name: g.kind === "GROUP" ? g.name : g.name, m: byId.get(g.id)! })).filter((x) => x.m.priceCents || x.m.costCents);
+  const types = COST_TYPES.map((t) => {
+    let cost = 0, price = 0;
+    for (const i of page.budget) if (i.kind === "ITEM" && i.costType === t.id) { const m = itemMoney(i); cost += m.costCents; price += m.priceCents; }
+    return { name: t.label, m: { costCents: cost, priceCents: price, profitCents: price - cost, marginBps: price > 0 ? Math.round(((price - cost) / price) * 10_000) : 0 } };
+  }).filter((x) => x.m.priceCents || x.m.costCents);
+  const table = (title: string, rows: { name: string; m: { costCents: number; priceCents: number; profitCents: number; marginBps: number } }[], best = Math.max(1, ...rows.map((g) => Math.abs(g.m.profitCents)))) => (
+    <Card eyebrow="Profit" title={title}>
+      <Table min={680} head={<tr><th>{title === "By cost group" ? "Group" : "Kind"}</th><th className="text-right">Price</th><th className="text-right">Cost</th><th className="text-right">Profit</th><th className="text-right">Margin</th><th className="w-40" /></tr>}>
+        {rows.map((r) => (
+          <tr key={r.name}>
+            <td className="font-medium">{r.name}</td>
+            <td className="text-right font-mono">{fmtMoney(r.m.priceCents)}</td>
+            <td className="text-right font-mono text-ink-soft">{fmtMoney(r.m.costCents)}</td>
+            <td className={clsx("text-right font-mono", r.m.profitCents < 0 ? "text-bad" : "text-ok")}>{fmtMoney(r.m.profitCents)}</td>
+            <td className={clsx("text-right tabular-nums", r.m.priceCents > 0 && (r.m.marginBps < 1500 ? "text-bad" : r.m.marginBps < 2500 ? "text-warn" : ""))}>{r.m.priceCents ? fmtPct(r.m.marginBps) : "—"}</td>
+            <td><div className="h-1.5 rounded-full bg-hover"><div className={clsx("h-1.5 rounded-full", r.m.profitCents < 0 ? "bg-bad" : "bg-ok")} style={{ width: `${Math.round((Math.abs(r.m.profitCents) / best) * 100)}%` }} /></div></td>
+          </tr>
+        ))}
+        <tr className="border-t-2 border-line font-semibold">
+          <td>Whole job</td><td className="text-right font-mono">{fmtMoney(total.priceCents)}</td><td className="text-right font-mono">{fmtMoney(total.costCents)}</td>
+          <td className={clsx("text-right font-mono", total.profitCents < 0 ? "text-bad" : "text-ok")}>{fmtMoney(total.profitCents)}</td><td className="text-right">{total.priceCents ? fmtPct(total.marginBps) : "—"}</td><td />
+        </tr>
+      </Table>
+    </Card>
+  );
+  if (!groups.length) return <Card><Empty>Nothing in the budget yet.</Empty></Card>;
+  return (
+    <div className="space-y-5">
+      <KpiRow items={[
+        { value: money0(total.priceCents), label: "Approved price" },
+        { value: money0(total.costCents), label: "Budgeted cost" },
+        { value: money0(total.profitCents), label: "Projected profit", tone: total.profitCents < 0 ? "bad" : "ok" },
+        { value: total.priceCents ? fmtPct(total.marginBps) : "—", label: "Projected margin", tone: total.marginBps < 1500 ? "bad" : total.marginBps < 2500 ? "warn" : "ok" },
+      ]} />
+      {table("By cost group", groups)}
+      {table("By kind of cost", types)}
+      <p className="text-[11px] text-ink-faint">Budgeted figures. Once purchase orders, bills and time come in (purchasing and job costing), actual cost and variance show here too.</p>
+    </div>
   );
 }

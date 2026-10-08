@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
-  ArrowLeft, CreditCard, Gauge, Layers, ShieldHalf, Activity, AudioLines, Boxes, Briefcase, Building, Building2, ClipboardList, FileText, Hammer, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Target, Users, UsersRound, Mail } from "lucide-react";
+  ArrowLeft, CreditCard, Gauge, Layers, ShieldHalf, Activity, AudioLines, Boxes, Briefcase, Building, Building2, ClipboardList, FileText, Hammer, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Target, Package, Percent, Users, UsersRound, Mail } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { OpsMe } from "@shared/ops/types";
@@ -86,6 +86,8 @@ export function AvlNav() {
     ] },
     { title: "Pricing", items: [
       { href: "/avl/catalog", label: "Product pricing", icon: Search },
+      { href: "/avl/kits", label: "Kits", icon: Package },
+      { href: "/avl/pricing", label: "Labor & markup", icon: Percent },
       { href: "/avl/vendors", label: "Vendors", icon: Boxes },
     ] },
     { title: "Settings", items: [
