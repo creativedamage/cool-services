@@ -237,7 +237,7 @@ async function quotesWith(where: unknown, opts: { limit?: number; order?: unknow
   if (!qs.length) return [];
   const ids = qs.map((q) => q.id as string);
   const [items, customers, payments] = await Promise.all([
-    sql`select quote_id, quantity, unit_cost_cents, unit_price_cents, taxable from ops.quote_items where quote_id = any(${ids})`,
+    sql`select quote_id, quantity, unit_cost_cents, unit_price_cents, taxable, selected from ops.quote_items where quote_id = any(${ids})`,
     sql`select * from ops.customers where id = any(${[...new Set(qs.map((q) => q.customerId as string))]})`,
     sql`select quote_id, status, amount_cents from ops.payments where quote_id = any(${ids})`,
   ]);
