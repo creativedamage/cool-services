@@ -9,6 +9,7 @@ import { LogoPicker } from "@/components/ops/LogoPicker";
 import { PlanBilling } from "@/components/ops/PlanBilling";
 import { useModule } from "@/components/ops/context";
 import { OrgEmail } from "@/components/ops/OrgEmail";
+import { OrgCheckin } from "@/components/ops/OrgCheckin";
 
 type Data = { org: OrgSettings; logo: string | null; logoDark: string | null };
 const TEXT: [keyof OrgSettings, string][] = [
@@ -56,6 +57,7 @@ function OrgForm({ data }: { data: Data }) {
           </Card>
         </form>
         <OrgEmail orgName={o.name || "Your church"} />
+        <OrgCheckin />
       </div>
     </>
   );

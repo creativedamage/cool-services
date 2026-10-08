@@ -1,0 +1,17 @@
+{
+  "name": "Sundays Check-ins",
+  "short_name": "Check-ins",
+  "description": "See who’s here on each team and check people in.",
+  "id": "/checkin",
+  "start_url": "/checkin",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0e16",
+  "theme_color": "#0b0e16",
+  "icons": [
+    { "src": "/checkin/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/checkin/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/checkin/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/checkin/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

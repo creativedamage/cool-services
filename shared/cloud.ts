@@ -11,3 +11,5 @@ export const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_gE2iL8LyEZDBV54yKVKlRw_7
 export const SYNC_URL: string = (typeof process !== "undefined" ? process.env?.COOL_SYNC_URL : undefined) ?? SUPABASE_URL;
 /** The Sundays | Operations website (invitations point people here). */
 export const WEBSITE_URL = "https://sundays-ops.vercel.app";
+/** Team check-ins on phones (the same website, its own address: see vercel.json). */
+export const CHECKIN_URL = "https://sundays-checkin.vercel.app";

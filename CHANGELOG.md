@@ -4,6 +4,20 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.32.0
+Team check-ins move to the web: sundays-checkin.vercel.app, where each person signs in with their own Planning Center account.
+- **Check-ins on your phone.** Open sundays-checkin.vercel.app and add it to your home screen; it
+  gets its own app icon. People sign in with their own Planning Center account and only see what
+  Planning Center lets them see. Sundays' own Check-Ins sign-in isn't used.
+- **Check-in access on its own.** In Operations → Settings → Users, each person has a "Team
+  check-ins" level: None, View, Check in or Manage. Someone can get check-ins and nothing else.
+  System admins always manage.
+- **Settings live on the website.** People who manage check-ins pick each service's event, each
+  team's area, and ministries there. Copy your Mac's settings across once from Preferences → Team
+  Check-ins → Copy to the website.
+- The church is linked the first time a System admin signs in to the check-in site; Operations →
+  Settings → Organization shows the link and can disconnect it. Check-ins on the Mac stay for now.
+
 ## 1.31.1
 On Micboard, someone on a vocal mic and a pack shows up once, with both mics named on their tile.
 - **One tile per person on Micboard.** Someone on more than one mic (a vocal and their acoustic

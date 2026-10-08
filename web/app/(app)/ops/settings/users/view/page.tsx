@@ -7,7 +7,9 @@ import { toast } from "sonner";
 import { avlLabel, roleLabel, type AvlLevel, type Role } from "@shared/ops/rbac";
 import type { Ref, UserRow } from "@shared/ops/types";
 import { fmtDateTime, ops, useOps, useOpsRefresh } from "@/lib/ops";
-import { AvlSelect, Card, Check, ErrorBox, Field, Loading, PageHeader, Pill, RolePicker } from "@/components/ops/OpsUi";
+import { AvlSelect, Card, Check, CheckinSelect, ErrorBox, Field, Loading, PageHeader, Pill, RolePicker } from "@/components/ops/OpsUi";
+import { checkinLabel, type CheckinLevel } from "@shared/ops/checkin";
+import { CHECKIN_URL } from "@shared/cloud";
 import { Spinner } from "@/components/ui";
 
 type Data = { user: UserRow; campuses: Ref[]; self: boolean; global: boolean; grantableRoles: Role[]; grantsAvl: boolean; teams: (Ref & { campusName: string | null; manageable: boolean })[] };
@@ -27,7 +29,7 @@ function Form({ data }: { data: Data }) {
   const refresh = useOpsRefresh();
   const [f, setF] = useState({
     name: u.name, email: u.email, title: u.title ?? "", department: u.department ?? "", phone: u.phone ?? "",
-    campusId: u.campusId ?? (data.campuses.length === 1 ? data.campuses[0].id : ""), allCampuses: u.allCampuses, role: u.role as Role, avlLevel: u.avlLevel as AvlLevel, opsAccess: u.pending ? true : u.opsAccess,
+    campusId: u.campusId ?? (data.campuses.length === 1 ? data.campuses[0].id : ""), allCampuses: u.allCampuses, role: u.role as Role, avlLevel: u.avlLevel as AvlLevel, opsAccess: u.pending ? true : u.opsAccess, checkinLevel: (u.checkinLevel ?? "NONE") as CheckinLevel,
     teamIds: u.teams.filter((t) => !t.synced).map((t) => t.id), active: u.pending ? true : u.active,
   });
   const [busy, setBusy] = useState<string | null>(null);
@@ -62,10 +64,13 @@ function Form({ data }: { data: Data }) {
               {data.grantsAvl ? (
                 <Field label="Sundays | AVL"><AvlSelect value={f.avlLevel} onChange={(avlLevel) => setF({ ...f, avlLevel })} /></Field>
               ) : <p className="text-xs text-ink-muted">Sundays | AVL: {u.effectiveAvl === "NONE" ? "no access" : avlLabel(u.effectiveAvl)} <span className="text-ink-faint">(an AVL Manager changes this)</span></p>}
+              <Field label="Team check-ins" hint={u.effectiveRole === "ADMIN" ? "System admins always manage check-ins." : `On phones at ${CHECKIN_URL.replace("https://", "")}, signed in with Planning Center using this email. Turn Operations off above for check-ins only.`}>
+                <CheckinSelect value={u.effectiveRole === "ADMIN" ? "MANAGER" : f.checkinLevel} disabled={self || u.effectiveRole === "ADMIN"} onChange={(checkinLevel) => setF({ ...f, checkinLevel })} />
+              </Field>
             </div>
             <div className="space-y-3">
               {global && multi && !self && <Check label="Global: all campuses" hint="Managers with this act at every campus. Executives and admins always do." checked={f.allCampuses} onChange={(v) => setF({ ...f, allCampuses: v })} />}
-              {!self && !u.pending && <Check label="Active" hint="Inactive people can't sign in to Operations or AVL." checked={f.active} onChange={(v) => setF({ ...f, active: v })} />}
+              {!self && !u.pending && <Check label="Active" hint="Inactive people can't sign in to Operations, AVL or check-ins." checked={f.active} onChange={(v) => setF({ ...f, active: v })} />}
             </div>
             <div className="md:col-span-2"><span className="label mb-1.5 block">Teams</span>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -87,7 +92,7 @@ function Form({ data }: { data: Data }) {
         <aside className="space-y-5">
           <Card eyebrow="Effective access">
             <dl className="divide-y divide-line text-sm">
-              {[["Operations", u.opsAccess || u.effectiveRole === "ADMIN" ? `${roleLabel(u.effectiveRole)}${u.global ? " · all campuses" : ""}` : "No access"], ["AVL", u.effectiveAvl === "NONE" ? "None" : avlLabel(u.effectiveAvl)], ["Account", u.registered ? "Registered" : "Not yet"],
+              {[["Operations", u.opsAccess || u.effectiveRole === "ADMIN" ? `${roleLabel(u.effectiveRole)}${u.global ? " · all campuses" : ""}` : "No access"], ["AVL", u.effectiveAvl === "NONE" ? "None" : avlLabel(u.effectiveAvl)], ["Check-ins", checkinLabel(u.effectiveCheckin ?? "NONE")], ["Account", u.registered ? "Registered" : "Not yet"],
                 ["Last sign-in", u.lastLoginAt ? fmtDateTime(u.lastLoginAt) : "Never"], ["Joined", fmtDateTime(u.createdAt)]].map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-4 px-4 py-2.5"><dt className="text-ink-muted">{k}</dt><dd className="text-right">{v}</dd></div>
               ))}

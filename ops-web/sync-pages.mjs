@@ -37,4 +37,11 @@ for (const app of ["ops", "avl", "admin"]) {
   };
   prune(path.join(site, app));
 }
+// Planning Center's official logo for the sign-in buttons (web/public/brand, see its README).
+const brandFrom = path.join(here, "..", "web", "public", "brand"), brandTo = path.join(here, "public", "brand");
+for (const f of fs.existsSync(brandFrom) ? fs.readdirSync(brandFrom) : []) {
+  if (!/\.(svg|png)$/i.test(f)) continue;
+  fs.mkdirSync(brandTo, { recursive: true });
+  fs.copyFileSync(path.join(brandFrom, f), path.join(brandTo, f));
+}
 console.log(`ops-web: ${wanted.size} screens`);

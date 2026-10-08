@@ -2,6 +2,7 @@
 import type { AvlLevel, Permission, Role } from "./rbac";
 import type { RequestAction, RequestKind, RequestRole, RequestStatus, RequestWorkflow } from "./workflow";
 import type { QuoteStatus } from "./state-machine";
+import type { CheckinLevel } from "./checkin";
 import type { Bill, Interval, ModuleDef, ModuleKey, OrgStatus, OrgType, PlanDef } from "./billing";
 
 export type Priority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
@@ -121,6 +122,8 @@ export interface UserRow {
   id: string; email: string; name: string; title: string | null; department: string | null; phone: string | null;
   active: boolean; pending: boolean; registered: boolean; campusId: string | null; campusName: string | null; allCampuses: boolean;
   role: Role; avlLevel: AvlLevel; opsAccess: boolean; effectiveRole: Role; effectiveAvl: AvlLevel; global: boolean; source: string;
+  /** Team check-ins on the website (none / view / check in / manage); effectiveCheckin includes System admins. */
+  checkinLevel: CheckinLevel; effectiveCheckin: CheckinLevel;
   teams: { id: string; name: string; synced: boolean }[]; lastLoginAt: string | null; createdAt: string; editable: boolean;
 }
 export interface CampusRow {

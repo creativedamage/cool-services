@@ -16,3 +16,6 @@ sundays-signing.*
 
 # Files Claude saves for you in the project folder
 Claude outputs/
+
+# Copied from web/public/brand at build (ops-web/sync-pages.mjs)
+ops-web/public/brand/

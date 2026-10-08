@@ -8,13 +8,15 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { CalendarCheck, MapPin, Save, Wand2 } from "lucide-react";
+import { CalendarCheck, CloudUpload, MapPin, Save, Wand2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { VolunteerCheckInConfig, VolunteerCheckInSetup } from "@shared/types";
 import { Api } from "@/lib/api";
 import { useCampus } from "@/lib/campus";
 import { Spinner } from "@/components/ui";
+import { ops, OpsError } from "@/lib/ops";
+import { CHECKIN_URL } from "@shared/cloud";
 
 const KEY = ["volunteerSetup"];
 const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length > 2).map((w) => w.replace(/s$/, ""));
@@ -99,6 +101,7 @@ export function VolunteerCheckInSettings() {
           </p>
         )}
       </section>
+      <CopyToWebsite />
       {serviceTypes.map((st) => <ServiceTypeCard key={st.id} st={st} events={events} config={draft} onChange={(d) => edit(st.id, d)} />)}
       {!serviceTypes.length && <p className="text-sm text-ink-muted">No service types{campus && !everyCampus ? ` for ${campus.name}` : ""}.</p>}
 
@@ -191,6 +194,44 @@ function ServiceTypeCard({ st, events, config, onChange }: {
           )}
         </>
       )}
+    </section>
+  );
+}
+
+/**
+ * Team check-ins are moving to the website (sundays-checkin.vercel.app). This copies the settings
+ * kept on this Mac (every service type's event and team areas, and the ministries) to it, once.
+ */
+function CopyToWebsite() {
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const copy = async () => {
+    setBusy(true); setDone(null);
+    try {
+      const [all, groups] = await Promise.all([Api.volunteerSetup(), Api.teamGroups()]);
+      const body = { events: all.config.events, teamLocations: all.config.teamLocations, groups: groups.filter((g) => g.name.trim()) };
+      try { await ops("/settings/checkin/import", { method: "PUT", json: body }); }
+      catch (e) {
+        if (!(e instanceof OpsError && e.status === 409)) throw e;
+        if (!window.confirm("The website already has check-in settings. Replace them with this Mac’s?")) return;
+        await ops("/settings/checkin/import", { method: "PUT", json: { ...body, replace: true } });
+      }
+      setDone(`Copied ${Object.keys(body.events).length} service types and ${body.groups.length} ministries.`);
+      toast.success("Copied to the check-in website");
+    } catch (e) {
+      const m = e instanceof OpsError && e.status === 401 ? "Sign in to Sundays | Operations in this app first (the Operations app or the sidebar switcher)." : (e as Error).message;
+      toast.error("Couldn’t copy", { description: m });
+    } finally { setBusy(false); }
+  };
+  return (
+    <section className="panel flex flex-wrap items-center gap-3 p-4 text-sm">
+      <CloudUpload size={16} className="text-accent" />
+      <span className="min-w-0 flex-1 text-ink-soft">
+        Team check-ins on phones now live at <b>{CHECKIN_URL.replace("https://", "")}</b>, where everyone signs in with Planning Center.
+        Copy these settings there so you don’t set them up twice.
+        {done && <span className="mt-1 block text-xs text-ok">{done}</span>}
+      </span>
+      <button className="btn-outline py-1.5 text-xs" disabled={busy} onClick={() => void copy()}>{busy ? <Spinner /> : <CloudUpload size={13} />} Copy to the website</button>
     </section>
   );
 }

@@ -10,10 +10,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
 import { avlLabel, roleLabel, type AvlLevel, type Role } from "@shared/ops/rbac";
+import { checkinLabel, type CheckinLevel } from "@shared/ops/checkin";
+import { CHECKIN_URL } from "@shared/cloud";
 import type { Ref, UserRow } from "@shared/ops/types";
 import { fmtDate, ops, useOps, useOpsRefresh } from "@/lib/ops";
 import { STANDALONE } from "@/lib/ops";
-import { AvlSelect, Card, Check, Empty, ErrorBox, Field, Loading, PageHeader, Pill, RolePicker, Table, Tabs } from "@/components/ops/OpsUi";
+import { AvlSelect, CheckinSelect, Card, Check, Empty, ErrorBox, Field, Loading, PageHeader, Pill, RolePicker, Table, Tabs } from "@/components/ops/OpsUi";
 import { Spinner } from "@/components/ui";
 
 type Data = { users: UserRow[]; campuses: Ref[]; teams: Ref[]; pending: number; global: boolean; grantableRoles: Role[]; myCampusId: string | null; grantsAvl: boolean };
@@ -38,7 +40,7 @@ function Users() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Tabs value={status} onChange={(s) => router.replace(`/ops/settings/users?status=${s}`)} items={[
           { key: "pending", label: "Waiting for approval", count: d.data?.pending ?? null }, { key: "active", label: "Active" }, { key: "inactive", label: "Inactive" },
-          ...(d.data?.global ? [{ key: "avl", label: "AVL only" }] : []),
+          ...(d.data?.global ? [{ key: "avl", label: "Other apps only" }] : []),
         ]} />
         <form className="ml-auto flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); router.replace(`/ops/settings/users?${new URLSearchParams({ status, ...(q ? { q } : {}) })}`); }}>
           <input className="input w-60" placeholder="Search name, email, department…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -56,12 +58,13 @@ function Users() {
       {!d.data ? (!d.error && <Loading />) : (
         <Card>
           {d.data.users.length ? (
-            <Table min={900} head={<tr><th>User</th><th>Role</th><th>AVL</th>{multi && <th>Campus</th>}<th>Teams</th><th>Last sign-in</th><th /></tr>}>
+            <Table min={900} head={<tr><th>User</th><th>Role</th><th>AVL</th><th>Check-ins</th>{multi && <th>Campus</th>}<th>Teams</th><th>Last sign-in</th><th /></tr>}>
               {d.data.users.map((u) => (
                 <tr key={u.id}>
                   <td><div className="font-medium">{u.name}</div><div className="text-[11px] text-ink-faint">{u.email}{u.title && ` · ${u.title}`}</div></td>
                   <td>{u.pending ? <Pill tone="warn">waiting</Pill> : <Pill tone={u.effectiveRole === "STAFF" ? "muted" : u.effectiveRole === "MANAGER" ? "info" : u.effectiveRole === "EXECUTIVE" ? "accent" : "violet"}>{roleLabel(u.effectiveRole)}{u.effectiveRole === "MANAGER" && u.global ? " · global" : ""}</Pill>}</td>
                   <td className="text-xs text-ink-soft">{u.effectiveAvl === "NONE" ? "—" : avlLabel(u.effectiveAvl)}</td>
+                  <td className="text-xs text-ink-soft">{(u.effectiveCheckin ?? "NONE") === "NONE" ? "—" : checkinLabel(u.effectiveCheckin)}</td>
                   {multi && <td className="text-ink-soft">{u.global ? "All campuses" : u.campusName ?? "—"}</td>}
                   <td className="text-xs text-ink-soft">{u.teams.map((t) => t.name).join(", ") || "—"}</td>
                   <td className="text-xs text-ink-faint">{u.registered ? (u.lastLoginAt ? fmtDate(u.lastLoginAt) : "Never") : "Hasn't registered yet"}</td>
@@ -69,7 +72,7 @@ function Users() {
                 </tr>
               ))}
             </Table>
-          ) : <Empty>{status === "pending" ? "Nobody is waiting. New sign-ups show up here." : status === "avl" ? "Nobody uses only AVL." : "No users match."}</Empty>}
+          ) : <Empty>{status === "pending" ? "Nobody is waiting. New sign-ups show up here." : status === "avl" ? "Nobody uses only AVL or check-ins." : "No users match."}</Empty>}
         </Card>
       )}
     </>
@@ -81,7 +84,7 @@ function AddUser({ data, onDone }: { data: Data; onDone: () => void }) {
   const router = useRouter();
   const refresh = useOpsRefresh();
   const me = useOpsUser();
-  const [f, setF] = useState({ name: "", email: "", title: "", department: "", campusId: data.myCampusId ?? data.campuses[0]?.id ?? "", allCampuses: false, role: "STAFF" as Role, avlLevel: "NONE" as AvlLevel, teamIds: [] as string[] });
+  const [f, setF] = useState({ name: "", email: "", title: "", department: "", campusId: data.myCampusId ?? data.campuses[0]?.id ?? "", allCampuses: false, role: "STAFF" as Role, avlLevel: "NONE" as AvlLevel, opsAccess: true, checkinLevel: "NONE" as CheckinLevel, teamIds: [] as string[] });
   const [busy, setBusy] = useState(false);
   return (
     <Card title="Invite someone" eyebrow="They're approved already: when they create their Sundays account with this email, they're straight in." className="mb-5">
@@ -91,7 +94,10 @@ function AddUser({ data, onDone }: { data: Data; onDone: () => void }) {
           const r = await ops<{ id: string }>("/settings/users", { json: { ...f, campusId: f.campusId || null } });
           // A ready-to-send invitation (Sundays doesn't email it for you yet).
           const site = typeof window !== "undefined" && STANDALONE ? window.location.origin : WEBSITE_URL;
-          const text = `${me.org.name ?? "We"} added you to Sundays. Create your account at ${site} using ${f.email.trim()} and you'll be straight in.`;
+          // Check-ins only: no Sundays account needed, they sign in with Planning Center.
+          const text = !f.opsAccess && f.avlLevel === "NONE" && f.checkinLevel !== "NONE"
+            ? `${me.org.name ?? "We"} added you to team check-ins. On your phone, open ${CHECKIN_URL} and sign in with Planning Center (your Planning Center profile needs ${f.email.trim()}). Share → Add to Home Screen keeps it handy.`
+            : `${me.org.name ?? "We"} added you to Sundays. Create your account at ${site} using ${f.email.trim()} and you'll be straight in.`;
           const copied = await navigator.clipboard?.writeText(text).then(() => true, () => false);
           toast.success(copied ? "Added. An invitation is on your clipboard: paste it into an email or text." : `Added. Tell them to create an account at ${site} with ${f.email.trim()}.`, { duration: 8000 });
           await refresh(); onDone(); router.push(`/ops/settings/users/view?id=${r.id}`);
@@ -107,6 +113,8 @@ function AddUser({ data, onDone }: { data: Data; onDone: () => void }) {
           </>
         ) : <Field label="Campus"><input className="input" readOnly value={data.campuses.find((c) => c.id === data.myCampusId)?.name ?? ""} /></Field>}
         {data.grantsAvl && <Field label="AVL access" hint="Separate app; only AVL Managers set this."><AvlSelect value={f.avlLevel} onChange={(avlLevel) => setF({ ...f, avlLevel })} /></Field>}
+        <Field label="Team check-ins" hint="On phones, signed in with Planning Center using this email."><CheckinSelect value={f.checkinLevel} onChange={(checkinLevel) => setF({ ...f, checkinLevel })} /></Field>
+        <div className="flex items-end pb-2"><Check label="Sundays | Operations" hint="Off for someone who only does check-ins." checked={f.opsAccess} onChange={(opsAccess) => setF({ ...f, opsAccess })} /></div>
         <div className="md:col-span-2"><span className="label mb-1.5 block">Role</span><RolePicker allowed={data.grantableRoles} value={f.role} onChange={(role) => setF({ ...f, role })} /></div>
         <div><span className="label mb-1.5 block">Teams</span>
           <div className="max-h-44 space-y-2 overflow-y-auto">{data.teams.map((t) => <Check key={t.id} label={t.name} checked={f.teamIds.includes(t.id)} onChange={(v) => setF({ ...f, teamIds: v ? [...f.teamIds, t.id] : f.teamIds.filter((x) => x !== t.id) })} />)}

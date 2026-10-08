@@ -1,6 +1,7 @@
 "use client";
 /** Sundays | Operations building blocks, in Sundays' look. */
 import clsx from "clsx";
+import { CHECKIN_LEVELS, type CheckinLevel } from "@shared/ops/checkin";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { labelStatus, type RequestStatus } from "@shared/ops/workflow";
@@ -165,6 +166,15 @@ export function RolePicker({ allowed, value, onChange }: { allowed: Role[]; valu
         </label>
       ))}
     </div>
+  );
+}
+
+/** Team check-ins on the website: none / view / check in / manage. */
+export function CheckinSelect({ value, onChange, disabled }: { value: CheckinLevel; onChange: (l: CheckinLevel) => void; disabled?: boolean }) {
+  return (
+    <select className="input" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value as CheckinLevel)}>
+      {CHECKIN_LEVELS.map((l) => <option key={l.key} value={l.key}>{l.label}{l.key !== "NONE" ? ` — ${l.help}` : ""}</option>)}
+    </select>
   );
 }
 

@@ -10,7 +10,8 @@
  *   /ops/me · /ops/overview
  *   /ops/requests… · /ops/work
  *   /ops/avl/overview · /ops/clients… · /ops/quotes… · /ops/catalog · /ops/vendors… · /ops/avl/{people,business}…
- *   /ops/settings/{users,teams,request-types,supply-items,campuses,activity,organization,email}…
+ *   /ops/settings/{users,teams,request-types,supply-items,campuses,activity,organization,email,checkin}…
+ *   /ops/checkin/…  team check-ins on the website, signed in with Planning Center (checkin.ts)
  */
 import { z, ZodError } from "zod";
 import {
@@ -26,6 +27,8 @@ import { account, checkEntry, myOrgs, pickOrg, requireUser, sessionUser, touch, 
 import { addRequestComment, handlesRequests, performRequestAction, requestDetail, requestRows, submitRequest, workQueueWhere } from "./requests.ts";
 import { isEmail, keyUpdate, relayAvailable, render, send, senderFor, type MailChoice } from "./mail.ts";
 import { mailSettings } from "./notify.ts";
+import { ConfigSchema, checkinSettings, handleCheckin, saveCheckinSettings } from "./checkin.ts";
+import { checkinLevelFor, CHECKIN_RANK } from "./lib/checkin.ts";
 import { applyEvent, createQuote, effectiveTotals, liveTotals, loadQuote, quoteDTO, saveQuote, toPublicQuote, type FullQuote } from "./quotes.ts";
 
 type U = OpsSessionUser;
@@ -74,6 +77,7 @@ export async function handle(req: Request): Promise<Response> {
   const url = new URL(req.url);
   // /functions/v1/ops/x, /ops/x → /x
   const path = url.pathname.replace(/^.*?\/ops(?=\/|$)/, "") || "/";
+  if (path.startsWith("/checkin/")) return handleCheckin(req, path, url);
   for (const r of routes) {
     if (r.method !== req.method) continue;
     const m = path.match(r.re);
@@ -780,6 +784,7 @@ const UserSchema = z.object({
   title: optStr(), department: optStr(), phone: optStr(50), campusId: id.nullish().transform((v) => v ?? null),
   allCampuses: z.boolean().default(false), role: z.enum(["STAFF", "MANAGER", "EXECUTIVE", "ADMIN"]).default("STAFF"),
   avlLevel: z.enum(["NONE", "TECH", "MANAGER"]).default("NONE"), opsAccess: z.boolean().default(true),
+  checkinLevel: z.enum(["NONE", "VIEW", "CHECKIN", "MANAGER"]).default("NONE"),
   teamIds: z.array(id).default([]), active: z.boolean().default(true),
 });
 /** Only AVL Managers and admins hand out AVL access; everyone else keeps what's there. */
@@ -804,6 +809,7 @@ async function userRows(me: U, where: unknown): Promise<UserRow[]> {
     return {
       id: u.id, email: u.email, name: u.name, title: u.title, department: u.department, phone: u.phone, active: u.active, pending: u.pending,
       registered: u.registered, campusId: u.campusId, campusName: u.campusName, allCampuses: u.allCampuses, role: u.role, avlLevel: u.avlLevel, opsAccess: u.opsAccess,
+      checkinLevel: u.checkinLevel ?? "NONE", effectiveCheckin: checkinLevelFor(u as never),
       effectiveRole: a.role, effectiveAvl: a.avlLevel, global: a.global, source: u.source, teams: u.teams, lastLoginAt: u.lastLoginAt, createdAt: u.createdAt,
       // A pending sign-up at no campus can be approved by any manager (they choose the campus).
       editable: canEditUser(me, { id: u.id, role: a.role, allCampuses: u.allCampuses, campusId: u.campusId }) || (u.pending && !u.campusId && atLeast(me, "MANAGER")),
@@ -886,6 +892,7 @@ route("PUT", "/settings/users/:id", async ({ req, params, body }) => {
   if (existing.id === actor.id) {
     // Your own role, scope and status are changed by someone else.
     data.role = existing.role; data.allCampuses = existing.allCampuses; data.active = true; data.opsAccess = existing.opsAccess; data.avlLevel = existing.avlLevel;
+    data.checkinLevel = existing.checkinLevel;
   } else {
     const err = checkUserGrant(actor, data);
     if (err) throw new HttpError(403, err);
@@ -1163,6 +1170,49 @@ route("GET", "/settings/activity", async ({ req, url }) => {
 });
 
 /* ───────────── Settings: organization ───────────── */
+
+/* ───────────── Settings: team check-ins (the website at sundays-checkin.vercel.app) ───────────── */
+
+/** Someone who manages check-ins (System admins always do). */
+async function checkinManager(req: Request) {
+  const me = await requireUser(req);
+  const [row] = await sql`select role, synced_role, checkin_level from ops.users where id = ${me.id}`;
+  if (!me.platform && (!row || CHECKIN_RANK[checkinLevelFor(row as never)] < CHECKIN_RANK.MANAGER)) throw new HttpError(403, "Only people who manage check-ins can do that.");
+  return me;
+}
+route("GET", "/settings/checkin", async ({ req }) => {
+  await checkinManager(req);
+  const o = await getOrg();
+  const [cfg, levels] = await Promise.all([
+    checkinSettings(),
+    sql`select role, synced_role, checkin_level from ops.users where active and source <> 'PLATFORM'`,
+  ]);
+  const people: Record<string, number> = {};
+  for (const u of levels) { const l = checkinLevelFor(u as never); people[l] = (people[l] ?? 0) + 1; }
+  return {
+    linked: o.pcoOrgId ? { pcoOrgId: o.pcoOrgId, pcoOrgName: o.pcoOrgName } : null,
+    configured: { events: Object.keys(cfg.events).length, teamLocations: Object.keys(cfg.teamLocations).length, groups: cfg.groups.length },
+    people,
+  };
+});
+/** Disconnect Planning Center: everyone signed in to check-ins is signed out. */
+route("DELETE", "/settings/checkin/link", async ({ req }) => {
+  const me = await admin(req);
+  await raw`update ops.organization set pco_org_id = null, pco_org_name = null, updated_at = now() where id = ${orgId()}`;
+  await raw`delete from ops.checkin_sessions where org_id = ${orgId()}`;
+  await logActivity({ actorId: me.id, action: "Disconnected Planning Center", detail: "Team check-ins", area: "ADMIN", href: "/ops/settings/organization" });
+});
+/** The Mac's check-in settings (Preferences → Team Check-ins and its ministries), copied up once. */
+route("PUT", "/settings/checkin/import", async ({ req, body }) => {
+  const me = await checkinManager(req);
+  const { replace, ...cfg } = ConfigSchema.extend({ replace: z.boolean().default(false) }).parse(await body());
+  const cur = await checkinSettings();
+  const has = Object.keys(cur.events).length + Object.keys(cur.teamLocations).length + cur.groups.length > 0;
+  if (has && !replace) throw new HttpError(409, "The website already has check-in settings.", { status: "exists" });
+  const saved = await saveCheckinSettings(cfg, me.name);
+  await logActivity({ actorId: me.id, action: "Copied check-in settings from the Mac", detail: `${Object.keys(cfg.events).length} service types, ${cfg.groups.length} ministries`, area: "ADMIN" });
+  return saved;
+});
 
 route("GET", "/settings/organization", async ({ req }) => {
   await admin(req);
