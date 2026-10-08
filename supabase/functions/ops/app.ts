@@ -16,7 +16,8 @@
 import { z, ZodError } from "zod";
 import {
   atLeast, can, canAccessCampus, canEditUser, canManageCampus, canViewActivity, checkUserGrant, effectiveAccess, grantableRoles,
-  hasAvlAccess, hasOpsAccess, isAdmin, isAvlManager, isGlobalManager, roleLabel, seesAllCampuses,
+  hasAvlAccess, hasAvlField, hasOpsAccess, isAdmin, isAvlCrew, isAvlManager, isGlobalManager, roleLabel, seesAllCampuses,
+  type AvlLevel,
 } from "./lib/rbac.ts";
 import { OPEN_STATUSES, type RequestKind } from "./lib/workflow.ts";
 import { isDeletable, QUOTE_STATUSES, type QuoteStatus } from "./lib/state-machine.ts";
@@ -37,6 +38,13 @@ import { kitDetail, kitLines, kitRows, KitSchema, laborRates, LaborRatesSchema, 
 import { applySelections, optionGroups } from "./lib/estimating.ts";
 import { OPEN_STAGES, stageLabel, type LeadPage, type LeadReport, type LeadsBoard } from "./lib/crm.ts";
 import type { ClientProposalPage, JobPage, JobsList, JobStatus } from "./lib/jobs.ts";
+import {
+  addTime, assignable, canEditLog, clockIn, ClockInSchema, clockOut, createTask, crewJobsWhere, crewOf, deleteFiles, editableTime, fileRows, finishUpload,
+  jobAccess, jobManage, logRows, LogSchema, phasesOf, PhasesSchema, projectInfo, savePhases, scheduleItems, setCrew, startUpload, strip, TaskSchema,
+  taskRows, tickTask, timeRows, TimeSchema, updateTask, updateTime, UploadSchema,
+} from "./projects.ts";
+import { storageOk } from "./storage.ts";
+import { addDays, toDay, type MyWork, type SchedulePage, type Timesheet } from "./lib/projects.ts";
 
 type U = OpsSessionUser;
 type Ctx = { req: Request; url: URL; params: Record<string, string>; body: () => Promise<any>; acc: Account };
@@ -119,6 +127,15 @@ const avl = async (req: Request, perm?: "QUOTE_APPROVE" | "AVL_PURCHASING") => {
   if (perm && !can(u, perm)) throw new HttpError(403, "An AVL Manager has to do that.");
   return u;
 };
+/** Anyone in Sundays | AVL, AVL Crew included (crew are then limited to their own jobs). */
+const field = async (req: Request) => {
+  const u = await requireUser(req);
+  if (!hasModule("avl")) throw new HttpError(403, "AVL isn't part of this organization's plan.");
+  if (!hasAvlField(u)) throw new HttpError(403, "AVL access required");
+  return u;
+};
+/** A job as crew see it: no money. */
+const noMoney = <T extends { priceCents: number; costCents: number; profitCents: number; marginBps: number }>(j: T): T => ({ ...j, priceCents: 0, costCents: 0, profitCents: 0, marginBps: 0 });
 /** Someone who uses Sundays | Operations. */
 const opsUser = async (req: Request) => {
   const u = await requireUser(req);
@@ -191,7 +208,7 @@ async function meInOrg() {
   const u = await requireUser();
   const org = await brand();
   const ops = hasOpsAccess(u);
-  const avlOn = hasModule("avl") && hasAvlAccess(u);
+  const avlOn = hasModule("avl") && hasAvlField(u);
   const handles = ops && (await handlesRequests(u));
   const [[{ n: queueCount }], [{ n: pendingUsers }], [campus], [{ n: avlPending }], avl] = await Promise.all([
     handles ? sql`select count(*)::int as n from ops.requests r where ${workQueueWhere(u, { openOnly: true })}` : [{ n: 0 }],
@@ -206,7 +223,7 @@ async function meInOrg() {
     status: "ok" as const, user: u, org,
     nav: {
       handlesRequests: handles, queueCount, pendingUsers, manager: ops && atLeast(u, "MANAGER"), admin: isAdmin(u), campusName: campus?.name ?? null,
-      ops, avl: avlOn, avlManager: avlOn && isAvlManager(u), avlPending, avlName: avl?.name ?? null, avlChurch: avl?.businessType === "CHURCH", modules: reqCtx()!.modules, platform: !!u.platform,
+      ops, avl: avlOn, avlManager: avlOn && isAvlManager(u), avlPending, avlName: avl?.name ?? null, avlChurch: avl?.businessType === "CHURCH", avlCrew: avlOn && isAvlCrew(u), modules: reqCtx()!.modules, platform: !!u.platform,
     },
   };
 }
@@ -501,23 +518,24 @@ route("POST", "/customers", async ({ req, body }) => {
 
 const JOB_STATUS_IDS: JobStatus[] = ["PLANNING", "IN_PROGRESS", "ON_HOLD", "COMPLETE", "CANCELLED"];
 route("GET", "/jobs", async ({ req, url }) => {
-  await avl(req);
+  const u = await field(req);
+  const crew = isAvlCrew(u);
   const status = JOB_STATUS_IDS.find((s) => s === url.searchParams.get("status"));
   const open = url.searchParams.get("status") === "open";
   const client = url.searchParams.get("client") || null;
   const q = url.searchParams.get("q")?.trim();
   const like = q ? `%${q}%` : null;
   const [jobs, counts, customers, biz] = await Promise.all([
-    jobRows(sql`true ${status ? sql`and j.status = ${status}` : open ? sql`and j.status in ('PLANNING','IN_PROGRESS','ON_HOLD')` : sql``}
+    jobRows(sql`true ${crew ? sql`and ${crewJobsWhere(u)}` : sql``} ${status ? sql`and j.status = ${status}` : open ? sql`and j.status in ('PLANNING','IN_PROGRESS','ON_HOLD')` : sql``}
       ${client ? sql`and j.customer_id = ${client}` : sql``}
       ${like ? sql`and (j.number ilike ${like} or j.name ilike ${like} or j.site_line1 ilike ${like} or j.site_city ilike ${like} or c.name ilike ${like})` : sql``}`),
-    sql`select status, count(*)::int as n from ops.jobs group by status`,
-    sql`select id, name from ops.customers where active order by name`,
+    sql`select j.status, count(*)::int as n from ops.jobs j ${crew ? sql`where ${crewJobsWhere(u)}` : sql``} group by j.status`,
+    crew ? [] : sql`select id, name from ops.customers where active order by name`,
     getAvl(),
   ]);
   return {
-    jobs, counts: Object.fromEntries(JOB_STATUS_IDS.map((s) => [s, counts.find((c) => c.status === s)?.n ?? 0])) as JobsList["counts"],
-    customers: customers as unknown as JobsList["customers"], businessType: biz.businessType,
+    jobs: crew ? jobs.map(noMoney) : jobs, counts: Object.fromEntries(JOB_STATUS_IDS.map((s) => [s, counts.find((c) => c.status === s)?.n ?? 0])) as JobsList["counts"],
+    customers: customers as unknown as JobsList["customers"], businessType: biz.businessType, crewView: crew,
   } satisfies JobsList;
 });
 
@@ -531,15 +549,19 @@ route("POST", "/jobs", async ({ req, body }) => {
 });
 
 route("GET", "/jobs/:id", async ({ req, params }) => {
-  await avl(req);
+  const u = await field(req);
+  const { crew } = await jobAccess(u, params.id);
   const job = await jobDetail(params.id);
-  const [budget, documents, customers, people, biz] = await Promise.all([
-    budgetOf(job.id), jobDocuments(job),
-    sql`select id, name from ops.customers where active or id = ${job.customerId} order by name`,
-    sql`select id, name from ops.users where active and not pending and source <> 'PLATFORM' and (avl_level <> 'NONE' or role = 'ADMIN' or id = ${job.managerId}) order by name`,
-    getAvl(),
+  const [budget, documents, customers, people, biz, project, everyone] = await Promise.all([
+    crew ? [] : budgetOf(job.id), crew ? [] : jobDocuments(job),
+    crew ? [] : sql`select id, name from ops.customers where active or id = ${job.customerId} order by name`,
+    sql`select id, name from ops.users where active and not pending and source <> 'PLATFORM' and (avl_level not in ('NONE', 'CREW') or role = 'ADMIN' or id = ${job.managerId}) order by name`,
+    getAvl(), projectInfo(job.id, crew), assignable([job.managerId]),
   ]);
-  return { job, budget, documents, customers, people, businessType: biz.businessType, canEdit: true } as unknown as JobPage;
+  return {
+    job: crew ? { ...noMoney(job), notes: job.notes } : job, budget, documents, customers, people, businessType: biz.businessType, canEdit: !crew,
+    project, assignable: everyone, crewView: crew,
+  } as unknown as JobPage;
 });
 
 route("PUT", "/jobs/:id", async ({ req, params, body }) => {
@@ -562,10 +584,270 @@ route("PUT", "/jobs/:id/budget", async ({ req, params, body }) => {
 
 route("DELETE", "/jobs/:id", async ({ req, params }) => {
   const u = await avlManager(req);
+  // Its files go from Storage too (once the job is really gone).
+  await deleteFiles(sql`f.job_id = ${params.id}`);
   const [j] = await sql`delete from ops.jobs where id = ${params.id} returning number, name, quote_id`;
   if (!j) throw new HttpError(404, "Job not found");
   // Its proposal can make a new job again.
   await logActivity({ actorId: u.id, action: "Deleted job", detail: `${j.number} · ${j.name}`, area: "AVL" });
+});
+
+/** Is everything the function needs reachable? (No details, just yes or no.) */
+route("GET", "/public/health", async () => ({ ok: true, storage: await storageOk() }), "public");
+
+/* ───────────── AVL: projects (schedule, crew, tasks, daily logs, files, time) ───────────── */
+
+const jobHref = (id: string, tab?: string) => `/avl/jobs/view?id=${id}${tab ? `&tab=${tab}` : ""}`;
+const dayParam = (v: string | null, fallback: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : fallback);
+
+route("GET", "/jobs/:id/project", async ({ req, params }) => {
+  const u = await field(req);
+  const { crew } = await jobAccess(u, params.id);
+  return projectInfo(params.id, crew);
+});
+
+route("PUT", "/jobs/:id/phases", async ({ req, params, body }) => {
+  const u = await field(req);
+  const { job } = await jobManage(u, params.id);
+  const { phases } = z.object({ phases: PhasesSchema }).parse(await body());
+  const out = await savePhases(params.id, phases);
+  await logActivity({ actorId: u.id, action: "Updated job schedule", detail: `${job.number} · ${job.name}`, area: "AVL", entityType: "Job", entityId: job.id, href: jobHref(job.id, "schedule") });
+  return out;
+});
+
+route("PUT", "/jobs/:id/crew", async ({ req, params, body }) => {
+  const u = await field(req);
+  const { job } = await jobManage(u, params.id);
+  const { userIds } = z.object({ userIds: z.array(z.string().max(60)).max(100) }).parse(await body());
+  const out = await setCrew(params.id, userIds);
+  await logActivity({ actorId: u.id, action: "Changed job crew", detail: `${job.number} · ${out.map((c) => c.name).join(", ") || "nobody"}`, area: "AVL", entityType: "Job", entityId: job.id, href: jobHref(job.id, "schedule") });
+  return out;
+});
+
+/** Move one phase (dragged on the all-jobs calendar). */
+route("PUT", "/phases/:id/dates", async ({ req, params, body }) => {
+  const u = await field(req);
+  const [p] = await sql`select job_id, name from ops.job_phases where id = ${params.id}`;
+  if (!p) throw new HttpError(404, "Phase not found");
+  const { job } = await jobManage(u, p.jobId);
+  const { startDate, endDate } = z.object({ startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })
+    .refine((x) => x.endDate >= x.startDate, "A phase can't end before it starts.").parse(await body());
+  await sql`update ops.job_phases set start_date = ${startDate}, end_date = ${endDate} where id = ${params.id}`;
+  // The job's dates follow its schedule (in SQL: dates never pass through JavaScript time zones).
+  await sql`update ops.jobs j set start_date = s.a, end_date = s.b, updated_at = now()
+    from (select min(start_date) as a, max(coalesce(end_date, start_date)) as b from ops.job_phases where job_id = ${job.id} and start_date is not null) s
+    where j.id = ${job.id}`;
+  await logActivity({ actorId: u.id, action: "Moved a phase", detail: `${job.number} · ${p.name} → ${startDate}`, area: "AVL", entityType: "Job", entityId: job.id, href: jobHref(job.id, "schedule") });
+  return (await phasesOf(job.id)).find((x) => x.id === params.id);
+});
+
+/* Tasks */
+
+route("GET", "/jobs/:id/tasks", async ({ req, params }) => {
+  const u = await field(req);
+  await jobAccess(u, params.id);
+  return taskRows(sql`t.job_id = ${params.id}`);
+});
+route("POST", "/jobs/:id/tasks", async ({ req, params, body }) => {
+  const u = await field(req);
+  const { job } = await jobManage(u, params.id);
+  const t = await createTask(params.id, TaskSchema.parse(await body()), u.id);
+  await logActivity({ actorId: u.id, action: "Added a task", detail: `${job.number} · ${t.title}${t.assignee ? ` → ${t.assignee.name}` : ""}`, area: "AVL", entityType: "Job", entityId: job.id, href: jobHref(job.id, "tasks") });
+  return t;
+});
+async function taskJob(u: U, id: string, manage: boolean) {
+  const [t] = await sql`select job_id, title from ops.job_tasks where id = ${id}`;
+  if (!t) throw new HttpError(404, "Task not found");
+  const a = manage ? await jobManage(u, t.jobId) : await jobAccess(u, t.jobId);
+  return { ...a, title: t.title as string };
+}
+route("PUT", "/tasks/:id", async ({ req, params, body }) => {
+  const u = await field(req);
+  const { job } = await taskJob(u, params.id, true);
+  return updateTask(params.id, job.id, TaskSchema.parse(await body()));
+});
+route("POST", "/tasks/:id/tick", async ({ req, params, body }) => {
+  const u = await field(req);
+  const { job } = await taskJob(u, params.id, false);
+  const p = z.object({ done: z.boolean().optional(), checklist: z.array(z.object({ id: z.string().max(40), done: z.boolean() })).max(100).optional() }).parse(await body());
+  const t = await tickTask(params.id, u.id, p);
+  if (p.done !== undefined) await logActivity({ actorId: u.id, action: p.done ? "Finished a task" : "Reopened a task", detail: `${job.number} · ${t.title}`, area: "AVL", entityType: "Job", entityId: job.id, href: jobHref(job.id, "tasks") });
+  return t;
+});
+route("DELETE", "/tasks/:id", async ({ req, params }) => {
+  const u = await field(req);
+  await taskJob(u, params.id, true);
+  await sql`delete from ops.job_tasks where id = ${params.id}`;
+});
+
+/* Daily logs */
+
+route("GET", "/jobs/:id/logs", async ({ req, params }) => {
+  const u = await field(req);
+  const { crew } = await jobAccess(u, params.id);
+  return logRows(params.id, u, crew);
+});
+route("POST", "/jobs/:id/logs", async ({ req, params, body }) => {
+  const u = await field(req);
+  const { job, crew } = await jobAccess(u, params.id);
+  const input = LogSchema.parse(await body());
+  const [l] = await sql`insert into ops.daily_logs ${sql({ ...input, jobId: job.id, authorId: u.id })} returning id`;
+  await logActivity({ actorId: u.id, action: "Wrote a daily log", detail: `${job.number} · ${input.logDate}`, area: "AVL", entityType: "Job", entityId: job.id, href: jobHref(job.id, "logs") });
+  return (await logRows(job.id, u, crew)).find((x) => x.id === l.id);
+});
+route("PUT", "/logs/:id", async ({ req, params, body }) => {
+  const u = await field(req);
+  const { jobId } = await canEditLog(u, params.id);
+  await sql`update ops.daily_logs set ${sql({ ...LogSchema.parse(await body()), updatedAt: new Date() })} where id = ${params.id}`;
+  return (await logRows(jobId, u, isAvlCrew(u))).find((x) => x.id === params.id);
+});
+route("DELETE", "/logs/:id", async ({ req, params }) => {
+  const u = await field(req);
+  await canEditLog(u, params.id);
+  await deleteFiles(sql`f.daily_log_id = ${params.id}`);
+  await sql`delete from ops.daily_logs where id = ${params.id}`;
+});
+
+/* Files (photos on daily logs are files too) */
+
+route("GET", "/jobs/:id/files", async ({ req, params }) => {
+  const u = await field(req);
+  await jobAccess(u, params.id);
+  return (await fileRows(sql`f.job_id = ${params.id}`)).map(strip);
+});
+route("POST", "/jobs/:id/files", async ({ req, params, body }) => {
+  const u = await field(req);
+  await jobAccess(u, params.id);
+  return startUpload(params.id, UploadSchema.parse(await body()), u.id);
+});
+async function fileAccess(u: U, id: string, change: boolean) {
+  const [f] = await sql`select job_id, uploaded_by_id, name from ops.job_files where id = ${id}`;
+  if (!f) throw new HttpError(404, "File not found");
+  const a = await jobAccess(u, f.jobId);
+  if (change && a.crew && f.uploadedById !== u.id) throw new HttpError(403, "You can change the files you added.");
+  return { ...a, name: f.name as string };
+}
+route("POST", "/files/:id/done", async ({ req, params }) => {
+  const u = await field(req);
+  const { job } = await fileAccess(u, params.id, true);
+  const f = await finishUpload(params.id);
+  if (!f.dailyLogId) await logActivity({ actorId: u.id, action: "Added a file", detail: `${job.number} · ${f.name}`, area: "AVL", entityType: "Job", entityId: job.id, href: jobHref(job.id, "files") });
+  return f;
+});
+route("PUT", "/files/:id", async ({ req, params, body }) => {
+  const u = await field(req);
+  const { crew } = await fileAccess(u, params.id, true);
+  const p = z.object({ name: z.string().trim().min(1).max(200).optional(), folder: z.string().trim().max(80).nullish().transform((v) => (v === undefined ? undefined : v || null)), shared: z.boolean().optional() }).parse(await body());
+  if (p.shared !== undefined && crew) throw new HttpError(403, "Only AVL Techs and Managers can share files with the client.");
+  const patch = Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined));
+  if (Object.keys(patch).length) await sql`update ops.job_files set ${sql(patch)} where id = ${params.id}`;
+  return strip((await fileRows(sql`f.id = ${params.id}`))[0]);
+});
+route("DELETE", "/files/:id", async ({ req, params }) => {
+  const u = await field(req);
+  await fileAccess(u, params.id, true);
+  await deleteFiles(sql`f.id = ${params.id}`);
+});
+
+/* Time */
+
+route("GET", "/jobs/:id/time", async ({ req, params }) => {
+  const u = await field(req);
+  const { crew } = await jobAccess(u, params.id);
+  // Crew see their own time on the job; techs and managers see everyone's.
+  return timeRows(sql`t.job_id = ${params.id} ${crew ? sql`and t.user_id = ${u.id}` : sql``}`, u, !crew);
+});
+route("GET", "/time/clock", async ({ req }) => {
+  const u = await field(req);
+  const [t] = await timeRows(sql`t.user_id = ${u.id} and t.started_at is not null and t.ended_at is null`, u, false, 1);
+  return { clock: t ?? null };
+});
+route("POST", "/time/clock-in", async ({ req, body }) => {
+  const u = await field(req);
+  const id = await clockIn(u, ClockInSchema.parse(await body()));
+  return (await timeRows(sql`t.id = ${id}`, u, false, 1))[0];
+});
+route("POST", "/time/clock-out", async ({ req, body }) => {
+  const u = await field(req);
+  const { note } = z.object({ note: z.string().trim().max(1000).nullish() }).parse(await body());
+  const id = await clockOut(u, note || null);
+  return (await timeRows(sql`t.id = ${id}`, u, false, 1))[0];
+});
+route("POST", "/time", async ({ req, body }) => {
+  const u = await field(req);
+  const id = await addTime(u, TimeSchema.parse(await body()));
+  return (await timeRows(sql`t.id = ${id}`, u, hasAvlAccess(u), 1))[0];
+});
+route("PUT", "/time/:id", async ({ req, params, body }) => {
+  const u = await field(req);
+  await updateTime(u, params.id, TimeSchema.parse(await body()));
+  return (await timeRows(sql`t.id = ${params.id}`, u, hasAvlAccess(u), 1))[0];
+});
+route("DELETE", "/time/:id", async ({ req, params }) => {
+  const u = await field(req);
+  await editableTime(u, params.id);
+  await sql`delete from ops.time_entries where id = ${params.id}`;
+});
+route("POST", "/time/approve", async ({ req, body }) => {
+  const u = await field(req);
+  if (!isAvlManager(u)) throw new HttpError(403, "An AVL Manager approves time.");
+  const { ids, approved } = z.object({ ids: z.array(z.string().max(60)).min(1).max(1000), approved: z.boolean().default(true) }).parse(await body());
+  const rows = approved
+    ? await sql`update ops.time_entries set approved_at = now(), approved_by_id = ${u.id}, updated_at = now() where id = any(${ids}) and approved_at is null and not (started_at is not null and ended_at is null) returning id`
+    : await sql`update ops.time_entries set approved_at = null, approved_by_id = null, updated_at = now() where id = any(${ids}) returning id`;
+  await logActivity({ actorId: u.id, action: approved ? "Approved time" : "Unapproved time", detail: `${rows.length} entr${rows.length === 1 ? "y" : "ies"}`, area: "AVL", href: "/avl/time" });
+  return { changed: rows.length };
+});
+/** A timesheet: your own time (everyone), or everyone's (AVL Managers; `user` narrows it). */
+route("GET", "/time", async ({ req, url }) => {
+  const u = await field(req);
+  const manager = isAvlManager(u);
+  const today = toDay(new Date());
+  const from = dayParam(url.searchParams.get("from"), addDays(today, -13)), to = dayParam(url.searchParams.get("to"), today);
+  const who = manager ? (url.searchParams.get("user") || null) : u.id;
+  const crew = isAvlCrew(u);
+  const [entries, people, jobs] = await Promise.all([
+    timeRows(sql`t.work_date between ${from} and ${to} ${who ? sql`and t.user_id = ${who}` : sql``}`, u, hasAvlAccess(u)),
+    manager ? assignable() : [{ id: u.id, name: u.name }],
+    sql`select j.id, j.number, j.name, coalesce((select json_agg(json_build_object('id', p.id, 'name', p.name) order by p.sort_order) from ops.job_phases p where p.job_id = j.id), '[]') as phases
+      from ops.jobs j where j.status in ('PLANNING','IN_PROGRESS','ON_HOLD') ${crew ? sql`and ${crewJobsWhere(u)}` : sql``} order by j.number desc limit 500`,
+  ]);
+  return { from, to, entries, people: people.map((p) => ({ id: p.id, name: p.name })), jobs: jobs as unknown as Timesheet["jobs"], canApprove: manager, seesCost: hasAvlAccess(u) } satisfies Timesheet;
+});
+
+/* Schedule: every job's phases on one calendar */
+
+route("GET", "/schedule", async ({ req, url }) => {
+  const u = await field(req);
+  const today = toDay(new Date());
+  const from = dayParam(url.searchParams.get("from"), addDays(today, -7)), to = dayParam(url.searchParams.get("to"), addDays(today, 28));
+  if (from > to || addDays(from, 400) < to) throw new HttpError(422, "Pick a range of up to a year.");
+  const crew = isAvlCrew(u);
+  const [items, tasks, people, jobs] = await Promise.all([
+    scheduleItems(u, from, to),
+    taskRows(sql`t.due_date between ${from} and ${to} and t.done_at is null ${crew ? sql`and ${crewJobsWhere(u)}` : sql``}`, 300),
+    assignable(),
+    sql`select j.id, j.number, j.name from ops.jobs j where j.status in ('PLANNING','IN_PROGRESS','ON_HOLD') ${crew ? sql`and ${crewJobsWhere(u)}` : sql``} order by j.number desc limit 300`,
+  ]);
+  return { from, to, items, tasks, people: people.map((p) => ({ id: p.id, name: p.name })), jobs: jobs as unknown as SchedulePage["jobs"], canEdit: !crew } satisfies SchedulePage;
+});
+
+/** Home for anyone in the field: my open tasks, where I'm working today, my clock. */
+route("GET", "/avl/my-work", async ({ req, url }) => {
+  const u = await field(req);
+  const today = dayParam(url.searchParams.get("today"), toDay(new Date()));
+  const monday = addDays(today, -((new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7));
+  const crew = isAvlCrew(u);
+  const [tasks, todayItems, [clock], [{ m }], jobs] = await Promise.all([
+    taskRows(sql`t.assignee_id = ${u.id} and t.done_at is null and j.status not in ('COMPLETE','CANCELLED')`, 50),
+    scheduleItems(u, today, today),
+    timeRows(sql`t.user_id = ${u.id} and t.started_at is not null and t.ended_at is null`, u, false, 1),
+    sql`select coalesce(sum(minutes), 0)::int as m from ops.time_entries where user_id = ${u.id} and work_date >= ${monday} and work_date <= ${today}`,
+    sql`select j.id, j.number, j.name, coalesce((select json_agg(json_build_object('id', p.id, 'name', p.name) order by p.sort_order) from ops.job_phases p where p.job_id = j.id), '[]') as phases from ops.jobs j where j.status in ('PLANNING','IN_PROGRESS','ON_HOLD') ${crew ? sql`and ${crewJobsWhere(u)}` : sql``} order by j.number desc limit 300`,
+  ]);
+  // Today: the phases I'm on.
+  const mine = todayItems.filter((i) => i.phase.people.includes(u.id));
+  return { tasks, today: mine, clock: clock ?? null, weekMinutes: m, jobs: jobs as unknown as MyWork["jobs"] } satisfies MyWork;
 });
 
 /* ───────────── AVL: estimating (labor rates, markup rules, kits) ───────────── */
@@ -1042,11 +1324,11 @@ route("DELETE", "/contacts/:id", async ({ req, params }) => {
 
 route("GET", "/avl/people", async ({ req }) => {
   const me = await avlManager(req);
-  const rows = await sql`select id, name, email, avl_level, synced_avl_level, ops_access, role, pending, active, last_login_at from ops.users
-    where source <> 'PLATFORM' and (pending or avl_level <> 'NONE' or synced_avl_level in ('TECH','MANAGER') or role = 'ADMIN') order by pending desc, name`;
+  const rows = await sql`select id, name, email, avl_level, synced_avl_level, ops_access, role, pending, active, last_login_at, hourly_cost_cents from ops.users
+    where source <> 'PLATFORM' and (pending or avl_level <> 'NONE' or synced_avl_level in ('CREW','TECH','MANAGER') or role = 'ADMIN') order by pending desc, name`;
   const others = await sql`select id, name, email from ops.users where active and not pending and avl_level = 'NONE' and role <> 'ADMIN' and source <> 'PLATFORM' order by name`;
   return {
-    people: rows.map((r) => ({ id: r.id, name: r.name, email: r.email, avlLevel: effectiveAccess(r as never).avlLevel, opsAccess: r.opsAccess, role: r.role, pending: r.pending, active: r.active, lastLoginAt: r.lastLoginAt })),
+    people: rows.map((r) => ({ id: r.id, name: r.name, email: r.email, avlLevel: effectiveAccess(r as never).avlLevel, opsAccess: r.opsAccess, role: r.role, pending: r.pending, active: r.active, lastLoginAt: r.lastLoginAt, hourlyCostCents: r.hourlyCostCents ?? null })),
     others, me: me.id,
   };
 });
@@ -1054,12 +1336,22 @@ route("GET", "/avl/people", async ({ req }) => {
 /** Give someone AVL access (or take it away). Approving a sign-up here makes them AVL-only. */
 route("PUT", "/avl/people/:id", async ({ req, params, body }) => {
   const me = await avlManager(req);
-  const { avlLevel, active } = z.object({ avlLevel: z.enum(["NONE", "TECH", "MANAGER"]), active: z.boolean().optional() }).parse(await body());
+  const { avlLevel, active, hourlyCostCents } = z.object({
+    avlLevel: z.enum(["NONE", "CREW", "TECH", "MANAGER"]).optional(), active: z.boolean().optional(),
+    hourlyCostCents: z.number().int().min(0).max(100_000_000).nullable().optional(),
+  }).parse(await body());
   const [u] = await sql`select * from ops.users where id = ${params.id}`;
   if (!u) throw new HttpError(404, "Person not found");
+  // Just the hourly cost (anyone's, your own included).
+  if (avlLevel === undefined) {
+    if (hourlyCostCents === undefined) throw new HttpError(422, "Nothing to change.");
+    await sql`update ops.users set hourly_cost_cents = ${hourlyCostCents}, updated_at = now() where id = ${u.id}`;
+    await logActivity({ actorId: me.id, area: "AVL", entityType: "User", entityId: u.id, href: "/avl/people", action: "Changed hourly cost", detail: u.name });
+    return;
+  }
   if (u.id === me.id) throw new HttpError(403, "Someone else has to change your own access.");
   if (u.role === "ADMIN" && !isAdmin(me)) throw new HttpError(403, "Only a system admin can change another admin.");
-  const patch: Record<string, unknown> = { avlLevel, updatedAt: new Date() };
+  const patch: Record<string, unknown> = { avlLevel, updatedAt: new Date(), ...(hourlyCostCents !== undefined ? { hourlyCostCents } : {}) };
   if (u.pending) {
     if (active === false) Object.assign(patch, { pending: false, active: false, deactivatedBy: "ADMIN" });
     else Object.assign(patch, { pending: false, active: true, opsAccess: false, approvedBy: me.id, approvedAt: new Date() });
@@ -1240,12 +1532,12 @@ const UserSchema = z.object({
   name: z.string().min(1).max(200), email: z.string().email().transform((e) => e.toLowerCase()),
   title: optStr(), department: optStr(), phone: optStr(50), campusId: id.nullish().transform((v) => v ?? null),
   allCampuses: z.boolean().default(false), role: z.enum(["STAFF", "MANAGER", "EXECUTIVE", "ADMIN"]).default("STAFF"),
-  avlLevel: z.enum(["NONE", "TECH", "MANAGER"]).default("NONE"), opsAccess: z.boolean().default(true),
+  avlLevel: z.enum(["NONE", "CREW", "TECH", "MANAGER"]).default("NONE"), opsAccess: z.boolean().default(true),
   checkinLevel: z.enum(["NONE", "VIEW", "CHECKIN", "MANAGER"]).default("NONE"),
   teamIds: z.array(id).default([]), active: z.boolean().default(true),
 });
 /** Only AVL Managers and admins hand out AVL access; everyone else keeps what's there. */
-const keepAvl = (actor: U, data: { avlLevel: "NONE" | "TECH" | "MANAGER" }, existing: "NONE" | "TECH" | "MANAGER") => {
+const keepAvl = (actor: U, data: { avlLevel: AvlLevel }, existing: AvlLevel) => {
   if (!isAvlManager(actor)) data.avlLevel = existing;
 };
 

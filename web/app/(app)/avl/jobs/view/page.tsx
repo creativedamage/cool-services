@@ -1,7 +1,8 @@
 "use client";
 /**
  * One job: its dashboard (what it's worth and where it stands), its budget (cost groups and cost
- * items, edited like a spreadsheet) and its documents (the signed proposal it came from).
+ * items, edited like a spreadsheet), its schedule, tasks, daily logs, files and time, and its
+ * documents (the signed proposal it came from). AVL Crew see the job without any money.
  */
 import { ActivityFeed } from "@/components/avl/ActivityFeed";
 import { KitPicker } from "@/components/avl/KitPicker";
@@ -18,44 +19,68 @@ import { fmtDate, fmtDateTime, fmtMoney, fmtPct, money0, ops, useOps, useOpsMe, 
 import { Card, Empty, ErrorBox, Field, JobStatusBadge, KpiRow, Loading, MoneyInput, PercentInput, QuoteStatusBadge, Table } from "@/components/ops/OpsUi";
 import { Modal, Spinner } from "@/components/ui";
 import type { QuoteStatus } from "@shared/ops/state-machine";
+import { fmtHours, phaseOn, PHASE_STATUSES, toDay } from "@shared/ops/projects";
+import { JobSchedule } from "@/components/avl/project/JobSchedule";
+import { JobTasks } from "@/components/avl/project/JobTasks";
+import { JobLogs } from "@/components/avl/project/JobLogs";
+import { JobFiles } from "@/components/avl/project/JobFiles";
+import { JobTime } from "@/components/avl/project/Time";
+import { fmtRange, phaseHex } from "@/components/avl/project/Gantt";
+import { Faces } from "@/components/avl/project/bits";
 
 export default function Page() { return <Suspense><JobView /></Suspense>; }
 
-type Tab = "dashboard" | "budget" | "profit" | "documents";
+type Tab = "dashboard" | "budget" | "profit" | "schedule" | "tasks" | "logs" | "files" | "time" | "documents";
+const TABS: Tab[] = ["dashboard", "budget", "profit", "schedule", "tasks", "logs", "files", "time", "documents"];
 
 function JobView() {
   const sp = useSearchParams();
   const router = useRouter();
   const id = sp.get("id") ?? "";
-  const tab = (["dashboard", "budget", "profit", "documents"].includes(sp.get("tab") ?? "") ? sp.get("tab") : "dashboard") as Tab;
+  const want = (TABS.includes(sp.get("tab") as Tab) ? sp.get("tab") : "dashboard") as Tab;
   const d = useOps<JobPage>(id ? `/jobs/${id}` : null);
   const [editing, setEditing] = useState(false);
   if (!d.data) return <><ErrorBox error={d.error} />{!d.error && <Loading />}</>;
-  const { job, businessType } = d.data;
+  const { job, businessType, crewView } = d.data;
   const church = businessType === "CHURCH";
+  const tabs: [Tab, string][] = [
+    ["dashboard", crewView ? "Overview" : "Dashboard"],
+    ...(crewView ? [] : [["budget", "Budget"]] as [Tab, string][]),
+    ...(crewView || church ? [] : [["profit", "Profit"]] as [Tab, string][]),
+    ["schedule", "Schedule"], ["tasks", "Tasks"], ["logs", "Daily logs"], ["files", "Files"], ["time", "Time"],
+    ...(crewView ? [] : [["documents", "Documents"]] as [Tab, string][]),
+  ];
+  const tab = tabs.some(([k]) => k === want) ? want : "dashboard";
   const where = [job.customer?.name, job.siteLine1].filter(Boolean).join(" / ");
   const setTab = (t: Tab) => router.replace(`/avl/jobs/view?id=${id}${t === "dashboard" ? "" : `&tab=${t}`}`);
 
   return (
     <div className="space-y-4">
-      <Link href="/avl/jobs" className="inline-flex items-center gap-1 text-xs text-ink-muted hover:text-ink"><ArrowLeft size={13} /> Jobs</Link>
+      <Link href="/avl/jobs" className="inline-flex items-center gap-1 text-xs text-ink-muted hover:text-ink"><ArrowLeft size={13} /> {crewView ? "My jobs" : "Jobs"}</Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           {where && <div className="truncate text-[12px] font-semibold uppercase tracking-[0.06em] text-accent">{where}</div>}
           <h1 className="mt-0.5 text-2xl font-semibold tracking-tight">{job.name}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
             <span className="font-mono">{job.number}</span><JobStatusBadge status={job.status} />
-            {job.quote && <Link href={`/avl/quotes/view?id=${job.quote.id}`} className="hover:text-accent">from {job.quote.number}</Link>}
+            {job.quote && !crewView && <Link href={`/avl/quotes/view?id=${job.quote.id}`} className="hover:text-accent">from {job.quote.number}</Link>}
           </div>
         </div>
-        <button className="btn-outline" onClick={() => setEditing(true)}><Pencil size={14} /> Edit job</button>
+        {!crewView && <button className="btn-outline" onClick={() => setEditing(true)}><Pencil size={14} /> Edit job</button>}
       </div>
-      <div className="flex gap-1 border-b border-line">
-        {([["dashboard", "Dashboard"], ["budget", "Budget"], ...(church ? [] : [["profit", "Profit"]]), ["documents", "Documents"]] as [Tab, string][]).map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)} className={clsx("-mb-px border-b-2 px-4 py-2.5 text-sm font-semibold transition", tab === k ? "border-accent text-ink" : "border-transparent text-ink-muted hover:text-ink")}>{label}</button>
+      <div className="-mx-1 flex gap-1 overflow-x-auto border-b border-line px-1">
+        {tabs.map(([k, label]) => (
+          <button key={k} ref={k === tab ? (el) => el?.scrollIntoView({ block: "nearest", inline: "nearest" }) : undefined} onClick={() => setTab(k)} className={clsx("-mb-px shrink-0 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-semibold transition", tab === k ? "border-accent text-ink" : "border-transparent text-ink-muted hover:text-ink")}>
+            {label}{k === "tasks" && d.data!.project.openTasks > 0 && <span className="ml-1.5 rounded-full bg-accent-soft px-1.5 text-[10px] tabular-nums text-accent">{d.data!.project.openTasks}</span>}
+          </button>
         ))}
       </div>
-      {tab === "dashboard" && <Dashboard page={d.data} church={church} onTab={setTab} />}
+      {tab === "dashboard" && (crewView ? <CrewOverview page={d.data} onTab={setTab} /> : <Dashboard page={d.data} church={church} onTab={setTab} />)}
+      {tab === "schedule" && <JobSchedule page={d.data} onSaved={() => void d.refetch()} />}
+      {tab === "tasks" && <JobTasks page={d.data} />}
+      {tab === "logs" && <JobLogs page={d.data} />}
+      {tab === "files" && <JobFiles page={d.data} church={church} />}
+      {tab === "time" && <JobTime page={d.data} />}
       {tab === "budget" && <Budget key={job.id} page={d.data} church={church} onSaved={() => void d.refetch()} />}
       {tab === "profit" && <Profit page={d.data} />}
       {tab === "documents" && <Documents page={d.data} />}
@@ -121,12 +146,72 @@ function Dashboard({ page, church, onTab }: { page: JobPage; church: boolean; on
             ) : <p className="mt-2 text-sm text-ink-muted">Accepted without an online signature.</p>}
           </div>
         )}
+        <ScheduleSummary page={page} onTab={onTab} />
         <div className="panel p-4">
           <div className="flex items-center justify-between"><div className="label">Budget by group</div><button className="text-xs text-accent hover:underline" onClick={() => onTab("budget")}>Open the budget →</button></div>
           <GroupBars items={page.budget} church={church} />
         </div>
         {job.notes && <div className="panel whitespace-pre-wrap p-4 text-sm text-ink-soft"><div className="label mb-1">Notes</div>{job.notes}</div>}
         <ActivityFeed target={{ jobId: job.id }} people={page.people} title="Notes & follow-ups" eyebrow="Activity" compact />
+      </div>
+    </div>
+  );
+}
+
+/** Where the job stands on its schedule: the phase it's in, what's next, the crew, tasks and hours. */
+function ScheduleSummary({ page, onTab }: { page: JobPage; onTab: (t: Tab) => void }) {
+  const { phases, crew, openTasks, loggedMinutes } = page.project;
+  const today = toDay(new Date());
+  const now = phases.filter((p) => phaseOn(p, today));
+  const next = phases.filter((p) => p.startDate && p.startDate > today).sort((a, b) => a.startDate!.localeCompare(b.startDate!))[0];
+  const done = phases.filter((p) => p.status === "DONE").length;
+  return (
+    <div className="panel p-4">
+      <div className="flex items-center justify-between"><div className="label">Schedule</div><button className="text-xs text-accent hover:underline" onClick={() => onTab("schedule")}>{phases.length ? "Open the schedule →" : "Plan the schedule →"}</button></div>
+      {phases.length ? (
+        <>
+          <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-hover">
+            {phases.map((p) => <div key={p.id} title={`${p.name}: ${PHASE_STATUSES.find((s) => s.id === p.status)?.label}`} className="h-full border-r border-surface last:border-0" style={{ flex: 1, background: p.status === "NOT_STARTED" ? "transparent" : phaseHex(p.color), opacity: p.status === "IN_PROGRESS" ? 0.55 : 1 }} />)}
+          </div>
+          <div className="mt-1 text-[11px] text-ink-faint">{done} of {phases.length} phase{phases.length === 1 ? "" : "s"} done</div>
+          <ul className="mt-3 space-y-1.5 text-sm">
+            {now.map((p) => <li key={p.id} className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: phaseHex(p.color) }} /><b>{p.name}</b><span className="text-ink-muted">now · {fmtRange(p.startDate, p.endDate)}</span></li>)}
+            {next && <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full border-2" style={{ borderColor: phaseHex(next.color) }} /><span>{next.name}</span><span className="text-ink-muted">next · {fmtRange(next.startDate, next.endDate)}</span></li>}
+            {!now.length && !next && <li className="text-ink-muted">{done === phases.length ? "Every phase is done." : "No phase on today."}</li>}
+          </ul>
+        </>
+      ) : <p className="mt-2 text-sm text-ink-faint">No phases yet.</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-3 text-sm">
+        <span className="flex items-center gap-2"><Faces people={crew} max={5} /></span>
+        <button className="text-ink-soft hover:text-accent" onClick={() => onTab("tasks")}>{openTasks} open task{openTasks === 1 ? "" : "s"}</button>
+        <button className="text-ink-soft hover:text-accent" onClick={() => onTab("time")}>{fmtHours(loggedMinutes)} logged</button>
+      </div>
+    </div>
+  );
+}
+
+/** What crew see first: where and when, what's on now, and the job's notes (no money). */
+function CrewOverview({ page, onTab }: { page: JobPage; onTab: (t: Tab) => void }) {
+  const { job } = page;
+  const facts: [string, React.ReactNode][] = [
+    ["Status", <JobStatusBadge key="s" status={job.status} />],
+    ...(job.customer ? [["Client", job.customer.name] as [string, React.ReactNode]] : []),
+    ["Project manager", job.manager?.name ?? "—"],
+    ["Dates", job.startDate ? fmtRange(job.startDate, job.endDate) : "—"],
+    ["Site", [job.siteLine1, job.siteLine2, [job.siteCity, job.siteState, job.sitePostalCode].filter(Boolean).join(", ")].filter(Boolean).join(", ") || "—"],
+  ];
+  const address = [job.siteLine1, job.siteCity, job.siteState, job.sitePostalCode].filter(Boolean).join(", ");
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+      <div className="space-y-4">
+        <div className="panel divide-y divide-line">
+          {facts.map(([k, v]) => <div key={k} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"><span className="text-ink-muted">{k}</span><span className="text-right">{v}</span></div>)}
+        </div>
+        {address && <a className="btn-outline w-full justify-center" target="_blank" rel="noreferrer" href={`https://maps.google.com/?q=${encodeURIComponent(address)}`}>Directions to the site</a>}
+      </div>
+      <div className="space-y-4">
+        <ScheduleSummary page={page} onTab={onTab} />
+        {job.notes && <div className="panel whitespace-pre-wrap p-4 text-sm text-ink-soft"><div className="label mb-1">Notes</div>{job.notes}</div>}
       </div>
     </div>
   );

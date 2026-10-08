@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
-  ArrowLeft, CreditCard, Gauge, Layers, ShieldHalf, Activity, AudioLines, Boxes, Briefcase, Building, Building2, ClipboardList, FileText, Hammer, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Target, Package, Percent, Users, UsersRound, Mail } from "lucide-react";
+  ArrowLeft, CalendarRange, Clock3, CreditCard, Gauge, Layers, ShieldHalf, Activity, AudioLines, Boxes, Briefcase, Building, Building2, ClipboardList, FileText, Hammer, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Target, Package, Percent, Users, UsersRound, Mail } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { OpsMe } from "@shared/ops/types";
@@ -77,12 +77,21 @@ export function AvlNav() {
   if (!me) return <div className="flex-1" />;
   const n = me.nav;
   if (!n.avl) return <SideNav groups={[]} footer={me.user.name} />;
+  // AVL Crew: just their jobs, the schedule and their time.
+  if (n.avlCrew) return <SideNav footer={`AVL crew · ${me.user.name}`} groups={[{ items: [
+    { href: "/avl", label: "Today", icon: LayoutGrid, exact: true },
+    { href: "/avl/jobs", label: "My jobs", icon: Hammer },
+    { href: "/avl/schedule", label: "Schedule", icon: CalendarRange },
+    { href: "/avl/time", label: "My time", icon: Clock3 },
+  ] }]} />;
   const groups: Group[] = [
     { items: [
       { href: "/avl", label: "Overview", icon: LayoutGrid, exact: true },
       // A church team runs its own projects: no clients or proposals to sell.
       ...(n.avlChurch ? [] : [{ href: "/avl/leads", label: "Leads", icon: Target }, { href: "/avl/clients", label: "Clients", icon: Briefcase }, { href: "/avl/quotes", label: "Quotes", icon: FileText }]),
       { href: "/avl/jobs", label: "Jobs", icon: Hammer },
+      { href: "/avl/schedule", label: "Schedule", icon: CalendarRange },
+      { href: "/avl/time", label: "Time", icon: Clock3 },
     ] },
     { title: "Pricing", items: [
       { href: "/avl/catalog", label: "Product pricing", icon: Search },

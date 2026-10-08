@@ -49,7 +49,7 @@ export const ErrorBox = ({ error }: { error: unknown }) => error ? <p className=
 /** Number tiles across the top of a page. */
 export function KpiRow({ items }: { items: { value: string; label: string; href?: string; tone?: "accent" | "warn" | "ok" | "bad" }[] }) {
   return (
-    <div className={clsx("grid gap-3 sm:grid-cols-2", items.length >= 4 ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
+    <div className={clsx("grid grid-cols-2 gap-3", items.length >= 4 ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
       {items.map((k) => {
         const tone = { accent: "text-accent", warn: "text-warn", ok: "text-ok", bad: "text-bad" }[k.tone ?? "accent"];
         const body = (

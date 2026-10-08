@@ -8,6 +8,7 @@
  */
 
 import type { AvlBusiness, PublicQuote } from "./types.ts";
+import type { ProjectInfo } from "./projects.ts";
 
 export type JobStatus = "PLANNING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETE" | "CANCELLED";
 export const JOB_STATUSES: { id: JobStatus; label: string }[] = [
@@ -126,6 +127,12 @@ export interface JobPage {
   people: { id: string; name: string }[];
   businessType: BusinessType;
   canEdit: boolean;
+  /** Schedule, crew and how the job is going. */
+  project: ProjectInfo;
+  /** Everyone who can be put on the job (crew, techs, managers). */
+  assignable: { id: string; name: string; avlLevel: string }[];
+  /** Seen as AVL Crew: no budget, prices or documents; can't change the job or its schedule. */
+  crewView: boolean;
 }
 
 export interface JobsList {
@@ -133,6 +140,8 @@ export interface JobsList {
   counts: Record<JobStatus, number>;
   customers: { id: string; name: string }[];
   businessType: BusinessType;
+  /** AVL Crew: only their jobs, no money. */
+  crewView: boolean;
 }
 
 /** The page a client opens from the proposal link: what they see and sign (no cost, margin or internal notes). */

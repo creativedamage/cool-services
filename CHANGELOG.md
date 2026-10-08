@@ -4,6 +4,26 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.37.0
+Sundays AVL projects: schedules, crew, tasks, daily logs with photos, job files and time.
+- **Job schedule.** Plan a job in phases (Design, Order, Pre-wire, Install, Commission, Training, or
+  your own) on a Gantt chart: drag a bar to move it, pull its ends to change the dates, and put people
+  on each phase. One click lays out the standard AVL phases on working days.
+- **Schedule for every job.** AVL → Schedule shows every job's phases on one calendar, by job or by
+  person (who is where, which day), two weeks to a quarter at a time. Drag to move a phase there too.
+- **Tasks.** To-dos per job and phase, with who does it, a due date and a checklist. Your open tasks
+  and today's work show on the AVL home screen.
+- **Daily logs.** What got done on site, issues in the way, people and hours, with photos from your
+  phone (big photos are shrunk before they upload).
+- **Job files.** Drawings, rack elevations, signal flow PDFs and closeout documents in folders on each
+  job, up to 100 MB a file. Mark a file to share with the client (the client portal comes with billing).
+- **Time.** Clock in and out on a job (and phase) from your phone, or type hours in after. Each job
+  shows hours against the labor hours in its budget, and labor cost at each person's hourly cost
+  (AVL → People). AVL Managers see everyone's week in AVL → Time and approve it.
+- **AVL Crew.** A new access level for installers: they see only the jobs they're on (schedule, tasks,
+  daily logs, files and their own time) and never prices, budgets or clients' proposals.
+- Job dashboards show where the job stands on its schedule, its crew, open tasks and hours logged.
+
 ## 1.36.0
 Sundays AVL estimating: labor rates, markup rules, kits, options the client picks, and proposal versions.
 - **Labor rates.** Set up install, programming, travel and other rates with what each costs you and

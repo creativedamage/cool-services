@@ -9,8 +9,18 @@ import { ActivityList, Card, Empty, ErrorBox, JobStatusBadge, KpiRow, Loading, P
 import type { JobRow } from "@shared/ops/jobs";
 import type { FollowUps } from "@shared/ops/crm";
 import { FollowUpRow } from "@/components/avl/ActivityFeed";
+import type { MyWork } from "@shared/ops/projects";
+import { fmtHours, toDay } from "@shared/ops/projects";
+import { ClockCard } from "@/components/avl/project/Time";
+import { TaskList } from "@/components/avl/project/JobTasks";
+import { fmtRange, phaseHex } from "@/components/avl/project/Gantt";
 
 export default function AvlHome() {
+  const me = useOpsUser();
+  return me.nav.avlCrew ? <CrewHome /> : <OfficeHome />;
+}
+
+function OfficeHome() {
   const me = useOpsUser();
   const d = useOps<AvlOverview>("/avl/overview", { refetchInterval: 60_000 });
   const first = me.user.name.split(" ")[0];
@@ -59,6 +69,7 @@ export default function AvlHome() {
             </Card>}
             </div>
             <div className="space-y-5">
+              <MyWorkCard />
               <FollowUpsCard f={d.data.followUps} />
               <div className="grid gap-3">
                 {!church && <Quick href="/avl/leads" icon={Target} title="Leads" sub="Every church you might work with" />}
@@ -109,5 +120,76 @@ function FollowUpsCard({ f }: { f: FollowUps }) {
         </div>
       )) : <Empty>Nothing due in the next two weeks. Set follow-ups on a lead, client or job.</Empty>}
     </Card>
+  );
+}
+
+/** My open tasks and where I'm on today (and the clock) — for anyone in the field. */
+function useMyWork() {
+  return useOps<MyWork>(`/avl/my-work?today=${toDay(new Date())}`, { refetchInterval: 60_000 });
+}
+
+function MyWorkCard() {
+  const d = useMyWork();
+  if (!d.data || (!d.data.tasks.length && !d.data.today.length)) return null;
+  return (
+    <Card eyebrow="Your work" title="Today" action={<Link href="/avl/schedule" className="text-xs text-accent hover:underline">Schedule →</Link>}>
+      <TodayList w={d.data} />
+      {d.data.tasks.length > 0 && <TaskList tasks={d.data.tasks} showJob onChanged={() => void d.refetch()} />}
+    </Card>
+  );
+}
+
+function TodayList({ w }: { w: MyWork }) {
+  if (!w.today.length) return null;
+  return (
+    <ul className="divide-y divide-line border-b border-line">
+      {w.today.map((i) => (
+        <li key={i.phase.id}>
+          <Link href={`/avl/jobs/view?id=${i.job.id}`} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-hover/40">
+            <span className="h-8 w-1.5 shrink-0 rounded-full" style={{ background: phaseHex(i.phase.color) }} />
+            <span className="min-w-0 flex-1"><span className="block truncate font-medium">{i.phase.name} · {i.job.name}</span><span className="block truncate text-[11px] text-ink-faint">{[i.job.number, i.job.city, fmtRange(i.phase.startDate, i.phase.endDate)].filter(Boolean).join(" · ")}</span></span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** AVL Crew: the clock, today's site, my tasks, my jobs. */
+function CrewHome() {
+  const me = useOpsUser();
+  const d = useMyWork();
+  const hour = new Date().getHours();
+  const hello = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  return (
+    <>
+      <PageHeader crumb={me.nav.avlName ?? "Sundays | AVL"} title={`${hello}, ${me.user.name.split(" ")[0]}`} description="Where you're working, what's on your list, and your time." />
+      <ErrorBox error={d.error} />
+      {!d.data ? (!d.error && <Loading />) : (
+        <div className="space-y-5">
+          <ClockCard jobs={d.data.jobs} />
+          <KpiRow items={[
+            { value: String(d.data.tasks.length), label: "Tasks on your list" },
+            { value: String(d.data.today.length), label: "Phases you're on today", href: "/avl/schedule" },
+            { value: fmtHours(d.data.weekMinutes), label: "Logged this week", href: "/avl/time" },
+          ]} />
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <Card eyebrow="Tasks" title="Your list">
+              {d.data.tasks.length ? <TaskList tasks={d.data.tasks} showJob onChanged={() => void d.refetch()} /> : <Empty>Nothing on your list.</Empty>}
+            </Card>
+            <div className="space-y-5">
+              <Card eyebrow="Today" title="Where you're working">{d.data.today.length ? <TodayList w={d.data} /> : <Empty>Nothing on the schedule for you today.</Empty>}</Card>
+              <Card eyebrow="Jobs" title="Your jobs" action={<Link href="/avl/jobs" className="text-xs text-accent hover:underline">All →</Link>}>
+                {d.data.jobs.length ? (
+                  <ul className="divide-y divide-line">{d.data.jobs.slice(0, 8).map((j) => (
+                    <li key={j.id}><Link href={`/avl/jobs/view?id=${j.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-hover/40"><Hammer size={14} className="text-ink-faint" /><span className="min-w-0 flex-1 truncate">{j.name}</span><span className="font-mono text-[11px] text-ink-faint">{j.number}</span></Link></li>
+                  ))}</ul>
+                ) : <Empty>You&apos;re not on any open jobs yet.</Empty>}
+              </Card>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

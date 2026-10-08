@@ -36,6 +36,8 @@ export interface OpsNav {
   handlesRequests: boolean; queueCount: number; pendingUsers: number; manager: boolean; admin: boolean; campusName: string | null;
   /** Which apps this person can open. */
   ops: boolean; avl: boolean; avlManager: boolean; avlPending: number; avlName: string | null; avlChurch: boolean;
+  /** AVL Crew: only the jobs they're on, no prices. */
+  avlCrew: boolean;
   /** Modules this organization has. */
   modules: ModuleKey[];
   /** Sundays super admin (acting in this org as admin). */
@@ -183,7 +185,7 @@ export interface ClientDetail {
   taxExempt: boolean; notes: string | null; active: boolean; createdAt: string;
 }
 export interface ClientPage { client: ClientDetail; contacts: ClientContact[]; quotes: QuoteRow[]; totals: { openCents: number; wonCents: number } }
-export interface AvlPerson { id: string; name: string; email: string; avlLevel: AvlLevel; opsAccess: boolean; role: Role; pending: boolean; active: boolean; lastLoginAt: string | null }
+export interface AvlPerson { id: string; name: string; email: string; avlLevel: AvlLevel; opsAccess: boolean; role: Role; pending: boolean; active: boolean; lastLoginAt: string | null; hourlyCostCents: number | null }
 export interface AvlBusiness {
   name: string | null; legalName: string | null; addressLine1: string | null; addressLine2: string | null; city: string | null; state: string | null;
   postalCode: string | null; phone: string | null; email: string | null; website: string | null; ein: string | null; salesTaxId: string | null;

@@ -28,6 +28,7 @@ function Jobs() {
   const params = new URLSearchParams({ ...(show !== "all" ? { status: show } : {}), ...(sp.get("q") ? { q: sp.get("q")! } : {}) });
   const d = useOps<JobsList>(`/jobs?${params}`, { placeholderData: (p) => p });
   const church = d.data?.businessType === "CHURCH";
+  const crew = !!d.data?.crewView;
   const go = (p: Record<string, string>) => {
     const n = new URLSearchParams({ show, q: sp.get("q") ?? "", ...p });
     for (const [k, v] of [...n.entries()]) if (!v || (k === "show" && v === "open")) n.delete(k);
@@ -37,9 +38,9 @@ function Jobs() {
 
   return (
     <>
-      <PageHeader crumb="AVL" title="Jobs"
-        description={church ? "Your team's projects, each with its budget." : "Every project you're running: made from a signed proposal, or started by hand."}
-        actions={<button className="btn-primary" onClick={() => setAdding(true)}><Plus size={15} /> New job</button>} />
+      <PageHeader crumb="AVL" title={crew ? "My jobs" : "Jobs"}
+        description={crew ? "The jobs you're on." : church ? "Your team's projects, each with its budget." : "Every project you're running: made from a signed proposal, or started by hand."}
+        actions={crew ? undefined : <button className="btn-primary" onClick={() => setAdding(true)}><Plus size={15} /> New job</button>} />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-lg border border-line p-0.5">
           {SHOW.map((s) => (
@@ -56,19 +57,19 @@ function Jobs() {
       {!d.data ? (!d.error && <Loading />) : (
         <Card>
           {d.data.jobs.length ? (
-            <Table min={900} head={<tr><th>Job</th>{!church && <th>Client</th>}<th>Status</th><th>Dates</th><th className="text-right">{church ? "Budget" : "Price"}</th><th className="text-right">Cost</th>{!church && <th className="text-right">Margin</th>}</tr>}>
+            <Table min={crew ? 560 : 900} head={<tr><th>Job</th>{!church && <th>Client</th>}<th>Status</th><th>Dates</th>{!crew && <><th className="text-right">{church ? "Budget" : "Price"}</th><th className="text-right">Cost</th>{!church && <th className="text-right">Margin</th>}</>}</tr>}>
               {d.data.jobs.map((j) => (
                 <tr key={j.id} className="cursor-pointer" onClick={() => router.push(`/avl/jobs/view?id=${j.id}`)}>
                   <td>
                     <Link href={`/avl/jobs/view?id=${j.id}`} className="font-medium hover:text-accent" onClick={(e) => e.stopPropagation()}>{j.name}</Link>
-                    <div className="text-[11px] text-ink-faint"><span className="font-mono">{j.number}</span>{j.siteLine1 || j.siteCity ? ` · ${[j.siteLine1, j.siteCity].filter(Boolean).join(", ")}` : ""}{j.quote ? ` · from ${j.quote.number}` : ""}</div>
+                    <div className="text-[11px] text-ink-faint"><span className="font-mono">{j.number}</span>{j.siteLine1 || j.siteCity ? ` · ${[j.siteLine1, j.siteCity].filter(Boolean).join(", ")}` : ""}{j.quote && !crew ? ` · from ${j.quote.number}` : ""}</div>
                   </td>
                   {!church && <td className="text-ink-soft">{j.customer?.name ?? <span className="text-ink-faint">—</span>}</td>}
                   <td><JobStatusBadge status={j.status} /></td>
                   <td className="whitespace-nowrap text-xs text-ink-muted">{j.startDate ? `${fmtDate(j.startDate + "T12:00")}${j.endDate ? ` – ${fmtDate(j.endDate + "T12:00")}` : ""}` : "—"}</td>
-                  <td className="text-right font-mono">{money0(church ? j.costCents : j.priceCents)}</td>
-                  <td className="text-right font-mono text-ink-soft">{church ? "—" : money0(j.costCents)}</td>
-                  {!church && <td className={clsx("text-right font-mono", j.priceCents > 0 && (j.marginBps < 1500 ? "text-bad" : j.marginBps < 2500 ? "text-warn" : "text-ok"))}>{j.priceCents > 0 ? fmtPct(j.marginBps) : "—"}</td>}
+                  {!crew && <td className="text-right font-mono">{money0(church ? j.costCents : j.priceCents)}</td>}
+                  {!crew && <td className="text-right font-mono text-ink-soft">{church ? "—" : money0(j.costCents)}</td>}
+                  {!church && !crew && <td className={clsx("text-right font-mono", j.priceCents > 0 && (j.marginBps < 1500 ? "text-bad" : j.marginBps < 2500 ? "text-warn" : "text-ok"))}>{j.priceCents > 0 ? fmtPct(j.marginBps) : "—"}</td>}
                 </tr>
               ))}
             </Table>

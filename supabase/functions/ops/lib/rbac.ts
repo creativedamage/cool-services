@@ -4,7 +4,8 @@
  * ────────────
  * Two apps on one sign-in:
  *  Operations  (church business) — `opsAccess`, then the main role STAFF < MANAGER < EXECUTIVE, plus ADMIN.
- *  AVL         (quoting other churches) — avlLevel NONE | TECH | MANAGER, independent of Operations.
+ *  AVL         (quoting other churches) — avlLevel NONE | CREW | TECH | MANAGER, independent of Operations.
+ *              Crew see only the jobs they're on (schedule, tasks, logs, files, time), never prices.
  * System admins can open both.
  * Scope:      campus (home campus only) or global (`allCampuses`). Executives/Admins are always global.
  *
@@ -17,13 +18,13 @@
  * Pure module — shared by the ops Edge Function (the guards) and Sundays' screens.
  */
 export type Role = "STAFF" | "MANAGER" | "EXECUTIVE" | "ADMIN";
-export type AvlLevel = "NONE" | "TECH" | "MANAGER";
+export type AvlLevel = "NONE" | "CREW" | "TECH" | "MANAGER";
 
 /** Derived capabilities (kept as flags so feature code can ask simple questions). */
-export type Permission = "AVL_ACCESS" | "AVL_PURCHASING" | "QUOTE_APPROVE" | "REQUEST_APPROVE" | "MANAGE_USERS" | "ORG_ADMIN";
+export type Permission = "AVL_FIELD" | "AVL_ACCESS" | "AVL_PURCHASING" | "QUOTE_APPROVE" | "REQUEST_APPROVE" | "MANAGE_USERS" | "ORG_ADMIN";
 
 export const ROLE_RANK: Record<Role, number> = { STAFF: 0, MANAGER: 1, EXECUTIVE: 2, ADMIN: 3 };
-export const AVL_RANK: Record<AvlLevel, number> = { NONE: 0, TECH: 1, MANAGER: 2 };
+export const AVL_RANK: Record<AvlLevel, number> = { NONE: 0, CREW: 1, TECH: 2, MANAGER: 3 };
 
 export const ROLES: { key: Role; label: string; help: string }[] = [
   { key: "STAFF", label: "Staff", help: "Make and track their own requests" },
@@ -33,6 +34,7 @@ export const ROLES: { key: Role; label: string; help: string }[] = [
 ];
 export const AVL_LEVELS: { key: AvlLevel; label: string; help: string }[] = [
   { key: "NONE", label: "None", help: "No AVL access" },
+  { key: "CREW", label: "AVL Crew", help: "Only the jobs they're on: schedule, tasks, daily logs, files and their time. No prices" },
   { key: "TECH", label: "AVL Tech", help: "Clients, quotes, product pricing, vendors" },
   { key: "MANAGER", label: "AVL Manager", help: "AVL Tech + approving quotes, AVL people and business settings" },
 ];
@@ -52,8 +54,9 @@ export function effectiveAccess(u: { role: Role; avlLevel: AvlLevel; syncedRole?
 export function capabilities(role: Role, avl: AvlLevel): Permission[] {
   const r = ROLE_RANK[role];
   const caps = new Set<Permission>();
-  if (AVL_RANK[avl] >= 1 || role === "ADMIN") caps.add("AVL_ACCESS");
-  if (AVL_RANK[avl] >= 2 || role === "ADMIN") {
+  if (AVL_RANK[avl] >= 1 || role === "ADMIN") caps.add("AVL_FIELD");
+  if (AVL_RANK[avl] >= 2 || role === "ADMIN") caps.add("AVL_ACCESS");
+  if (AVL_RANK[avl] >= 3 || role === "ADMIN") {
     caps.add("AVL_PURCHASING");
     caps.add("QUOTE_APPROVE");
   }
@@ -88,6 +91,10 @@ export const can = (u: U, p: Permission) => !!u && (u.permissions.includes(p) ||
 export const isAdmin = (u: U) => !!u && u.role === "ADMIN";
 export const atLeast = (u: U, r: Role) => !!u && ROLE_RANK[u.role] >= ROLE_RANK[r];
 export const hasAvlAccess = (u: U) => can(u, "AVL_ACCESS");
+/** Opens Sundays | AVL at all (crew included). */
+export const hasAvlField = (u: U) => can(u, "AVL_FIELD");
+/** AVL Crew: only their own jobs, no prices. */
+export const isAvlCrew = (u: U) => hasAvlField(u) && !hasAvlAccess(u);
 export const hasOpsAccess = (u: U) => !!u && (u.opsAccess || u.role === "ADMIN");
 /** AVL Managers and admins: approve quotes, manage AVL people and AVL's business settings. */
 export const isAvlManager = (u: U) => can(u, "QUOTE_APPROVE");

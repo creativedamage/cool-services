@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { AVL_LEVELS, type AvlLevel } from "@shared/ops/rbac";
 import type { AvlPerson } from "@shared/ops/types";
 import { fmtDate, ops, useOps, useOpsRefresh } from "@/lib/ops";
-import { Card, Empty, ErrorBox, Loading, PageHeader, Pill } from "@/components/ops/OpsUi";
+import { Card, Empty, ErrorBox, Loading, MoneyInput, PageHeader, Pill } from "@/components/ops/OpsUi";
 
 type Data = { people: AvlPerson[]; others: { id: string; name: string; email: string }[]; me: string };
 const LEVELS = AVL_LEVELS.filter((l) => l.key !== "NONE");
@@ -45,6 +45,7 @@ export default function People() {
                     <div className="flex items-center gap-2 text-sm font-medium">{p.name}{p.role === "ADMIN" && <Pill tone="accent">System admin</Pill>}{p.opsAccess && <Pill tone="violet">Operations too</Pill>}{!p.active && <Pill tone="muted">inactive</Pill>}</div>
                     <div className="text-xs text-ink-muted">{p.email}{p.lastLoginAt && ` · last in ${fmtDate(p.lastLoginAt)}`}</div>
                   </div>
+                  <HourlyCost p={p} />
                   {p.id === d.data!.me || p.role === "ADMIN" ? (
                     <span className="text-xs text-ink-muted">{p.role === "ADMIN" ? "Everything" : AVL_LEVELS.find((l) => l.key === p.avlLevel)?.label}</span>
                   ) : (
@@ -62,6 +63,22 @@ export default function People() {
         </Card>
       </div>
     </>
+  );
+}
+
+/** What an hour of this person's time costs (for job costing). Saved when you leave the box (MoneyInput commits on blur). */
+function HourlyCost({ p }: { p: AvlPerson }) {
+  const refresh = useOpsRefresh();
+  const [v, setV] = useState<number | null>(p.hourlyCostCents);
+  const save = async (c: number | null) => {
+    setV(c);
+    if (c === p.hourlyCostCents) return;
+    try { await ops(`/avl/people/${p.id}`, { method: "PUT", json: { hourlyCostCents: c } }); toast.success(`Hourly cost saved for ${p.name}`); await refresh(); } catch (err) { toast.error((err as Error).message); }
+  };
+  return (
+    <label className="flex items-center gap-1.5 text-xs text-ink-muted" title="What an hour of their time costs the business (wages and burden), for job costing">
+      <span className="w-28"><MoneyInput nullable cents={v} placeholder="Cost" className="[&_input]:py-1 [&_input]:text-xs" onChange={(c) => void save(c)} /></span>/hr
+    </label>
   );
 }
 
