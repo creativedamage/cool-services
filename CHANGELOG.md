@@ -4,6 +4,19 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.33.0
+Three apps instead of seven: Sundays, Sundays Operations and Sundays AVL.
+- **Sundays has everything that runs on the Mac.** Services, Workflows, Paging and the FOH companion
+  are all in the Sundays app, as they already were; the separate Sundays Services, Sundays
+  Workflows, Sundays Paging and Sundays FOH apps are retired.
+- **Their last update points to Sundays.** Opening one of them now says it's part of Sundays, opens
+  Sundays at the same screen (or its download) and can move itself to the Trash. Sign-in and
+  settings are already shared, so nothing needs setting up again.
+- **FOH carries on in Sundays.** On a Mac that only had Sundays FOH, Sundays starts as the FOH
+  companion with its settings, still linked to the main computer. Elsewhere, choose
+  Preferences → Mode → FOH Companion.
+- The Apps menu and the app list in the sidebar show only Sundays, Operations and AVL.
+
 ## 1.32.1
 sundays-checkin.vercel.app opens Team check-ins instead of the Operations sign-in.
 - **Fix: the check-in address showed Operations.** Opening sundays-checkin.vercel.app (or the

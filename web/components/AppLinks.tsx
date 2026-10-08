@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { ArrowUpRight, LayoutGrid } from "lucide-react";
 import { useEffect, useState } from "react";
-import { APPS, APP_IDS, appFromUserAgent, appHas, type AppId } from "@shared/apps";
+import { ACTIVE_APP_IDS, APPS, appFromUserAgent, appHas, type AppId } from "@shared/apps";
 import { Api } from "@/lib/api";
 import { STANDALONE } from "@/lib/ops";
 import { Logo } from "@/components/Logo";
@@ -38,7 +38,7 @@ export function OtherApps({ current }: { current: AppId }) {
   const [open, setOpen] = useState(false);
   const listing = useListing(open);
   const installed = new Map(listing.data?.apps.map((a) => [a.id, a]) ?? []);
-  const ids = APP_IDS.filter((id) => id !== current);
+  const ids = ACTIVE_APP_IDS.filter((id) => id !== current);
   return (
     <div className="border-t border-line px-2 py-2">
       <button className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] text-ink-muted hover:bg-hover/60 hover:text-ink-soft" onClick={() => setOpen(!open)}>

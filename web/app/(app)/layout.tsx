@@ -62,8 +62,8 @@ function Shell({ children }: { children: React.ReactNode }) {
     if (path.startsWith("/services") && st && openPlan) void Api.boardOpenPlan(st, openPlan).catch(() => undefined);
   }, [path, st, openPlan]);
 
-  // The separate Sundays apps (Sundays Services, Workflows, Paging) show only their own screens;
-  // a link to another app's screen offers to open it there.
+  // A single-purpose app (Sundays Services, Workflows and Paging before 1.33) shows only its own
+  // screens; a link to another app's screen offers to open it there.
   const appId = useCurrentApp();
   const single = isSingle(appId) ? appId : null;
   const elsewhere = Boolean(single && !appHas(single, path));

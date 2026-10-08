@@ -13,7 +13,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { APPS, APP_IDS, type AppId } from "../../../shared/apps.js";
+import { ACTIVE_APP_IDS, APPS, type AppId } from "../../../shared/apps.js";
 import type { EmbedBridge, EmbedRequest } from "../../../shared/embed.js";
 import type { UpdateBridge } from "../../../shared/updates.js";
 import { config } from "../config.js";
@@ -152,7 +152,7 @@ function bundlePath(id: AppId): string | null {
 export interface AppListing { id: AppId; name: string; short: string; blurb: string; installed: boolean; running: boolean; current: boolean }
 export function appListing(current: AppId | null): AppListing[] {
   const mac = process.platform === "darwin";
-  return APP_IDS.map((id) => {
+  return ACTIVE_APP_IDS.map((id) => {
     const running = local.has(id) || alive(guests.get(id));
     return {
       id, name: APPS[id].name, short: APPS[id].short, blurb: APPS[id].blurb,

@@ -3,9 +3,12 @@
 // name, bundle id, icon and release files (shared/apps.ts):
 //
 //   Sundays-<v>.dmg / Sundays-<v>-mac.zip                    the full app (everything)
-//   Sundays-Services-<v>.dmg / …-mac.zip                      and Workflows, Paging, FOH, Operations, AVL
+//   Sundays-Operations-<v>.dmg, Sundays-AVL-<v>.dmg (+ -mac.zip)
 //
-// SUNDAYS_APPS=sundays,services packages only those (default: all); SUNDAYS_ARCH=arm64 builds for
+// A retired app (shared/apps.ts → retired) is built once more in its retired version, as the
+// farewell that sends people to Sundays, and never after.
+//
+// SUNDAYS_APPS=sundays,ops packages only those (default: all current ones); SUNDAYS_ARCH=arm64 builds for
 // Apple silicon only (quicker, for testing). Finished files land in desktop/release/.
 import fs from "node:fs";
 import path from "node:path";
@@ -23,7 +26,8 @@ const js = (await esbuild.build({ entryPoints: [path.join(root, "shared", "apps.
 const { APPS, APP_IDS } = await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
 
 const wanted = (process.env.SUNDAYS_APPS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-const ids = wanted.length ? APP_IDS.filter((id) => wanted.includes(id)) : APP_IDS;
+const current = APP_IDS.filter((id) => !APPS[id].retired || APPS[id].retired === version);
+const ids = wanted.length ? current.filter((id) => wanted.includes(id)) : current;
 if (!ids.length) { console.error(`No apps match SUNDAYS_APPS=${process.env.SUNDAYS_APPS}. Choose from: ${APP_IDS.join(", ")}`); process.exit(1); }
 
 const release = path.join(here, "release");

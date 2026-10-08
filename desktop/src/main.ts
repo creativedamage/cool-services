@@ -2,14 +2,14 @@
  * The Sundays Mac apps (one shell for all of them; which one it is comes from package.json →
  * sundaysApp, set when each app is packaged: see shared/apps.ts and desktop/dist.mjs).
  *
- * Sundays, Services, Workflows and Paging run the Sundays server on 127.0.0.1 (never reachable
- * from the network). They share one data folder and one running server: the first one open hosts
- * it; the others are guests that show their windows on it, and one of them takes over hosting if
- * the host quits. Signing in to Planning Center happens on Planning Center's own page, which
+ * Sundays runs the Sundays server on 127.0.0.1 (never reachable from the network). Before 1.33,
+ * Services, Workflows and Paging were separate apps sharing that data folder and server (the first
+ * one open hosted it, the others were guests); the host/guest machinery stays for older copies. Signing in to Planning Center happens on Planning Center's own page, which
  * returns to 127.0.0.1.
  *
- * Sundays FOH is an FOH companion with its own data. Operations and AVL show Sundays' cloud
- * screens (the website's) from inside the app, on their own sundays-app:// address.
+ * The FOH companion is a mode of Sundays (Sundays FOH, retired in 1.33, had its own data; see
+ * adoptFoh). Operations and AVL show Sundays' cloud screens (the website's) from inside the app,
+ * on their own sundays-app:// address. Retired apps' last version only says goodbye (farewell).
  */
 import { startClockOutputs } from "./clockOut";
 import { startBoardOutput } from "./boardOut";
@@ -22,7 +22,7 @@ import os from "node:os";
 import path from "node:path";
 import { createUpdater } from "./updater";
 import { createEmbed } from "./embed";
-import { APPS, type AppId } from "../../shared/apps";
+import { ACTIVE_APP_IDS, APPS, type AppId } from "../../shared/apps";
 import { WEBSITE_URL } from "../../shared/cloud";
 import type { EmbedRequest } from "../../shared/embed";
 
@@ -59,7 +59,23 @@ function sundaysDir(): string {
   } catch {
     return before; // couldn't move it: keep using it where it is
   }
+  adoptFoh(now);
   return now;
+}
+
+/**
+ * Sundays FOH was folded into Sundays in 1.33 (FOH Companion mode). On a Mac that only ever ran
+ * Sundays FOH, the first Sundays launch takes over its data, so it's still the FOH companion,
+ * still linked to the main computer, with its mic strip settings.
+ */
+const FOH_DIR = path.join(appData, "Sundays FOH");
+const FOH_MOVED = "foh-moved";
+function adoptFoh(dir: string) {
+  if (APP_ID !== "sundays" || fs.existsSync(dir) || !fs.existsSync(FOH_DIR)) return;
+  try {
+    fs.cpSync(FOH_DIR, dir, { recursive: true, filter: (src) => !/Singleton(Lock|Socket|Cookie)$/.test(src) });
+    fs.writeFileSync(path.join(dir, FOH_MOVED), new Date().toISOString());
+  } catch { /* couldn't copy it: Sundays starts fresh, and FOH Companion can be chosen in Preferences */ }
 }
 /** Where the server keeps its data: shared by the engine apps; Sundays FOH has its own. */
 const ENGINE_DIR = DEF.kind === "companion" ? path.join(appData, DEF.name) : sundaysDir();
@@ -186,7 +202,38 @@ function fatal(message: string) {
   app.quit();
 }
 
+/**
+ * A retired app's last version (Services, Workflows, Paging, FOH; shared/apps.ts): it says it's now
+ * part of Sundays, opens Sundays at the same place (or its download), and can put itself in the Trash.
+ */
+async function farewell() {
+  const full = bundleOf("sundays");
+  const foh = APP_ID === "foh";
+  const fresh = !fs.existsSync(path.join(appData, "Sundays")) && !fs.existsSync(path.join(appData, "Cool Services"));
+  const r = await dialog.showMessageBox({
+    type: "info",
+    message: `${DEF.name} is now part of Sundays`,
+    detail: (foh
+      ? fresh
+        ? "The FOH companion is a mode in the Sundays app now: the mic strip, Tuning keys and page requests work the same. Open Sundays on this Mac and it carries on as the FOH companion, still linked to your main computer."
+        : "The FOH companion is a mode in the Sundays app now. In Sundays, choose Preferences → Mode → FOH Companion, then link it to your main computer again."
+      : `Everything in ${DEF.short} is in the Sundays app, with the same sign-in and settings.`)
+      + (full ? "" : "\n\nSundays isn’t on this Mac yet: download it, drag it to Applications and open it."),
+    buttons: [full ? "Open Sundays" : "Download Sundays", "Quit"],
+    defaultId: 0, cancelId: 1,
+    ...(app.isPackaged ? { checkboxLabel: `Move ${DEF.name} to the Trash`, checkboxChecked: true } : {}),
+  });
+  if (r.response === 0) {
+    const page = foh ? "/companion" : DEF.home;
+    if (full) spawn("/usr/bin/open", ["-n", "-a", full, "--args", `--sundays-path=${page}`], { detached: true, stdio: "ignore" }).on("error", () => undefined).unref();
+    else { const repo = updateRepo(); void shell.openExternal(repo ? `https://github.com/${repo}/releases/latest` : WEBSITE_URL); }
+    if (r.checkboxChecked && app.isPackaged) await shell.trashItem(path.resolve(process.execPath, "..", "..", "..")).catch(() => undefined);
+  }
+  app.quit();
+}
+
 async function boot() {
+  if (DEF.retired) return farewell();
   // Start from a clean page cache so an updated app always shows its new screens.
   await session.defaultSession.clearCache();
   // Our own pages may use anything they ask for (MIDI for Waves SuperRack, clipboard…);
@@ -287,6 +334,9 @@ async function hostEngine(): Promise<boolean> {
   process.env.NODE_ENV = "production";
   process.env.APP_VERSION = app.getVersion();
   if (DEF.kind === "companion") process.env.SUNDAYS_APP_MODE = "companion";
+  // Taken over from Sundays FOH (adoptFoh): start as the FOH companion.
+  const fohMoved = path.join(ENGINE_DIR, FOH_MOVED);
+  if (fs.existsSync(fohMoved)) { process.env.SUNDAYS_INITIAL_APP_MODE = "companion"; fs.rmSync(fohMoved, { force: true }); }
   // Micboard's runtime: Contents/Resources/micboard in the app, desktop/micboard-runtime when developing.
   process.env.COOL_MICBOARD_NATIVE = app.isPackaged ? path.join(process.resourcesPath, "micboard") : path.join(__dirname, "..", "micboard-runtime");
 
@@ -416,8 +466,9 @@ function openSibling(url: string) {
   let id: string, page: string;
   try { const u = new URL(url); id = u.hostname; page = `${u.pathname || "/"}${u.search}`; } catch { return; }
   if (!(id in APPS)) return;
-  const target = id as AppId;
+  let target = id as AppId;
   if (!/^\/(?!\/)/.test(page)) page = APPS[target].home;
+  if (APPS[target].retired) target = "sundays"; // folded into Sundays
   if (target === APP_ID) return void go(page);
   const launch = (bundle: string) => {
     const child = spawn("/usr/bin/open", ["-n", "-a", bundle, "--args", `--sundays-path=${page}`], { detached: true, stdio: "ignore" });
@@ -428,7 +479,7 @@ function openSibling(url: string) {
   if (b) return launch(b);
   if (APPS[target].kind === "cloud") return void shell.openExternal(`${WEBSITE_URL}${page}`);
   const full = bundleOf("sundays");
-  if (full && target !== "foh") return launch(full);
+  if (full) return launch(full);
   const repo = updateRepo();
   void shell.openExternal(repo ? `https://github.com/${repo}/releases/latest` : WEBSITE_URL);
 }
@@ -479,7 +530,7 @@ async function checkFromMenu(u: Updater) {
 }
 
 function buildMenu(u: Updater) {
-  const others = (Object.keys(APPS) as AppId[]).filter((id) => id !== APP_ID && id !== "sundays");
+  const others = ACTIVE_APP_IDS.filter((id) => id !== APP_ID && id !== "sundays");
   const menu = Menu.buildFromTemplate([
     {
       label: app.name,

@@ -16,7 +16,14 @@ const hashPin = (pin: string, salt: string) => crypto.scryptSync(pin, salt, 32).
 
 /** Sundays FOH is always an FOH companion (SUNDAYS_APP_MODE, set by the app). */
 const FORCED = ((m) => (m === "full" || m === "service" || m === "companion" ? m : null))(process.env.SUNDAYS_APP_MODE);
-export const appMode = (): AppMode | null => FORCED ?? extras.get<AppMode | null>("appMode", null);
+/** The mode a Mac starts in when it has none yet (a Mac that was Sundays FOH: "companion"). */
+const INITIAL = ((m) => (m === "full" || m === "service" || m === "companion" ? m : null))(process.env.SUNDAYS_INITIAL_APP_MODE);
+export const appMode = (): AppMode | null => {
+  if (FORCED) return FORCED;
+  const m = extras.get<AppMode | null>("appMode", null);
+  if (m === null && INITIAL) { extras.set("appMode", INITIAL); return INITIAL; }
+  return m;
+};
 const pinStored = () => extras.get<Pin | null>("serviceModePin", null);
 
 let unlockedUntil = 0;

@@ -153,36 +153,29 @@ npm run dist:mac
 The installers land in **`desktop/release/`**, one per app. They run on both Apple Silicon and
 Intel Macs.
 
-To try the app without making a DMG: `npm run app` (or `SUNDAYS_APP=services npm run app` for one of
-the separate apps).
+To try the app without making a DMG: `npm run app` (or `SUNDAYS_APP=ops npm run app` for one of
+the other apps).
 
 ### The Sundays apps
 
-One project builds seven Mac apps (the list is in `shared/apps.ts`):
+One project builds three Mac apps (the list is in `shared/apps.ts`):
 
 | App | What's in it | Files |
 |---|---|---|
-| **Sundays** | Everything | `Sundays-<version>.dmg` |
-| **Sundays Services** | Services, run sheets, team check-ins, ProPresenter, Clock, Mic board, Dashboard | `Sundays-Services-…` |
-| **Sundays Workflows** | Workflows and Planning Center Chat | `Sundays-Workflows-…` |
-| **Sundays Paging** | Parent paging and the Kids & Nursery iPads | `Sundays-Paging-…` |
-| **Sundays FOH** | The FOH companion | `Sundays-FOH-…` |
+| **Sundays** | Everything that runs on the Mac: services, run sheets, check-ins, ProPresenter, Clock, Mic board, Workflows, Chat, Parent paging, and FOH Companion mode | `Sundays-<version>.dmg` |
 | **Sundays Operations** | Operations (and the Sundays admin console) | `Sundays-Operations-…` |
 | **Sundays AVL** | AVL | `Sundays-AVL-…` |
 
-- **Sundays, Services, Workflows and Paging share everything** on a Mac: one sign-in, one set of
-  settings, one weekend, one Micboard. The first one you open runs Sundays in the background; the
-  others use it. If that one quits, another takes over by itself.
-- **They link to each other.** A link to another app's screen offers to open it there; the **Apps**
-  menu and **Sundays apps** at the bottom of the sidebar open the others. An app that isn't installed
-  opens in the full Sundays app instead (Operations and AVL open on the website).
-- **Sundays FOH** is always an FOH companion, with its own settings (link it to the main computer
-  once).
+- **FOH companion** is a mode in Sundays (Preferences → Mode → FOH Companion): link it to the main
+  computer once.
 - **Operations and AVL** are the website's screens in a Mac window. They sign in with your Sundays
-  account, not Planning Center.
+  account, not Planning Center. Links between the apps open the right one (or the website).
 - Each app updates itself. A release has every app in it.
+- **Sundays Services, Workflows, Paging and FOH were retired in 1.33.** Their last version (1.33.0)
+  only says they're now part of Sundays and opens Sundays at the same screen; it can move itself to
+  the Trash. A Mac that only ran Sundays FOH carries on as the FOH companion in Sundays, still linked.
 
-`SUNDAYS_APPS=sundays,services npm run dist:mac` builds only those apps (quicker while testing).
+`SUNDAYS_APPS=sundays,ops npm run dist:mac` builds only those apps (quicker while testing).
 
 ### Updating
 

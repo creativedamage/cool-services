@@ -67,7 +67,7 @@ jobs:
           echo "COOL_SIGN_IDENTITY=$SHA" >> "$GITHUB_ENV"
           echo "COOL_SIGN_KEYCHAIN=$KC" >> "$GITHUB_ENV"
 
-      # Every Sundays app (shared/apps.ts): the full app, Services, Workflows, Paging, FOH, Operations, AVL.
+      # Every Sundays app (shared/apps.ts): Sundays, Operations and AVL (and retired apps' farewell builds in their last version).
       - name: Build the Mac apps
         run: npm run dist:mac
 
