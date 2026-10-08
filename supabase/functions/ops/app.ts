@@ -32,6 +32,8 @@ import { checkinLevelFor, CHECKIN_RANK } from "./lib/checkin.ts";
 import { applyEvent, createQuote, effectiveTotals, liveTotals, loadQuote, quoteDTO, saveQuote, toPublicQuote, type FullQuote } from "./quotes.ts";
 import { BudgetSchema, budgetOf, createJob, jobDetail, jobDocuments, jobFromQuote, jobRows, JobSchema, saveBudget } from "./jobs.ts";
 import { emailProposal, notifyAnswer } from "./avlmail.ts";
+import { activityRows, ActivitySchema, clientActivityWhere, createLead, dueAtDate, ensureClient, followUps, leadDetail, leadGetsJob, leadRows, LeadSchema, moveLead, sourceReport, sourcesInUse } from "./crm.ts";
+import { OPEN_STAGES, stageLabel, type LeadPage, type LeadReport, type LeadsBoard } from "./lib/crm.ts";
 import type { ClientProposalPage, JobPage, JobsList, JobStatus } from "./lib/jobs.ts";
 
 type U = OpsSessionUser;
@@ -147,6 +149,7 @@ const globalOnly = (u: U, what: string) => { if (!isGlobalManager(u)) throw new 
 
 const optStr = (max = 200) => z.string().max(max).nullish().transform((v) => (v ? v : null));
 const id = z.string().min(1);
+const optId = z.string().max(60).nullish().or(z.literal("")).transform((v) => v || null);
 
 /* ───────────── Me / organization brand ───────────── */
 
@@ -462,6 +465,7 @@ route("POST", "/quotes/:id/job", async ({ req, params }) => {
   if (q.status === "ACCEPTED") await applyEvent({ quoteId: params.id, event: "CONVERT", actor: "staff", actorId: u.id, note: "Job created" });
   else if (q.status !== "CONVERTED") throw new HttpError(409, "The client has to accept the proposal first.");
   const job = await jobFromQuote(params.id, u.id);
+  await leadGetsJob(params.id, job.id);
   if (job.created) await logActivity({ actorId: u.id, action: "Created job", detail: `${job.number} from ${q.number}`, area: "AVL", entityType: "Job", entityId: job.id, href: `/avl/jobs/view?id=${job.id}` });
   return job;
 });
@@ -557,6 +561,176 @@ route("DELETE", "/jobs/:id", async ({ req, params }) => {
   await logActivity({ actorId: u.id, action: "Deleted job", detail: `${j.number} · ${j.name}`, area: "AVL" });
 });
 
+/* ───────────── AVL: leads (CRM) ───────────── */
+
+const STAGE = z.enum(["NEW", "CONTACTED", "SITE_VISIT", "PROPOSAL", "WON", "LOST"]);
+const avlPeople = () => sql`select id, name from ops.users where active and not pending and source <> 'PLATFORM' and (avl_level <> 'NONE' or role = 'ADMIN') order by name`;
+const clientRefs = () => sql`select id, name from ops.customers where active order by name`;
+const leadHref = (id: string) => `/avl/leads/view?id=${id}`;
+/** Integrators only: a church team doesn't sell. */
+const leadsUser = async (req: Request) => {
+  const u = await avl(req);
+  if ((await getAvl()).businessType === "CHURCH") throw new HttpError(403, "Leads are for integrators. Change how you use AVL in AVL → Settings.");
+  return u;
+};
+
+route("GET", "/leads", async ({ req, url }) => {
+  await leadsUser(req);
+  const q = url.searchParams.get("q")?.trim();
+  const like = q ? `%${q}%` : null;
+  const closedDays = url.searchParams.get("closed") === "all" ? 100_000 : 90;
+  const [leads, people, customers, sources] = await Promise.all([
+    leadRows(sql`(l.stage in ${sql(OPEN_STAGES)} or coalesce(l.won_at, l.lost_at, l.updated_at) > now() - make_interval(days => ${closedDays}))
+      ${like ? sql`and (l.title ilike ${like} or l.org_name ilike ${like} or l.contact_name ilike ${like} or c.name ilike ${like} or l.city ilike ${like})` : sql``}`),
+    avlPeople(), clientRefs(), sourcesInUse(),
+  ]);
+  return { leads: leads.map(({ notes: _n, customerId: _c, ownerId: _o, createdBy: _b, createdById: _bi, ...l }) => l), closedDays, people, customers, sources } as unknown as LeadsBoard;
+});
+
+route("POST", "/leads", async ({ req, body }) => {
+  const u = await leadsUser(req);
+  const raw = await body();
+  const input = LeadSchema.parse(raw);
+  if (!input.customerId && !input.orgName) throw new HttpError(422, "Pick a client or type the church’s name.");
+  const fu = raw?.followUp?.dueAt ? { body: String(raw.followUp.body || "Follow up").slice(0, 500), dueAt: dueAtDate(String(raw.followUp.dueAt)).toISOString() } : null;
+  const id = await createLead(input, u.id, { note: typeof raw?.note === "string" ? raw.note.slice(0, 20_000) : null, followUp: fu });
+  await logActivity({ actorId: u.id, action: "Added lead", detail: input.title, area: "AVL", entityType: "Lead", entityId: id, href: leadHref(id) });
+  return { id };
+});
+
+route("GET", "/leads/report", async ({ req, url }) => {
+  await leadsUser(req);
+  const since = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get("since") ?? "") ? url.searchParams.get("since")! : `${new Date().getFullYear()}-01-01`;
+  return { since, ...(await sourceReport(since)) } satisfies LeadReport;
+});
+
+route("GET", "/leads/:id", async ({ req, params }) => {
+  await leadsUser(req);
+  const lead = await leadDetail(params.id);
+  const [activities, people, customers, sources] = await Promise.all([
+    activityRows(sql`a.lead_id = ${lead.id}`), avlPeople(), clientRefs(), sourcesInUse(),
+  ]);
+  return { lead, activities, people, customers, sources } as unknown as LeadPage;
+});
+
+route("PUT", "/leads/:id", async ({ req, params, body }) => {
+  const u = await leadsUser(req);
+  const input = LeadSchema.parse(await body());
+  if (!input.customerId && !input.orgName) throw new HttpError(422, "Pick a client or type the church’s name.");
+  const [l] = await sql`update ops.leads set ${sql({ ...input, updatedAt: new Date() })} where id = ${params.id} returning id, title`;
+  if (!l) throw new HttpError(404, "Lead not found");
+  await logActivity({ actorId: u.id, action: "Updated lead", detail: l.title, area: "AVL", entityType: "Lead", entityId: l.id, href: leadHref(l.id) });
+  return leadDetail(l.id);
+});
+
+/**
+ * Move a lead on the board (a stage, and optionally its place in the column). Won can make the job:
+ * from the lead's proposal when the client accepted it, otherwise a new job for the lead's client.
+ */
+route("POST", "/leads/:id/move", async ({ req, params, body }) => {
+  const u = await leadsUser(req);
+  const input = z.object({
+    stage: STAGE, position: z.number().finite().nullish(), lostReason: z.string().trim().max(500).nullish(), createJob: z.boolean().default(false),
+  }).parse(await body());
+  const before = await leadDetail(params.id);
+  await sql.begin((tx) => moveLead(tx, params.id, input.stage, { position: input.position ?? null, userId: u.id, lostReason: input.lostReason ?? undefined }));
+  let job: { id: string; number: string } | null = before.job;
+  if (input.stage === "WON" && input.createJob && !job) {
+    const q = before.quote ? (await sql`select status from ops.quotes where id = ${before.quote.id}`)[0] : null;
+    if (q && ["ACCEPTED", "CONVERTED"].includes(q.status)) {
+      if (!can(u, "QUOTE_APPROVE")) throw new HttpError(403, "An AVL Manager has to make the job from the proposal.");
+      if (q.status === "ACCEPTED") await applyEvent({ quoteId: before.quote!.id, event: "CONVERT", actor: "staff", actorId: u.id, note: "Job created" });
+      job = await jobFromQuote(before.quote!.id, u.id);
+    } else {
+      const customerId = await ensureClient(params.id);
+      job = await createJob(JobSchema.parse({ name: before.title, customerId, siteCity: before.city, siteState: before.state, managerId: before.ownerId }), u.id, true);
+    }
+    await sql`update ops.leads set job_id = ${job.id} where id = ${params.id}`;
+    await logActivity({ actorId: u.id, action: "Created job", detail: `${job.number} from lead ${before.title}`, area: "AVL", entityType: "Job", entityId: job.id, href: `/avl/jobs/view?id=${job.id}` });
+  }
+  if (before.stage !== input.stage) await logActivity({ actorId: u.id, action: `Moved lead to ${stageLabel(input.stage)}`, detail: before.title, area: "AVL", entityType: "Lead", entityId: params.id, href: leadHref(params.id) });
+  return { lead: await leadDetail(params.id), job };
+});
+
+/** Start the lead's proposal: makes the client from the lead if it isn't one yet. */
+route("POST", "/leads/:id/proposal", async ({ req, params }) => {
+  const u = await leadsUser(req);
+  const lead = await leadDetail(params.id);
+  if (lead.quote) return { id: lead.quote.id, number: lead.quote.number, created: false };
+  const customerId = await ensureClient(params.id);
+  const q = await createQuote({ title: lead.title, customerId, createdById: u.id });
+  await sql`update ops.leads set quote_id = ${q.id}, updated_at = now() where id = ${params.id}`;
+  await logActivity({ actorId: u.id, action: "Created quote", detail: `${q.number} · ${q.title} (from a lead)`, area: "AVL", entityType: "Quote", entityId: q.id, href: `/avl/quotes/view?id=${q.id}` });
+  return { id: q.id, number: q.number, created: true };
+});
+
+route("DELETE", "/leads/:id", async ({ req, params }) => {
+  const u = await leadsUser(req);
+  const [l] = await sql`select title, created_by_id from ops.leads where id = ${params.id}`;
+  if (!l) throw new HttpError(404, "Lead not found");
+  if (l.createdById !== u.id && !isAvlManager(u)) throw new HttpError(403, "Only whoever added the lead, or an AVL Manager, can delete it.");
+  await sql`delete from ops.leads where id = ${params.id}`;
+  await logActivity({ actorId: u.id, action: "Deleted lead", detail: l.title, area: "AVL" });
+});
+
+/* ───────────── AVL: activity (notes, calls, follow-ups) on leads, clients and jobs ───────────── */
+
+route("GET", "/activities", async ({ req, url }) => {
+  await avl(req);
+  const p = url.searchParams;
+  const where = p.get("lead") ? sql`a.lead_id = ${p.get("lead")}` : p.get("job") ? sql`a.job_id = ${p.get("job")}` : p.get("client") ? clientActivityWhere(p.get("client")!) : null;
+  if (!where) throw new HttpError(422, "Say whose activity: lead, client or job.");
+  return activityRows(where);
+});
+
+route("GET", "/followups", async ({ req, url }) => {
+  const u = await avl(req);
+  const everyone = url.searchParams.get("who") === "everyone";
+  return followUps(everyone ? sql`true` : sql`(a.assigned_to_id = ${u.id} or (a.assigned_to_id is null and a.created_by_id = ${u.id}))`);
+});
+
+route("POST", "/activities", async ({ req, body }) => {
+  const u = await avl(req);
+  const a = ActivitySchema.parse(await body());
+  const [row] = await sql`insert into ops.activities ${sql({
+    kind: a.kind, body: a.body, leadId: a.leadId, customerId: a.customerId, jobId: a.jobId,
+    dueAt: a.dueAt ? dueAtDate(a.dueAt) : null, assignedToId: a.dueAt ? (a.assignedToId ?? u.id) : a.assignedToId, createdById: u.id,
+  })} returning id`;
+  if (a.leadId) await sql`update ops.leads set updated_at = now() where id = ${a.leadId}`;
+  return (await activityRows(sql`a.id = ${row.id}`))[0];
+});
+
+route("PUT", "/activities/:id", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const input = z.object({
+    body: z.string().trim().max(20_000).optional(), done: z.boolean().optional(),
+    dueAt: z.string().max(40).nullish(), assignedToId: z.string().max(60).nullish(),
+  }).parse(await body());
+  const [cur] = await sql`select created_by_id, kind from ops.activities where id = ${params.id}`;
+  if (!cur) throw new HttpError(404, "Not found");
+  if (cur.kind === "STAGE") throw new HttpError(409, "Stage changes can't be edited.");
+  const data: Record<string, unknown> = { updatedAt: new Date() };
+  // Anyone can tick a follow-up off; changing what it says is for whoever wrote it, or a manager.
+  if (input.done !== undefined) data.doneAt = input.done ? new Date() : null;
+  if (input.body !== undefined || input.dueAt !== undefined || input.assignedToId !== undefined) {
+    if (cur.createdById !== u.id && !isAvlManager(u)) throw new HttpError(403, "Only whoever wrote this, or an AVL Manager, can change it.");
+    if (input.body !== undefined) data.body = input.body;
+    if (input.dueAt !== undefined) data.dueAt = input.dueAt ? dueAtDate(input.dueAt) : null;
+    if (input.assignedToId !== undefined) data.assignedToId = input.assignedToId || null;
+  }
+  await sql`update ops.activities set ${sql(data)} where id = ${params.id}`;
+  return (await activityRows(sql`a.id = ${params.id}`))[0];
+});
+
+route("DELETE", "/activities/:id", async ({ req, params }) => {
+  const u = await avl(req);
+  const [cur] = await sql`select created_by_id, kind from ops.activities where id = ${params.id}`;
+  if (!cur) throw new HttpError(404, "Not found");
+  if (cur.kind === "STAGE") throw new HttpError(409, "Stage changes stay on the timeline.");
+  if (cur.createdById !== u.id && !isAvlManager(u)) throw new HttpError(403, "Only whoever wrote this, or an AVL Manager, can delete it.");
+  await sql`delete from ops.activities where id = ${params.id}`;
+});
+
 /* ───────────── AVL: the client's proposal page (no sign-in: the link is the key) ───────────── */
 
 /** The proposal behind a link, and its organization (it must still have AVL). */
@@ -639,7 +813,7 @@ for (const [path, event, kind] of [["changes", "REQUEST_CHANGES", "CHANGES"], ["
 /* ───────────── AVL: overview ───────────── */
 
 route("GET", "/avl/overview", async ({ req }) => {
-  await avl(req);
+  const u = await avl(req);
   const yearStart = new Date(new Date().getFullYear(), 0, 1);
   const [active, accepted, [{ open }], recent, [{ n: clients }], activity] = await Promise.all([
     quotesWith(sql`q.status in ('DRAFT','SENT','CHANGES_REQUESTED')`, { limit: 1000 }),
@@ -651,8 +825,13 @@ route("GET", "/avl/overview", async ({ req }) => {
       from ops.activity_log a left join ops.users x on x.id = a.actor_id where a.area = 'AVL' order by a.created_at desc limit 8`,
   ]);
   const OPEN_JOBS = sql`j.status in ('PLANNING','IN_PROGRESS','ON_HOLD')`;
-  const [openJobRows, biz] = await Promise.all([jobRows(OPEN_JOBS, 1000), getAvl()]);
+  const [openJobRows, biz, [leadSum], fu] = await Promise.all([
+    jobRows(OPEN_JOBS, 1000), getAvl(),
+    sql`select count(*)::int as n, coalesce(sum(value_cents), 0)::bigint as v from ops.leads where stage in ${sql(OPEN_STAGES)}`,
+    followUps(sql`(a.assigned_to_id = ${u.id} or (a.assigned_to_id is null and a.created_by_id = ${u.id}))`),
+  ]);
   return {
+    openLeads: leadSum.n, openLeadsCents: Number(leadSum.v), followUps: fu,
     jobs: openJobRows.slice(0, 6), openJobs: openJobRows.length, openJobsCostCents: openJobRows.reduce((s, j) => s + j.costCents, 0), businessType: biz.businessType,
     pipelineCents: active.reduce((s, q) => s + effectiveTotals(q).totalCents, 0),
     acceptedCents: accepted.reduce((s, q) => s + effectiveTotals(q).totalCents, 0),

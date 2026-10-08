@@ -3,6 +3,7 @@
  * One job: its dashboard (what it's worth and where it stands), its budget (cost groups and cost
  * items, edited like a spreadsheet) and its documents (the signed proposal it came from).
  */
+import { ActivityFeed } from "@/components/avl/ActivityFeed";
 import clsx from "clsx";
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronRight, FileSignature, FolderPlus, Pencil, Plus, Printer, X } from "lucide-react";
 import Link from "next/link";
@@ -122,6 +123,7 @@ function Dashboard({ page, church, onTab }: { page: JobPage; church: boolean; on
           <GroupBars items={page.budget} church={church} />
         </div>
         {job.notes && <div className="panel whitespace-pre-wrap p-4 text-sm text-ink-soft"><div className="label mb-1">Notes</div>{job.notes}</div>}
+        <ActivityFeed target={{ jobId: job.id }} people={page.people} title="Notes & follow-ups" eyebrow="Activity" compact />
       </div>
     </div>
   );

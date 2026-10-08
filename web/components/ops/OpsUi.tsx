@@ -1,5 +1,6 @@
 "use client";
 /** Sundays | Operations building blocks, in Sundays' look. */
+import { stageLabel, type LeadStage } from "@shared/ops/crm";
 import { jobStatusLabel, type JobStatus } from "@shared/ops/jobs";
 import clsx from "clsx";
 import { CHECKIN_LEVELS, type CheckinLevel } from "@shared/ops/checkin";
@@ -86,6 +87,8 @@ export const QuoteStatusBadge = ({ status }: { status: QuoteStatus }) => <Pill t
 
 const J_TONE: Record<JobStatus, Tone> = { PLANNING: "accent", IN_PROGRESS: "info", ON_HOLD: "warn", COMPLETE: "ok", CANCELLED: "muted" };
 export const JobStatusBadge = ({ status }: { status: JobStatus }) => <Pill tone={J_TONE[status]}>{jobStatusLabel(status)}</Pill>;
+const L_TONE: Record<LeadStage, Tone> = { NEW: "accent", CONTACTED: "info", SITE_VISIT: "violet", PROPOSAL: "warn", WON: "ok", LOST: "muted" };
+export const LeadStageBadge = ({ stage }: { stage: LeadStage }) => <Pill tone={L_TONE[stage]}>{stageLabel(stage)}</Pill>;
 
 /** Segmented tabs (links or buttons). */
 export function Tabs<T extends string>({ items, value, onChange }: { items: { key: T; label: React.ReactNode; count?: number | null }[]; value: T; onChange: (v: T) => void }) {

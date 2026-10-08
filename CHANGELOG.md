@@ -4,6 +4,25 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.35.0
+Sundays AVL gets a leads board, notes and follow-ups on every lead, client and job, and a report on where work comes from.
+- **Leads.** A board of every church you might work with: New, Contacted, Site visit, Proposal
+  sent, then Won or Lost. Drag a card to move it, or use the steps on the lead's page. Each card
+  shows what it's worth, who owns it and the next follow-up.
+- **From lead to job without retyping.** Start a proposal from a lead (the church becomes a client
+  if it isn't one yet). Sending the proposal moves the lead to Proposal sent, and the client
+  signing it marks the lead won. Winning a lead can create the job straight away.
+- **Notes, calls and follow-ups.** Log a note, call, email, meeting or site visit on any lead,
+  client or job, and set a follow-up with a date and who it's for. Open follow-ups stay at the top
+  until they're ticked off. A lead's timeline also shows every change of stage.
+- **Your follow-ups on the AVL home.** Overdue, today and coming up, ticked off right there. The
+  top of the home now shows leads in play, proposals out, sales this year and open jobs.
+- **Lead sources.** See how many leads each source brings, how many you win and what they're worth,
+  for this year, the last 12 months or all time.
+- Church teams keep notes and follow-ups on their jobs; leads stay an integrator feature.
+- **Fix: the retired apps' last update.** Sundays Services, Workflows, Paging and FOH now get their
+  "this is part of Sundays" update in every release, so a Mac that skipped 1.33.0 still gets it.
+
 ## 1.34.0
 Sundays AVL gets jobs with budgets, and clients can review and e-sign proposals online.
 - **Jobs.** A new Jobs page tracks every project from planning to complete, with its client, site,

@@ -3,6 +3,7 @@
  * applyEvent, which row-locks the quote, checks the state machine + guards, updates timestamps and
  * writes an audit event in one transaction. Ported from coolchurch-ops lib/server/quotes.ts.
  */
+import { leadFollowsQuote } from "./crm.ts";
 import { computeTotals } from "./lib/math.ts";
 import { isEditable, transition, type Actor, type QuoteEventType, type QuoteGuardContext, type QuoteStatus } from "./lib/state-machine.ts";
 import type { PublicQuote, QuoteDTO } from "./lib/types.ts";
@@ -88,6 +89,7 @@ export async function applyEvent(opts: { quoteId: string; event: QuoteEventType;
     }
     await tx`update ops.quotes set ${tx(data)} where id = ${q.id}`;
     await tx`insert into ops.quote_events ${tx({ quoteId: q.id, type: opts.event, fromStatus: q.status, toStatus: res.to, actorId: opts.actorId ?? null, actorLabel: opts.actorLabel ?? null, note: opts.note ?? null })}`;
+    await leadFollowsQuote(tx, q.id, opts.event, q.number);
     return loadQuote(q.id, tx);
   });
 }

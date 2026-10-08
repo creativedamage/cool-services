@@ -150,6 +150,10 @@ export interface AvlOverview {
   clients: number; recent: QuoteRow[]; activity: ActivityRow[];
   /** Planning, in progress or on hold. */
   openJobs: number; openJobsCostCents: number; jobs: import("./jobs").JobRow[]; businessType: "INTEGRATOR" | "CHURCH";
+  /** Leads not yet won or lost, and what they're worth. */
+  openLeads: number; openLeadsCents: number;
+  /** My open follow-ups (assigned to me, or mine and unassigned). */
+  followUps: import("./crm").FollowUps;
 }
 export interface ClientRow {
   id: string; name: string; contactName: string | null; email: string | null; phone: string | null; city: string | null; state: string | null;

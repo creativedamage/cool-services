@@ -1,5 +1,6 @@
 "use client";
 /** One client: their details, contacts and every quote. */
+import { ActivityFeed } from "@/components/avl/ActivityFeed";
 import clsx from "clsx";
 import { Mail, Pencil, Phone, Plus, Star, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -23,7 +24,10 @@ function Client() {
     <>
       <PageHeader crumb="AVL / Clients" title={c.name}
         description={<span className="flex flex-wrap gap-x-3">{where && <span>{where}</span>}{c.taxExempt && <span className="text-ok">Tax exempt</span>}{!c.active && <span className="text-warn">Inactive</span>}</span>}
-        actions={<Link href={`/avl/quotes?new=1&client=${c.id}`} className="btn-primary"><Plus size={15} /> New quote</Link>} />
+        actions={<>
+          <Link href={`/avl/leads?new=1&client=${c.id}`} className="btn-outline"><Plus size={15} /> New lead</Link>
+          <Link href={`/avl/quotes?new=1&client=${c.id}`} className="btn-primary"><Plus size={15} /> New quote</Link>
+        </>} />
       <div className="space-y-5">
         <KpiRow items={[
           { value: String(quotes.length), label: "Quotes" },
@@ -46,6 +50,7 @@ function Client() {
                 </Table>
               ) : <Empty>No quotes yet.</Empty>}
             </Card>
+            <ActivityFeed target={{ customerId: c.id }} title="Notes & follow-ups" eyebrow="Activity" showContext compact />
             <Details key={JSON.stringify(c)} c={c} />
           </div>
           <Contacts clientId={c.id} contacts={contacts} />

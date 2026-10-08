@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
-  ArrowLeft, CreditCard, Gauge, Layers, ShieldHalf, Activity, AudioLines, Boxes, Briefcase, Building, Building2, ClipboardList, FileText, Hammer, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Users, UsersRound, Mail } from "lucide-react";
+  ArrowLeft, CreditCard, Gauge, Layers, ShieldHalf, Activity, AudioLines, Boxes, Briefcase, Building, Building2, ClipboardList, FileText, Hammer, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Target, Users, UsersRound, Mail } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { OpsMe } from "@shared/ops/types";
@@ -81,7 +81,7 @@ export function AvlNav() {
     { items: [
       { href: "/avl", label: "Overview", icon: LayoutGrid, exact: true },
       // A church team runs its own projects: no clients or proposals to sell.
-      ...(n.avlChurch ? [] : [{ href: "/avl/clients", label: "Clients", icon: Briefcase }, { href: "/avl/quotes", label: "Quotes", icon: FileText }]),
+      ...(n.avlChurch ? [] : [{ href: "/avl/leads", label: "Leads", icon: Target }, { href: "/avl/clients", label: "Clients", icon: Briefcase }, { href: "/avl/quotes", label: "Quotes", icon: FileText }]),
       { href: "/avl/jobs", label: "Jobs", icon: Hammer },
     ] },
     { title: "Pricing", items: [

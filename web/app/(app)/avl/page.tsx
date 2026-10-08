@@ -1,12 +1,14 @@
 "use client";
 /** Sundays | AVL overview: pipeline, open jobs, recent quotes and AVL activity (a church team: its jobs). */
-import { Boxes, Briefcase, Hammer, Plus, Search } from "lucide-react";
+import { Boxes, Briefcase, Hammer, Plus, Search, Target } from "lucide-react";
 import Link from "next/link";
 import type { AvlOverview } from "@shared/ops/types";
 import { fmtDate, money0, useOps } from "@/lib/ops";
 import { useOpsUser } from "@/components/ops/context";
 import { ActivityList, Card, Empty, ErrorBox, JobStatusBadge, KpiRow, Loading, PageHeader, Quick, QuoteStatusBadge } from "@/components/ops/OpsUi";
 import type { JobRow } from "@shared/ops/jobs";
+import type { FollowUps } from "@shared/ops/crm";
+import { FollowUpRow } from "@/components/avl/ActivityFeed";
 
 export default function AvlHome() {
   const me = useOpsUser();
@@ -20,7 +22,7 @@ export default function AvlHome() {
       <PageHeader crumb={me.nav.avlName ?? "Sundays | AVL"} title={`${hello}, ${first}`}
         description={church ? "Your team's projects and their budgets." : "Clients, proposals, jobs and margin for the churches you work with."}
         actions={church ? <Link href="/avl/jobs?new=1" className="btn-primary"><Plus size={15} /> New job</Link> : <>
-          <Link href="/avl/clients?new=1" className="btn-outline"><Plus size={15} /> New client</Link>
+          <Link href="/avl/leads?new=1" className="btn-outline"><Plus size={15} /> New lead</Link>
           <Link href="/avl/quotes?new=1" className="btn-primary"><Plus size={15} /> New quote</Link>
         </>} />
       <ErrorBox error={d.error} />
@@ -30,10 +32,10 @@ export default function AvlHome() {
             { value: String(d.data.openJobs), label: "Open jobs", href: "/avl/jobs" },
             { value: money0(d.data.openJobsCostCents), label: "Budgeted in open jobs", href: "/avl/jobs" },
           ] : [
-            { value: money0(d.data.pipelineCents), label: "Active pipeline", href: "/avl/quotes" },
-            { value: money0(d.data.acceptedCents), label: "Accepted sales (this year)", href: "/avl/quotes?status=ACCEPTED", tone: "ok" },
+            { value: money0(d.data.openLeadsCents), label: `${d.data.openLeads} lead${d.data.openLeads === 1 ? "" : "s"} in play`, href: "/avl/leads" },
+            { value: money0(d.data.pipelineCents), label: "Proposals out", href: "/avl/quotes" },
+            { value: money0(d.data.acceptedCents), label: `Accepted this year · ${money0(d.data.profitCents)} profit`, href: "/avl/quotes?status=ACCEPTED", tone: "ok" },
             { value: String(d.data.openJobs), label: "Open jobs", href: "/avl/jobs" },
-            { value: money0(d.data.profitCents), label: "Projected gross profit", tone: "ok" },
           ]} />
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="space-y-5">
@@ -57,7 +59,9 @@ export default function AvlHome() {
             </Card>}
             </div>
             <div className="space-y-5">
+              <FollowUpsCard f={d.data.followUps} />
               <div className="grid gap-3">
+                {!church && <Quick href="/avl/leads" icon={Target} title="Leads" sub="Every church you might work with" />}
                 {!church && <Quick href="/avl/clients" icon={Briefcase} title="Clients" sub="The churches you work with" />}
                 <Quick href="/avl/catalog" icon={Search} title="Find equipment pricing" sub="Every vendor price list" />
                 <Quick href="/avl/vendors" icon={Boxes} title="Vendors & products" sub="Add products or import a price sheet" />
@@ -89,6 +93,21 @@ function OpenJobs({ jobs, total, church }: { jobs: JobRow[]; total: number; chur
           ))}
         </ul>
       ) : <Empty>{church ? "No open jobs. Start one with New job." : "No open jobs. When a client signs a proposal, create the job from it."}</Empty>}
+    </Card>
+  );
+}
+
+function FollowUpsCard({ f }: { f: FollowUps }) {
+  const groups: [string, FollowUps["overdue"], string][] = [["Overdue", f.overdue, "text-bad"], ["Today", f.today, "text-warn"], ["Coming up", f.upcoming, "text-ink-muted"]];
+  const n = f.overdue.length + f.today.length + f.upcoming.length;
+  return (
+    <Card eyebrow="Follow-ups" title="Your follow-ups" action={f.overdue.length ? <span className="text-xs font-medium text-bad">{f.overdue.length} overdue</span> : undefined}>
+      {n ? groups.filter(([, rows]) => rows.length).map(([label, rows, tone]) => (
+        <div key={label} className="border-t border-line first:border-t-0">
+          <div className={`label px-4 pb-1 pt-3 ${tone}`}>{label}</div>
+          <ul>{rows.map((a) => <FollowUpRow key={a.id} a={a} showContext />)}</ul>
+        </div>
+      )) : <Empty>Nothing due in the next two weeks. Set follow-ups on a lead, client or job.</Empty>}
     </Card>
   );
 }
