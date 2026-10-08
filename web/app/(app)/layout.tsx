@@ -5,7 +5,9 @@ import clsx from "clsx";
 import { BellRing, CalendarDays, UsersRound, LayoutDashboard, MessageCircle, MonitorUp, KanbanSquare, Lock, LockOpen, LogOut, Settings, Timer, MicVocal } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import { useOpsMe, useOpsSession } from "@/lib/ops";
 import { Api, planQuery, qk } from "@/lib/api";
 import { prefetchPlans, usePlans } from "@/lib/plans";
 import { useUpdates } from "@/components/settings/UpdatesSettings";
@@ -71,6 +73,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const side = elsewhere ? "sundays" : sideOf(path);
   const inOps = side !== "sundays";
   useRememberApp(side, qs ? `${path}?${qs}` : path);
+  useAppSettingsShortcut(side);
 
   const nav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -149,7 +152,18 @@ function Shell({ children }: { children: React.ReactNode }) {
         )}
 
         {single && <OtherApps current={single} />}
-        {me.data && (
+        {/* Operations and AVL have their own account and settings; Sundays' Planning Center sign-in and
+            Preferences aren't part of them. Updates are the Mac app's, so they stay. */}
+        {inOps ? (version || updates.data?.state === "available") && (
+          <div className="flex items-center gap-2 px-4 pb-3 text-[11px] text-ink-faint">
+            {version && <span>Sundays v{version}</span>}
+            {updates.data?.state === "available" && (
+              <PrefsLink section="updates" className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent hover:bg-accent/20">
+                Update to {updates.data.latest?.version}
+              </PrefsLink>
+            )}
+          </div>
+        ) : me.data && (
           <div className="flex items-center gap-2.5 border-t border-line p-3">
             <Avatar name={me.data.name} src={me.data.avatarUrl} size={30} />
             <div className="min-w-0 flex-1 leading-tight">
@@ -339,4 +353,27 @@ function ClosedInServiceMode() {
       {unlock.dialog}
     </div>
   );
+}
+
+/**
+ * Sundays → Preferences… (⌘,) in Operations or AVL opens that app's own settings (the Mac app asks
+ * with a "sundays:app-settings" event): Operations' for its managers, AVL's business settings.
+ */
+function useAppSettingsShortcut(side: string) {
+  const router = useRouter();
+  const { session } = useOpsSession();
+  const ops = useOpsMe(Boolean(session) && side !== "sundays").data;
+  useEffect(() => {
+    const go = () => {
+      const nav = ops?.status === "ok" ? ops.nav : null;
+      if (side === "avl") router.push("/avl/settings");
+      else if (side === "ops") {
+        if (nav?.admin) router.push("/ops/settings/organization");
+        else if (nav?.manager) router.push("/ops/settings/users");
+        else toast("Operations settings are for managers.");
+      } else if (side === "admin") router.push("/admin");
+    };
+    window.addEventListener("sundays:app-settings", go);
+    return () => window.removeEventListener("sundays:app-settings", go);
+  }, [side, ops, router]);
 }

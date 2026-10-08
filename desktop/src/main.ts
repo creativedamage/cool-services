@@ -538,7 +538,7 @@ function buildMenu(u: Updater) {
         { role: "about" },
         { label: "Check for Updates…", click: () => void checkFromMenu(u) },
         { type: "separator" },
-        ...(DEF.kind === "cloud" ? [] : [{ label: "Preferences…", accelerator: "CmdOrCtrl+,", click: () => openPreferences() }, { type: "separator" as const }]),
+        ...(DEF.kind === "cloud" ? [] : [{ label: "Preferences…", accelerator: "CmdOrCtrl+,", click: () => preferencesHere() }, { type: "separator" as const }]),
         { role: "services" },
         { type: "separator" },
         { role: "hide" }, { role: "hideOthers" }, { role: "unhide" },
@@ -571,6 +571,21 @@ function isInApp(url: string) {
   }
 }
 const isSibling = (url: string) => url.startsWith("sundays-open://");
+
+/**
+ * Sundays → Preferences… (⌘,) follows where you are: in Operations or AVL (separate apps in the same
+ * window) it opens that app's own settings instead of Sundays' Preferences, which aren't part of it.
+ */
+function preferencesHere() {
+  let path = "";
+  try { path = win ? new URL(win.webContents.getURL()).pathname : ""; } catch { /* no page yet */ }
+  if (win && /^\/(ops|avl|admin)(\/|$)/.test(path)) {
+    void win.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent("sundays:app-settings"))`);
+    win.show(); win.focus();
+    return;
+  }
+  openPreferences();
+}
 
 /** Preferences in their own window (Sundays → Preferences…). One at a time. */
 let prefsWin: BrowserWindow | null = null;

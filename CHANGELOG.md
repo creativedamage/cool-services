@@ -20,6 +20,9 @@ Sundays AVL gets a leads board, notes and follow-ups on every lead, client and j
 - **Lead sources.** See how many leads each source brings, how many you win and what they're worth,
   for this year, the last 12 months or all time.
 - Church teams keep notes and follow-ups on their jobs; leads stay an integrator feature.
+- **Operations and AVL keep to themselves in Sundays.** In the Operations or AVL side of the Sundays
+  app, the sidebar no longer shows your Planning Center sign-in and the Preferences button, and
+  Sundays → Preferences… (⌘,) opens that app's own settings instead of Sundays' Preferences.
 - **Fix: the retired apps' last update.** Sundays Services, Workflows, Paging and FOH now get their
   "this is part of Sundays" update in every release, so a Mac that skipped 1.33.0 still gets it.
 
