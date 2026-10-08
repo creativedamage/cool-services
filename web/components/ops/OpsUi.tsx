@@ -1,5 +1,6 @@
 "use client";
 /** Sundays | Operations building blocks, in Sundays' look. */
+import { jobStatusLabel, type JobStatus } from "@shared/ops/jobs";
 import clsx from "clsx";
 import { CHECKIN_LEVELS, type CheckinLevel } from "@shared/ops/checkin";
 import Link from "next/link";
@@ -82,6 +83,9 @@ const PRI_TONE = { LOW: "muted", NORMAL: "muted", HIGH: "warn", URGENT: "bad" } 
 export const PriorityBadge = ({ priority }: { priority: keyof typeof PRI_TONE }) => <Pill tone={PRI_TONE[priority]}>{priority.toLowerCase()}</Pill>;
 const Q_TONE: Record<QuoteStatus, Tone> = { DRAFT: "muted", SENT: "info", ACCEPTED: "ok", CHANGES_REQUESTED: "warn", DECLINED: "bad", CONVERTED: "violet" };
 export const QuoteStatusBadge = ({ status }: { status: QuoteStatus }) => <Pill tone={Q_TONE[status]}>{STATUS_LABEL[status]}</Pill>;
+
+const J_TONE: Record<JobStatus, Tone> = { PLANNING: "accent", IN_PROGRESS: "info", ON_HOLD: "warn", COMPLETE: "ok", CANCELLED: "muted" };
+export const JobStatusBadge = ({ status }: { status: JobStatus }) => <Pill tone={J_TONE[status]}>{jobStatusLabel(status)}</Pill>;
 
 /** Segmented tabs (links or buttons). */
 export function Tabs<T extends string>({ items, value, onChange }: { items: { key: T; label: React.ReactNode; count?: number | null }[]; value: T; onChange: (v: T) => void }) {

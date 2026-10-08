@@ -23,13 +23,16 @@ import { isDeletable, QUOTE_STATUSES, type QuoteStatus } from "./lib/state-machi
 import { computeBill, effectiveModules, kindAllowed, MODULE_KEYS, type ModuleKey } from "./lib/billing.ts";
 import type { AvlOverview, OpsSessionUser, OverviewData, QuoteRow, UserRow } from "./lib/types.ts";
 import { ctx as reqCtx, defined, getAvl, getOrg, hasModule, inOrg, orgId, raw, HttpError, logActivity, sql } from "./db.ts";
-import { account, checkEntry, myOrgs, pickOrg, requireUser, sessionUser, touch, type Account } from "./auth.ts";
+import { account, checkEntry, loadOrg, myOrgs, pickOrg, requireUser, sessionUser, touch, type Account } from "./auth.ts";
 import { addRequestComment, handlesRequests, performRequestAction, requestDetail, requestRows, submitRequest, workQueueWhere } from "./requests.ts";
 import { isEmail, keyUpdate, relayAvailable, render, send, senderFor, type MailChoice } from "./mail.ts";
 import { mailSettings } from "./notify.ts";
 import { ConfigSchema, checkinSettings, handleCheckin, saveCheckinSettings } from "./checkin.ts";
 import { checkinLevelFor, CHECKIN_RANK } from "./lib/checkin.ts";
 import { applyEvent, createQuote, effectiveTotals, liveTotals, loadQuote, quoteDTO, saveQuote, toPublicQuote, type FullQuote } from "./quotes.ts";
+import { BudgetSchema, budgetOf, createJob, jobDetail, jobDocuments, jobFromQuote, jobRows, JobSchema, saveBudget } from "./jobs.ts";
+import { emailProposal, notifyAnswer } from "./avlmail.ts";
+import type { ClientProposalPage, JobPage, JobsList, JobStatus } from "./lib/jobs.ts";
 
 type U = OpsSessionUser;
 type Ctx = { req: Request; url: URL; params: Record<string, string>; body: () => Promise<any>; acc: Account };
@@ -198,7 +201,7 @@ async function meInOrg() {
     status: "ok" as const, user: u, org,
     nav: {
       handlesRequests: handles, queueCount, pendingUsers, manager: ops && atLeast(u, "MANAGER"), admin: isAdmin(u), campusName: campus?.name ?? null,
-      ops, avl: avlOn, avlManager: avlOn && isAvlManager(u), avlPending, avlName: avl?.name ?? null, modules: reqCtx()!.modules, platform: !!u.platform,
+      ops, avl: avlOn, avlManager: avlOn && isAvlManager(u), avlPending, avlName: avl?.name ?? null, avlChurch: avl?.businessType === "CHURCH", modules: reqCtx()!.modules, platform: !!u.platform,
     },
   };
 }
@@ -423,14 +426,44 @@ route("DELETE", "/quotes/:id", async ({ req, params }) => {
 });
 
 route("POST", "/quotes/:id/events", async ({ req, params, body }) => {
-  const { event, note } = z.object({
+  const { event, note, emailTo } = z.object({
     event: z.enum(["SEND", "REVISE", "REOPEN", "CONVERT", "MARK_ACCEPTED", "MARK_CHANGES", "MARK_DECLINED"]), note: z.string().max(5000).optional(),
+    /** SEND: email the proposal link here (the client's address, or another). */
+    emailTo: z.string().email().max(200).nullish(),
   }).parse(await body());
   const u = await avl(req, event === "CONVERT" || event === "MARK_ACCEPTED" ? "QUOTE_APPROVE" : undefined);
   const q = await applyEvent({ quoteId: params.id, event, actor: "staff", actorId: u.id, note: note ?? (event === "SEND" ? "Pricing locked for the customer" : null) });
+  // A converted proposal is a job.
+  if (event === "CONVERT") await jobFromQuote(q.id, u.id);
+  const emailedTo = event === "SEND" && emailTo ? await emailProposal(q.id, emailTo) : null;
   const verb = { SEND: "Sent quote", REVISE: "Revised quote", REOPEN: "Reopened quote", CONVERT: "Converted quote", MARK_ACCEPTED: "Recorded acceptance", MARK_CHANGES: "Recorded change request", MARK_DECLINED: "Recorded decline" }[event];
-  await logActivity({ actorId: u.id, action: verb, detail: q.number, area: "AVL", entityType: "Quote", entityId: q.id, href: `/avl/quotes/view?id=${q.id}`, campusId: q.campusId });
-  return quoteDTO(params.id);
+  await logActivity({ actorId: u.id, action: verb, detail: emailedTo ? `${q.number} · emailed to ${emailedTo}` : q.number, area: "AVL", entityType: "Quote", entityId: q.id, href: `/avl/quotes/view?id=${q.id}`, campusId: q.campusId });
+  return { ...(await quoteDTO(params.id)), emailedTo };
+});
+
+/** Email the proposal link (again) to the client, or to another address. */
+route("POST", "/quotes/:id/email", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const { to } = z.object({ to: z.string().email().max(200) }).parse(await body());
+  const [q] = await sql`select status, number from ops.quotes where id = ${params.id}`;
+  if (!q) throw new HttpError(404, "Quote not found");
+  if (q.status === "DRAFT") throw new HttpError(409, "Send (lock) the proposal first.");
+  const emailedTo = await emailProposal(params.id, to);
+  if (!emailedTo) throw new HttpError(409, "Email is turned off for this organization (Operations → Settings → Organization → Email). Copy the link instead.");
+  await logActivity({ actorId: u.id, action: "Emailed proposal", detail: `${q.number} · ${emailedTo}`, area: "AVL", entityType: "Quote", entityId: params.id, href: `/avl/quotes/view?id=${params.id}` });
+  return { emailedTo };
+});
+
+/** Make the job for an accepted proposal (marks the proposal converted). */
+route("POST", "/quotes/:id/job", async ({ req, params }) => {
+  const u = await avl(req, "QUOTE_APPROVE");
+  const [q] = await sql`select status, number from ops.quotes where id = ${params.id}`;
+  if (!q) throw new HttpError(404, "Quote not found");
+  if (q.status === "ACCEPTED") await applyEvent({ quoteId: params.id, event: "CONVERT", actor: "staff", actorId: u.id, note: "Job created" });
+  else if (q.status !== "CONVERTED") throw new HttpError(409, "The client has to accept the proposal first.");
+  const job = await jobFromQuote(params.id, u.id);
+  if (job.created) await logActivity({ actorId: u.id, action: "Created job", detail: `${job.number} from ${q.number}`, area: "AVL", entityType: "Job", entityId: job.id, href: `/avl/jobs/view?id=${job.id}` });
+  return job;
 });
 
 /** Print preview / PDF: exactly what the customer gets (no cost, margin or internal notes). */
@@ -453,6 +486,156 @@ route("POST", "/customers", async ({ req, body }) => {
   return c;
 });
 
+/* ───────────── AVL: jobs ───────────── */
+
+const JOB_STATUS_IDS: JobStatus[] = ["PLANNING", "IN_PROGRESS", "ON_HOLD", "COMPLETE", "CANCELLED"];
+route("GET", "/jobs", async ({ req, url }) => {
+  await avl(req);
+  const status = JOB_STATUS_IDS.find((s) => s === url.searchParams.get("status"));
+  const open = url.searchParams.get("status") === "open";
+  const client = url.searchParams.get("client") || null;
+  const q = url.searchParams.get("q")?.trim();
+  const like = q ? `%${q}%` : null;
+  const [jobs, counts, customers, biz] = await Promise.all([
+    jobRows(sql`true ${status ? sql`and j.status = ${status}` : open ? sql`and j.status in ('PLANNING','IN_PROGRESS','ON_HOLD')` : sql``}
+      ${client ? sql`and j.customer_id = ${client}` : sql``}
+      ${like ? sql`and (j.number ilike ${like} or j.name ilike ${like} or j.site_line1 ilike ${like} or j.site_city ilike ${like} or c.name ilike ${like})` : sql``}`),
+    sql`select status, count(*)::int as n from ops.jobs group by status`,
+    sql`select id, name from ops.customers where active order by name`,
+    getAvl(),
+  ]);
+  return {
+    jobs, counts: Object.fromEntries(JOB_STATUS_IDS.map((s) => [s, counts.find((c) => c.status === s)?.n ?? 0])) as JobsList["counts"],
+    customers: customers as unknown as JobsList["customers"], businessType: biz.businessType,
+  } satisfies JobsList;
+});
+
+route("POST", "/jobs", async ({ req, body }) => {
+  const u = await avl(req);
+  const raw = await body();
+  const input = JobSchema.parse(raw);
+  const job = await createJob(input, u.id, raw?.startWithGroups !== false);
+  await logActivity({ actorId: u.id, action: "Created job", detail: `${job.number} · ${input.name}`, area: "AVL", entityType: "Job", entityId: job.id, href: `/avl/jobs/view?id=${job.id}` });
+  return job;
+});
+
+route("GET", "/jobs/:id", async ({ req, params }) => {
+  await avl(req);
+  const job = await jobDetail(params.id);
+  const [budget, documents, customers, people, biz] = await Promise.all([
+    budgetOf(job.id), jobDocuments(job),
+    sql`select id, name from ops.customers where active or id = ${job.customerId} order by name`,
+    sql`select id, name from ops.users where active and not pending and source <> 'PLATFORM' and (avl_level <> 'NONE' or role = 'ADMIN' or id = ${job.managerId}) order by name`,
+    getAvl(),
+  ]);
+  return { job, budget, documents, customers, people, businessType: biz.businessType, canEdit: true } as unknown as JobPage;
+});
+
+route("PUT", "/jobs/:id", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const input = JobSchema.parse(await body());
+  const [j] = await sql`update ops.jobs set ${sql({ ...input, updatedAt: new Date() })} where id = ${params.id} returning id, number, name`;
+  if (!j) throw new HttpError(404, "Job not found");
+  await logActivity({ actorId: u.id, action: "Updated job", detail: `${j.number} · ${j.name}`, area: "AVL", entityType: "Job", entityId: j.id, href: `/avl/jobs/view?id=${j.id}` });
+  return jobDetail(j.id);
+});
+
+route("PUT", "/jobs/:id/budget", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const { items } = z.object({ items: BudgetSchema }).parse(await body());
+  const out = await saveBudget(params.id, items);
+  const [j] = await sql`select number, name from ops.jobs where id = ${params.id}`;
+  await logActivity({ actorId: u.id, action: "Updated job budget", detail: `${j.number} · ${j.name}`, area: "AVL", entityType: "Job", entityId: params.id, href: `/avl/jobs/view?id=${params.id}&tab=budget` });
+  return out;
+});
+
+route("DELETE", "/jobs/:id", async ({ req, params }) => {
+  const u = await avlManager(req);
+  const [j] = await sql`delete from ops.jobs where id = ${params.id} returning number, name, quote_id`;
+  if (!j) throw new HttpError(404, "Job not found");
+  // Its proposal can make a new job again.
+  await logActivity({ actorId: u.id, action: "Deleted job", detail: `${j.number} · ${j.name}`, area: "AVL" });
+});
+
+/* ───────────── AVL: the client's proposal page (no sign-in: the link is the key) ───────────── */
+
+/** The proposal behind a link, and its organization (it must still have AVL). */
+async function proposalByToken(token: string) {
+  if (!/^[\w-]{20,64}$/.test(token)) throw new HttpError(404, "This proposal link isn’t right. Ask for a new one.");
+  const [q] = await raw`select id, org_id, token_expires_at from ops.quotes where public_token = ${token}`;
+  if (!q || (q.tokenExpiresAt && new Date(q.tokenExpiresAt) < new Date())) throw new HttpError(404, "This proposal link isn’t right, or has expired. Ask for a new one.");
+  const o = await loadOrg(q.orgId);
+  if (!o || !o.modules.includes("avl")) throw new HttpError(404, "This proposal isn’t available any more.");
+  return { quoteId: q.id as string, org: { id: q.orgId as string, row: o.row, modules: o.modules } };
+}
+const inProposal = <T>(token: string, fn: (quoteId: string) => Promise<T>) =>
+  proposalByToken(token).then(({ quoteId, org }) => inOrg(org, () => fn(quoteId)));
+
+async function clientProposal(quoteId: string): Promise<ClientProposalPage> {
+  const [q, biz, org, logo] = await Promise.all([loadQuote(quoteId), getAvl(), getOrg(), avlLogo()]);
+  if (q.status === "DRAFT") throw new HttpError(409, "This proposal is being updated. You’ll get the new version soon.", { status: "draft" });
+  const { id: _i, updatedAt: _u, ...settings } = biz;
+  const expired = q.status === "SENT" && Boolean(q.validUntil) && new Date(q.validUntil).getTime() + 86_400_000 < Date.now();
+  const [last] = await sql`select type, note, created_at from ops.quote_events where quote_id = ${quoteId} and type in ('REQUEST_CHANGES','DECLINE','MARK_CHANGES','MARK_DECLINED') order by created_at desc limit 1`;
+  return {
+    quote: toPublicQuote(q), org: { ...settings, name: settings.name ?? org.name } as ClientProposalPage["org"], logo, expired,
+    canAnswer: q.status === "SENT" && !expired,
+    signature: q.signature ? { signerName: q.signature.signerName, signerTitle: q.signature.signerTitle ?? null, signedAt: new Date(q.signature.signedAt).toISOString(), totalCents: q.signature.totalCentsAtSigning } : null,
+    answer: last && (q.status === "CHANGES_REQUESTED" || q.status === "DECLINED")
+      ? { kind: /DECLINE/.test(last.type) ? "DECLINED" : "CHANGES", note: last.note ?? null, at: new Date(last.createdAt).toISOString() } : null,
+  };
+}
+
+route("GET", "/public/proposals/:token", async ({ params }) => inProposal(params.token, async (id) => {
+  await sql`update ops.quotes set viewed_at = now() where id = ${id} and viewed_at is null and status = 'SENT'`;
+  return clientProposal(id);
+}), "public");
+
+const SignSchema = z.object({
+  name: z.string().trim().min(2).max(120), email: z.string().trim().email().max(200), title: z.string().trim().max(120).nullish().transform((v) => v || null),
+  /** The signature as drawn (PNG), or typed (then drawn from the name on the page). */
+  signature: z.string().regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/).max(400_000),
+  /** The total the client saw: if the proposal changed since, they have to look again. */
+  totalCents: z.number().int(),
+  agree: z.literal(true),
+});
+const clientIp = (req: Request) => (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim().slice(0, 64) || null;
+
+route("POST", "/public/proposals/:token/sign", async ({ req, params, body }) => {
+  const input = SignSchema.parse(await body());
+  return inProposal(params.token, async (id) => {
+    const page = await clientProposal(id);
+    if (!page.canAnswer) throw new HttpError(409, page.expired ? "This proposal has expired. Ask for a new one." : "This proposal can’t be signed any more.");
+    if (page.quote.totals.totalCents !== input.totalCents) throw new HttpError(409, "The proposal changed while you had it open. Look it over again, then sign.", { status: "changed" });
+    await sql`delete from ops.quote_signatures where quote_id = ${id}`;
+    await sql`insert into ops.quote_signatures ${sql({
+      quoteId: id, signerName: input.name, signerEmail: input.email, signerTitle: input.title, imageDataUrl: input.signature,
+      totalCentsAtSigning: input.totalCents, ipAddress: clientIp(req), userAgent: (req.headers.get("user-agent") ?? "").slice(0, 300),
+    })}`;
+    const q = await applyEvent({ quoteId: id, event: "ACCEPT", actor: "system", actorLabel: `${input.name} (client)`, note: `Signed online by ${input.name}${input.title ? `, ${input.title}` : ""} (${input.email})` });
+    await logActivity({ actorId: null, actorLabel: `${input.name} (client)`, action: "Client signed proposal", detail: `${q.number} · ${q.title}`, area: "AVL", entityType: "Quote", entityId: id, href: `/avl/quotes/view?id=${id}` });
+    await notifyAnswer("SIGNED", id, input.name);
+    return clientProposal(id);
+  });
+}, "public");
+
+const AnswerSchema = z.object({ name: z.string().trim().max(120).nullish(), note: z.string().trim().max(5000).nullish() });
+for (const [path, event, kind] of [["changes", "REQUEST_CHANGES", "CHANGES"], ["decline", "DECLINE", "DECLINED"]] as const) {
+  route("POST", `/public/proposals/:token/${path}`, async ({ params, body }) => {
+    const { name, note } = AnswerSchema.parse(await body());
+    if (kind === "CHANGES" && !note) throw new HttpError(422, "Tell us what you’d like changed.");
+    return inProposal(params.token, async (id) => {
+      const page = await clientProposal(id);
+      if (!page.canAnswer) throw new HttpError(409, "This proposal can’t be answered any more.");
+      const who = name?.trim() || page.quote.customer.contactName || page.quote.customer.name;
+      const q = await applyEvent({ quoteId: id, event, actor: "customer", actorLabel: `${who} (client)`, note: note ?? null });
+      await logActivity({ actorId: null, actorLabel: `${who} (client)`, action: kind === "CHANGES" ? "Client asked for changes" : "Client declined proposal", detail: `${q.number} · ${q.title}`, area: "AVL", entityType: "Quote", entityId: id, href: `/avl/quotes/view?id=${id}` });
+      await notifyAnswer(kind, id, who, note);
+      return clientProposal(id);
+    });
+  }, "public");
+}
+
 /* ───────────── AVL: overview ───────────── */
 
 route("GET", "/avl/overview", async ({ req }) => {
@@ -467,7 +650,10 @@ route("GET", "/avl/overview", async ({ req }) => {
     sql`select a.id, a.actor_label, a.action, a.detail, a.area, a.href, a.created_at, x.name as actor_name
       from ops.activity_log a left join ops.users x on x.id = a.actor_id where a.area = 'AVL' order by a.created_at desc limit 8`,
   ]);
+  const OPEN_JOBS = sql`j.status in ('PLANNING','IN_PROGRESS','ON_HOLD')`;
+  const [openJobRows, biz] = await Promise.all([jobRows(OPEN_JOBS, 1000), getAvl()]);
   return {
+    jobs: openJobRows.slice(0, 6), openJobs: openJobRows.length, openJobsCostCents: openJobRows.reduce((s, j) => s + j.costCents, 0), businessType: biz.businessType,
     pipelineCents: active.reduce((s, q) => s + effectiveTotals(q).totalCents, 0),
     acceptedCents: accepted.reduce((s, q) => s + effectiveTotals(q).totalCents, 0),
     profitCents: accepted.reduce((s, q) => s + liveTotals(q).grossProfitCents, 0),
@@ -624,6 +810,8 @@ const BusinessSchema = z.object({
   defaultTaxBps: z.number().int().min(0).max(5000), defaultDepositBps: z.number().int().min(0).max(10_000),
   defaultMarginBps: z.number().int().min(0).max(9900), laborRateCents: z.number().int().min(0).max(1_000_000_000),
   quoteValidDays: z.number().int().min(1).max(365), quoteTerms: optStr(20_000),
+  businessType: z.enum(["INTEGRATOR", "CHURCH"]).default("INTEGRATOR"),
+  jobPrefix: z.string().max(10).nullish().transform((v) => v?.toUpperCase().replace(/[^A-Z0-9]/g, "") || "J"),
 });
 route("GET", "/avl/business", async ({ req }) => {
   const me = await avl(req);

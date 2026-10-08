@@ -134,6 +134,19 @@ export function useSwitchOrg() {
   };
 }
 
+/** A no-sign-in call (the client's proposal page: the link is the key). */
+export async function opsPublic<T>(path: string, json?: unknown): Promise<T> {
+  const c = await cloud();
+  const res = await fetch(`${c.opsUrl}${path}`, {
+    method: json === undefined ? "GET" : "POST",
+    headers: { apikey: c.publishableKey, ...(json !== undefined ? { "Content-Type": "application/json" } : {}) },
+    body: json === undefined ? undefined : JSON.stringify(json),
+  }).catch(() => { throw new OpsError("Can’t reach the server. Check your connection and try again.", 0); });
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) throw new OpsError(String(body.error ?? `Something went wrong (${res.status})`), res.status, body);
+  return body as T;
+}
+
 /** Public plans and add-ons (no sign-in needed). */
 export async function publicPricing<T>(): Promise<T> {
   const c = await cloud();

@@ -7,6 +7,10 @@ import { computeTotals } from "./lib/math.ts";
 import { isEditable, transition, type Actor, type QuoteEventType, type QuoteGuardContext, type QuoteStatus } from "./lib/state-machine.ts";
 import type { PublicQuote, QuoteDTO } from "./lib/types.ts";
 import { getAvl, HttpError, nextNumber, sql, type Tx } from "./db.ts";
+import { SITE } from "./mail.ts";
+
+/** The page a client opens to see, sign or answer a proposal (on the website). */
+export const proposalUrl = (token: string) => `${SITE}/proposal?t=${encodeURIComponent(token)}`;
 
 type Db = typeof sql | Tx;
 
@@ -20,7 +24,7 @@ export type FullQuote = Record<string, any> & {
   id: string; number: string; status: QuoteStatus; taxBps: number; discountCents: number; depositBps: number;
   items: { quantity: number; unitCostCents: number; unitPriceCents: number; taxable: boolean }[];
   customer: { taxExempt: boolean; email: string | null; name: string; contactName: string | null };
-  signature: { totalCentsAtSigning: number; signerName: string; signerEmail: string; signedAt: string } | null;
+  signature: { totalCentsAtSigning: number; signerName: string; signerEmail: string; signerTitle: string | null; imageDataUrl: string; signedAt: string } | null;
   payments: { status: string; amountCents: number }[];
 };
 
@@ -134,8 +138,11 @@ export async function saveQuote(id: string, actorId: string, input: {
 
 export async function quoteDTO(id: string): Promise<QuoteDTO> {
   const q = await loadQuote(id);
-  const events = await sql`select e.*, a.name as actor_name from ops.quote_events e left join ops.users a on a.id = e.actor_id
-    where e.quote_id = ${id} order by e.created_at desc limit 50`;
+  const [events, [job]] = await Promise.all([
+    sql`select e.*, a.name as actor_name from ops.quote_events e left join ops.users a on a.id = e.actor_id
+      where e.quote_id = ${id} order by e.created_at desc limit 50`,
+    sql`select id, number from ops.jobs where quote_id = ${id}`,
+  ]);
   return {
     id: q.id, number: q.number, title: q.title, status: q.status, customerId: q.customerId, campusId: q.campusId,
     introNotes: q.introNotes, internalNotes: q.internalNotes, terms: q.terms, taxBps: q.taxBps, discountCents: q.discountCents,
@@ -145,8 +152,14 @@ export async function quoteDTO(id: string): Promise<QuoteDTO> {
       quantity: i.quantity, unitCostCents: i.unitCostCents, unitPriceCents: i.unitPriceCents, taxable: i.taxable,
     })),
     events: events.map((e) => ({ id: e.id, type: e.type, fromStatus: e.fromStatus, toStatus: e.toStatus, actorLabel: e.actorLabel ?? e.actorName ?? null, note: e.note, createdAt: new Date(e.createdAt).toISOString() })),
-    signature: q.signature ? { signerName: q.signature.signerName, signerEmail: q.signature.signerEmail, signedAt: new Date(q.signature.signedAt).toISOString() } : null,
+    signature: q.signature ? {
+      signerName: q.signature.signerName, signerEmail: q.signature.signerEmail, signerTitle: q.signature.signerTitle ?? null,
+      signedAt: new Date(q.signature.signedAt).toISOString(), imageDataUrl: q.signature.imageDataUrl, totalCents: q.signature.totalCentsAtSigning,
+    } : null,
     paidCents: paidCents(q),
+    clientUrl: proposalUrl(q.publicToken),
+    viewedAt: q.viewedAt ? new Date(q.viewedAt).toISOString() : null,
+    job: job ? { id: job.id, number: job.number } : null,
   };
 }
 

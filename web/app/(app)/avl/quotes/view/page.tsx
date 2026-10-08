@@ -1,7 +1,7 @@
 "use client";
 /** The quote builder: line items from vendor price lists, margins, totals, and the quote's life. */
 import clsx from "clsx";
-import { ArrowDown, ArrowLeft, ArrowUp, Printer, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Copy, ExternalLink, FileSignature, Hammer, Mail, Printer, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -35,6 +35,7 @@ function Builder({ page }: { page: QuotePage }) {
   const [error, setError] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
   const [askNote, setAskNote] = useState<QuoteEventType | null>(null);
+  const [sending, setSending] = useState<"send" | "email" | null>(null);
   const editable = isEditable(q.status);
   const customer = customers.find((c) => c.id === q.customerId);
   const totals = useMemo(() => computeTotals(q.items, { taxBps: q.taxBps, discountCents: q.discountCents, depositBps: q.depositBps, taxExempt: customer?.taxExempt }),
@@ -75,16 +76,38 @@ function Builder({ page }: { page: QuotePage }) {
     } catch (e) { setError((e as Error).message); } finally { setSaving(false); }
   }
 
-  const events = availableEvents(q.status, "staff").filter((e) => (e !== "CONVERT" && e !== "MARK_ACCEPTED") || canApprove);
+  // A converted proposal is a job: "Create job" (below) does that, so the bare event isn't offered.
+  const events = availableEvents(q.status, "staff").filter((e) => e !== "CONVERT" && (e !== "MARK_ACCEPTED" || canApprove));
   async function fire(event: QuoteEventType, note?: string) {
     if (dirty) return setError("Save your changes first.");
-    const confirmText = event === "SEND" ? (q.status === "CHANGES_REQUESTED" ? "Lock the revised pricing for the customer?" : "Lock this pricing for the customer? You can still revise it if they ask for changes.")
-      : event === "CONVERT" ? "Mark this sale as converted / fulfilled? This is final." : null;
-    if (confirmText && !window.confirm(confirmText)) return;
+    if (event === "SEND") return setSending("send");
     try {
       const next = await ops<QuoteDTO>(`/quotes/${q.id}/events`, { json: { event, note } });
-      setQ(next); setAskNote(null); toast.success(LABELS[event] ?? "Updated");
+      setQ(next); setAskNote(null);
+      toast.success(LABELS[event] ?? "Updated");
       void refresh();
+    } catch (e) { setError((e as Error).message); }
+  }
+  async function send(emailTo: string | null) {
+    try {
+      const next = await ops<QuoteDTO & { emailedTo: string | null }>(`/quotes/${q.id}/events`, { json: { event: "SEND", emailTo } });
+      setQ(next); setSending(null);
+      if (emailTo && !next.emailedTo) toast.warning("Locked, but the email didn’t go: email is turned off for your organization. Copy the link instead.");
+      else toast.success(next.emailedTo ? `Sent to ${next.emailedTo}` : "Locked. Copy the client link to share it.");
+      void refresh();
+    } catch (e) { setError((e as Error).message); setSending(null); }
+  }
+  async function emailAgain(to: string) {
+    try { const r = await ops<{ emailedTo: string }>(`/quotes/${q.id}/email`, { json: { to } }); toast.success(`Sent to ${r.emailedTo}`); setSending(null); }
+    catch (e) { toast.error((e as Error).message); }
+  }
+  async function makeJob() {
+    if (dirty) return setError("Save your changes first.");
+    try {
+      const j = await ops<{ id: string; number: string; created: boolean }>(`/quotes/${q.id}/job`, { method: "POST" });
+      if (j.created) toast.success(`Job ${j.number} created`);
+      void refresh();
+      router.push(`/avl/jobs/view?id=${j.id}`);
     } catch (e) { setError((e as Error).message); }
   }
   async function remove() {
@@ -102,6 +125,8 @@ function Builder({ page }: { page: QuotePage }) {
         </div>
         <div className="flex flex-wrap justify-end gap-2">
           {editable && <button className="btn-primary" disabled={!dirty || saving} onClick={save}>{saving && <Spinner />}Save</button>}
+          {q.status === "ACCEPTED" && canApprove && <button className="btn-primary" onClick={makeJob}><Hammer size={14} /> Create job</button>}
+          {q.job && <Link className="btn-primary" href={`/avl/jobs/view?id=${q.job.id}`}><Hammer size={14} /> Open job {q.job.number}</Link>}
           {events.map((e) => (
             <button key={e} className={e === "SEND" || e === "MARK_ACCEPTED" ? "btn-primary" : e === "MARK_DECLINED" ? "btn-ghost text-bad" : "btn-outline"}
               onClick={() => (NEEDS_NOTE.includes(e) ? setAskNote(e) : void fire(e))}>{e === "SEND" && q.status === "CHANGES_REQUESTED" ? "Lock revision" : LABELS[e]}</button>
@@ -114,7 +139,10 @@ function Builder({ page }: { page: QuotePage }) {
       {!editable && (
         <p className="rounded-lg border border-accent/30 bg-accent-soft px-3 py-2 text-sm text-ink-soft">
           This quote is <b>{q.status.replace("_", " ").toLowerCase()}</b> and locked. The customer's pricing is frozen at {q.sentTotalCents != null ? fmtMoney(q.sentTotalCents) : "send time"}.
-          {q.status === "SENT" ? " Print it or save the PDF for the customer, then record their answer here." : q.status === "CHANGES_REQUESTED" ? "" : " Use Revise / Reopen to make changes."}
+          {q.status === "SENT" ? " The client can open it from the link, sign it, or ask for changes. If they answer another way, record it here."
+            : q.status === "CHANGES_REQUESTED" ? " Revise it, then send the new version: the same link shows it."
+            : q.status === "ACCEPTED" ? (canApprove ? " Create the job to start its budget from these lines." : " An AVL Manager can create the job from it.")
+            : q.status === "CONVERTED" ? "" : " Use Revise / Reopen to make changes."}
         </p>
       )}
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -198,6 +226,16 @@ function Builder({ page }: { page: QuotePage }) {
         </div>
 
         <aside className="space-y-5">
+          {q.status !== "DRAFT" && <ClientLink q={q} onEmail={() => setSending("email")} />}
+          {q.signature && (
+            <div className="panel p-4">
+              <div className="label mb-2 flex items-center gap-1.5"><FileSignature size={13} className="text-ok" /> Signed online</div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={q.signature.imageDataUrl} alt={`Signature of ${q.signature.signerName}`} className="h-20 w-full rounded-lg border border-line bg-white object-contain p-1" />
+              <div className="mt-2 text-sm"><b>{q.signature.signerName}</b>{q.signature.signerTitle ? `, ${q.signature.signerTitle}` : ""}</div>
+              <div className="text-xs text-ink-muted">{q.signature.signerEmail} · {new Date(q.signature.signedAt).toLocaleString()} · {fmtMoney(q.signature.totalCents)}</div>
+            </div>
+          )}
           <div className="panel p-4">
             <div className="label mb-3">Totals</div>
             <dl className="space-y-2 text-sm">
@@ -243,6 +281,8 @@ function Builder({ page }: { page: QuotePage }) {
 
       {picker && <CatalogPicker vendors={vendors} onAdd={addFromCatalog} onClose={() => setPicker(false)} />}
       {askNote && <NoteModal event={askNote} onClose={() => setAskNote(null)} onSubmit={(n) => fire(askNote, n)} />}
+      {sending && <SendModal again={sending === "email"} revision={q.status === "CHANGES_REQUESTED"} defaultTo={customer?.email ?? ""} onClose={() => setSending(null)}
+        onSend={(to) => (sending === "email" ? emailAgain(to!) : send(to))} />}
       {marginAll !== null && (
         <Modal open onClose={() => setMarginAll(null)} title="Margin for every product line" width={380}>
           <form className="space-y-3 p-5" onSubmit={(e) => {
@@ -261,10 +301,45 @@ function Builder({ page }: { page: QuotePage }) {
 }
 
 const LABELS: Partial<Record<QuoteEventType | "CREATE" | "EDIT", string>> = {
-  SEND: "Lock & mark sent", REVISE: "Revise (back to draft)", REOPEN: "Reopen as draft", CONVERT: "Mark converted",
+  SEND: "Send to client", REVISE: "Revise (back to draft)", REOPEN: "Reopen as draft", CONVERT: "Mark converted",
   MARK_ACCEPTED: "Customer accepted", MARK_CHANGES: "Customer wants changes", MARK_DECLINED: "Customer declined", CREATE: "Created", EDIT: "Edited",
 };
 const NEEDS_NOTE: QuoteEventType[] = ["MARK_ACCEPTED", "MARK_CHANGES", "MARK_DECLINED"];
+
+/** The link the client opens: copy it, open it, or email it. */
+function ClientLink({ q, onEmail }: { q: QuoteDTO; onEmail: () => void }) {
+  const copy = () => void navigator.clipboard.writeText(q.clientUrl).then(() => toast.success("Link copied"));
+  return (
+    <div className="panel p-4">
+      <div className="label mb-2">Client link</div>
+      <p className="text-xs text-ink-muted">The client opens this to read the proposal{q.status === "SENT" ? ", sign it, or ask for changes" : ""}. No account needed.</p>
+      <div className="mt-2 truncate rounded-lg bg-hover px-2.5 py-1.5 font-mono text-[11px] text-ink-soft" title={q.clientUrl}>{q.clientUrl.replace(/^https?:\/\//, "")}</div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <button className="btn-outline py-1 text-xs" onClick={copy}><Copy size={12} /> Copy</button>
+        <a className="btn-outline py-1 text-xs" href={q.clientUrl} target="_blank" rel="noreferrer"><ExternalLink size={12} /> Open</a>
+        <button className="btn-outline py-1 text-xs" onClick={onEmail}><Mail size={12} /> Email</button>
+      </div>
+      <div className="mt-2 text-[11px] text-ink-faint">{q.viewedAt ? `Opened by the client ${new Date(q.viewedAt).toLocaleString()}` : q.status === "SENT" ? "Not opened yet." : ""}</div>
+    </div>
+  );
+}
+
+function SendModal({ again, revision, defaultTo, onClose, onSend }: { again: boolean; revision: boolean; defaultTo: string; onClose: () => void; onSend: (to: string | null) => Promise<void> }) {
+  const [email, setEmail] = useState(Boolean(defaultTo) || again);
+  const [to, setTo] = useState(defaultTo);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Modal open onClose={onClose} title={again ? "Email the proposal" : revision ? "Send the revised proposal" : "Send to the client"} width={480}>
+      <form className="space-y-3 p-5" onSubmit={async (e) => { e.preventDefault(); setBusy(true); await onSend(email ? to.trim() : null); setBusy(false); }}>
+        {!again && <p className="text-sm text-ink-soft">This locks the pricing. The client opens the proposal from its link to sign it or ask for changes; you can still revise it if they do.</p>}
+        {!again && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={email} onChange={(e) => setEmail(e.target.checked)} /> Email the link</label>}
+        {email && <Field label="To"><input type="email" required className="input" value={to} onChange={(e) => setTo(e.target.value)} placeholder="client@church.org" /></Field>}
+        {!email && <p className="text-xs text-ink-muted">You can copy the link from the proposal after sending.</p>}
+        <div className="flex justify-end gap-2"><button type="button" className="btn-ghost" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={busy}>{busy && <Spinner />}{again ? "Send email" : email ? "Lock and email" : "Lock"}</button></div>
+      </form>
+    </Modal>
+  );
+}
 
 function NoteModal({ event, onClose, onSubmit }: { event: QuoteEventType; onClose: () => void; onSubmit: (note: string) => Promise<void> }) {
   const [note, setNote] = useState("");

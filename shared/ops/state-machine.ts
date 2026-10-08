@@ -9,9 +9,10 @@
  * Pure module: no DB access, so it is trivially unit-testable and shared by
  * the ops Edge Function and Sundays' quote screens.
  *
- * Until customers can sign and pay online, staff record the customer's answer themselves
- * (MARK_ACCEPTED / MARK_CHANGES / MARK_DECLINED, each with a note). Recording an acceptance
- * needs the Quote approve permission (AVL Manager).
+ * Clients answer from the proposal link (sign = ACCEPT, by the system once the signature is in;
+ * REQUEST_CHANGES and DECLINE). Staff can also record an answer given another way
+ * (MARK_ACCEPTED / MARK_CHANGES / MARK_DECLINED, each with a note); recording an acceptance needs
+ * the Quote approve permission (AVL Manager).
  */
 
 export const QUOTE_STATUSES = [
@@ -66,6 +67,8 @@ export interface QuoteGuardContext {
   signedTotalCents: number | null; // total at time of signing
   paidCents: number; // sum of SUCCEEDED payments
   requiredDepositCents: number;
+  /** The deposit has to be paid online before the proposal is accepted (only with online payments on). */
+  paymentRequired?: boolean;
   note?: string | null; // change-request / decline reason
 }
 
@@ -74,7 +77,7 @@ export type TransitionResult =
   | { ok: false; error: string };
 
 const GUARDS: Partial<Record<QuoteEventType, (c: QuoteGuardContext) => string | null>> = {
-  // Sundays doesn't email the proposal (yet): "send" locks the pricing; print or save the PDF for the customer.
+  // "Send" locks the pricing; the client gets the proposal link (emailed, or shared by staff).
   SEND: (c) => {
     if (c.itemCount === 0) return "Add at least one line item before sending.";
     if (c.totalCents <= 0) return "Quote total must be greater than $0.";
@@ -84,7 +87,7 @@ const GUARDS: Partial<Record<QuoteEventType, (c: QuoteGuardContext) => string | 
     if (!c.hasSignature) return "Customer signature is required.";
     if (c.signedTotalCents !== c.totalCents)
       return "Quote changed after it was signed. Please re-sign.";
-    if (c.paidCents < c.requiredDepositCents) return "Required payment has not been received.";
+    if (c.paymentRequired && c.paidCents < c.requiredDepositCents) return "Required payment has not been received.";
     return null;
   },
   REQUEST_CHANGES: (c) => (c.note?.trim() ? null : "Please describe the changes you need."),

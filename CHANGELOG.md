@@ -4,6 +4,23 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.34.0
+Sundays AVL gets jobs with budgets, and clients can review and e-sign proposals online.
+- **Jobs.** A new Jobs page tracks every project from planning to complete, with its client, site,
+  dates and manager. A job's dashboard shows price, cost, profit and margin at a glance.
+- **Budgets.** Each job has a budget grid of groups and line items, with cost type (material,
+  labor, subcontract, other), quantity, unit cost and price. Totals, profit and margin update as you
+  type.
+- **Signed proposal → job in one click.** Create a job straight from an accepted proposal; its
+  sections and items become the budget.
+- **Clients sign online.** Sending a proposal gives it a private link you can copy or email. The
+  client sees the full proposal on any device and can sign (draw or type), ask for changes or
+  decline. You get an email either way, and the proposal shows who signed, when, and the signature.
+- **Know when it's been seen.** The proposal shows when the client first opened the link.
+- **For church teams too.** In AVL settings, choose whether you're an integrator or a church
+  team. Church teams get jobs and budgets without clients and quotes. Set your own job number prefix.
+- A deposit is only required to accept a proposal when the proposal asks for one.
+
 ## 1.33.0
 Three apps instead of seven: Sundays, Sundays Operations and Sundays AVL.
 - **Sundays has everything that runs on the Mac.** Services, Workflows, Paging and the FOH companion

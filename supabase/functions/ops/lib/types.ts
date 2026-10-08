@@ -35,7 +35,7 @@ export interface OrgBrand { id: string; name: string | null; logo: string | null
 export interface OpsNav {
   handlesRequests: boolean; queueCount: number; pendingUsers: number; manager: boolean; admin: boolean; campusName: string | null;
   /** Which apps this person can open. */
-  ops: boolean; avl: boolean; avlManager: boolean; avlPending: number; avlName: string | null;
+  ops: boolean; avl: boolean; avlManager: boolean; avlPending: number; avlName: string | null; avlChurch: boolean;
   /** Modules this organization has. */
   modules: ModuleKey[];
   /** Sundays super admin (acting in this org as admin). */
@@ -89,8 +89,13 @@ export interface QuoteDTO {
   taxBps: number; discountCents: number; depositBps: number; validUntil: string | null; sentTotalCents: number | null;
   items: LineItemDraft[];
   events: { id: string; type: string; fromStatus: QuoteStatus | null; toStatus: QuoteStatus | null; actorLabel: string | null; note: string | null; createdAt: string }[];
-  signature: { signerName: string; signerEmail: string; signedAt: string } | null;
+  signature: { signerName: string; signerEmail: string; signerTitle: string | null; signedAt: string; imageDataUrl: string; totalCents: number } | null;
   paidCents: number;
+  /** The link the client opens to see, sign or answer the proposal. */
+  clientUrl: string;
+  viewedAt: string | null;
+  /** The job made from this proposal, once it's accepted and a job is created. */
+  job: { id: string; number: string } | null;
 }
 export interface CustomerOption { id: string; name: string; email: string | null; taxExempt: boolean }
 export interface QuotePage { quote: QuoteDTO; customers: CustomerOption[]; vendors: Ref[]; campuses: Ref[]; defaultMarginBps: number; laborRateCents: number; canApprove: boolean }
@@ -106,6 +111,8 @@ export interface OrgSettings {
   postalCode: string | null; phone: string | null; email: string | null; website: string | null; ein: string | null; salesTaxId: string | null;
   quotePrefix: string; taxExempt: boolean; defaultTaxBps: number; defaultDepositBps: number; defaultMarginBps: number; laborRateCents: number;
   quoteValidDays: number; quoteTerms: string | null;
+  /** Integrator (sells to clients) or church team (its own projects). */
+  businessType: "INTEGRATOR" | "CHURCH"; jobPrefix: string;
 }
 export interface PrintData { quote: PublicQuote; org: AvlBusiness; logo: string | null }
 
@@ -142,6 +149,8 @@ export interface CategoryRow {
 export interface AvlOverview {
   pipelineCents: number; acceptedCents: number; profitCents: number; openPurchasingCents: number;
   clients: number; recent: QuoteRow[]; activity: ActivityRow[];
+  /** Planning, in progress or on hold. */
+  openJobs: number; openJobsCostCents: number; jobs: import("./jobs").JobRow[]; businessType: "INTEGRATOR" | "CHURCH";
 }
 export interface ClientRow {
   id: string; name: string; contactName: string | null; email: string | null; phone: string | null; city: string | null; state: string | null;
@@ -160,6 +169,8 @@ export interface AvlBusiness {
   postalCode: string | null; phone: string | null; email: string | null; website: string | null; ein: string | null; salesTaxId: string | null;
   quotePrefix: string; defaultTaxBps: number; defaultDepositBps: number; defaultMarginBps: number; laborRateCents: number;
   quoteValidDays: number; quoteTerms: string | null;
+  /** Integrator (sells to clients) or church team (its own projects). */
+  businessType: "INTEGRATOR" | "CHURCH"; jobPrefix: string;
 }
 
 /* ── Plans, billing and the super-admin console ── */

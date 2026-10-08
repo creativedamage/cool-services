@@ -1,5 +1,6 @@
 "use client";
 /** AVL's own business: the letterhead on proposals and the quoting defaults (AVL Managers edit). */
+import clsx from "clsx";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { AvlBusiness } from "@shared/ops/types";
@@ -44,6 +45,22 @@ function Form({ data }: { data: Data }) {
         </Card>
         <form onSubmit={save} className="space-y-5">
           <fieldset disabled={ro} className="space-y-5">
+            <Card eyebrow="AVL" title="How you use AVL">
+              <div className="grid gap-3 p-4 md:grid-cols-2">
+                {([
+                  ["INTEGRATOR", "AV integrator", "You sell to clients: proposals they sign online, jobs from signed proposals, prices and margins."],
+                  ["CHURCH", "Church production team", "You run your own projects: jobs and budgets, no clients, proposals or prices to sell."],
+                ] as const).map(([v, title, hint]) => (
+                  <label key={v} className={clsx("flex cursor-pointer gap-3 rounded-xl border p-3.5 transition", b.businessType === v ? "border-accent bg-accent-soft" : "border-line hover:bg-hover/40")}>
+                    <input type="radio" name="businessType" className="mt-1" checked={b.businessType === v} onChange={() => setB({ ...b, businessType: v })} />
+                    <span><span className="block font-semibold">{title}</span><span className="text-sm text-ink-muted">{hint}</span></span>
+                  </label>
+                ))}
+              </div>
+              <div className="grid gap-4 border-t border-line p-4 sm:grid-cols-3 lg:grid-cols-6">
+                <Field label="Job number prefix" hint={`Jobs are numbered ${(b.jobPrefix || "J").toUpperCase()}-0001…`}><input className="input font-mono uppercase" maxLength={10} value={b.jobPrefix} onChange={(e) => setB({ ...b, jobPrefix: e.target.value })} /></Field>
+              </div>
+            </Card>
             <Card eyebrow="Business" title="Details">
               <div className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
                 {TEXT.map(([k, label]) => <Field key={k} label={label}><input className="input" value={(b[k] as string | null) ?? ""} onChange={(e) => setB({ ...b, [k]: e.target.value })} /></Field>)}
