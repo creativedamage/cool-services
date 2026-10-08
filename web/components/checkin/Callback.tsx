@@ -9,7 +9,7 @@ import { finishSignIn } from "@/lib/checkin";
 import { SIGNIN_ERROR } from "./CheckInApp";
 import { AppMark, Centered, Shell } from "./ui";
 
-const home = () => (location.pathname.startsWith("/checkin") ? "/checkin" : "/");
+const home = () => "/checkin";
 
 export default function Callback() {
   const [state, setState] = useState<"working" | "handed-off">("working");

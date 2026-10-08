@@ -4,6 +4,12 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.32.1
+sundays-checkin.vercel.app opens Team check-ins instead of the Operations sign-in.
+- **Fix: the check-in address showed Operations.** Opening sundays-checkin.vercel.app (or the
+  app saved to a phone's home screen) went to the Operations sign-in. It now opens Team check-ins
+  and signs you in with Planning Center. Signing in comes back to the check-in address too.
+
 ## 1.32.0
 Team check-ins move to the web: sundays-checkin.vercel.app, where each person signs in with their own Planning Center account.
 - **Check-ins on your phone.** Open sundays-checkin.vercel.app and add it to your home screen; it

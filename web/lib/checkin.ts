@@ -53,9 +53,15 @@ export const CheckinApi = {
 const b64url = (b: Uint8Array) => btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const random = (n: number) => b64url(crypto.getRandomValues(new Uint8Array(n)));
 
+/**
+ * The check-in address (sundays-checkin.vercel.app; checkin.localhost when testing). Vercel serves
+ * the site's own front page there before any rewrite, so pages check the address themselves.
+ */
+export const isCheckinHost = () => /^(sundays-checkin\.|checkin\.)/.test(location.hostname);
+
 /** Where Planning Center comes back to: /callback on the check-in address, else /checkin/callback. */
 export function redirectUri() {
-  return `${location.origin}${location.pathname.startsWith("/checkin") ? "/checkin/callback" : "/callback"}`;
+  return `${location.origin}${isCheckinHost() ? "/callback" : "/checkin/callback"}`;
 }
 
 export async function startSignIn() {
