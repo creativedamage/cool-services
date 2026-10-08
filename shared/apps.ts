@@ -2,8 +2,9 @@
  * The Sundays apps. One codebase builds each of them (desktop/dist.mjs).
  *
  * Since 1.33 there are three: Sundays (everything that runs on the Mac, including FOH Companion
- * mode), Sundays Operations and Sundays AVL. Services, Workflows, Paging and FOH are retired: their
- * last build (in the `retired` version) only says they're now part of Sundays and opens it.
+ * mode), Sundays Operations and Sundays AVL. Services, Workflows, Paging and FOH are retired (in the
+ * `retired` version): every release still has a farewell build of each that only says they're now
+ * part of Sundays and opens it.
  *
  * - engine apps (Sundays, Services, Workflows, Paging) run the Sundays server on this Mac. They
  *   share one data folder and one running server: whichever opens first hosts it, the others use

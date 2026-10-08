@@ -5,8 +5,9 @@
 //   Sundays-<v>.dmg / Sundays-<v>-mac.zip                    the full app (everything)
 //   Sundays-Operations-<v>.dmg, Sundays-AVL-<v>.dmg (+ -mac.zip)
 //
-// A retired app (shared/apps.ts → retired) is built once more in its retired version, as the
-// farewell that sends people to Sundays, and never after.
+// A retired app (shared/apps.ts → retired) gets a small farewell build in every release (zip only,
+// for the updater): it says the app is now part of Sundays and opens it. Every release has one, so
+// a Mac still on an old version reaches it whichever release is the latest when it checks.
 //
 // SUNDAYS_APPS=sundays,ops packages only those (default: all current ones); SUNDAYS_ARCH=arm64 builds for
 // Apple silicon only (quicker, for testing). Finished files land in desktop/release/.
@@ -26,7 +27,7 @@ const js = (await esbuild.build({ entryPoints: [path.join(root, "shared", "apps.
 const { APPS, APP_IDS } = await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
 
 const wanted = (process.env.SUNDAYS_APPS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-const current = APP_IDS.filter((id) => !APPS[id].retired || APPS[id].retired === version);
+const current = APP_IDS;
 const ids = wanted.length ? current.filter((id) => wanted.includes(id)) : current;
 if (!ids.length) { console.error(`No apps match SUNDAYS_APPS=${process.env.SUNDAYS_APPS}. Choose from: ${APP_IDS.join(", ")}`); process.exit(1); }
 
@@ -36,7 +37,9 @@ const base = pkg.build;
 
 for (const id of ids) {
   const a = APPS[id];
-  const cloud = a.kind === "cloud";
+  const farewell = !!a.retired;
+  // A farewell build only needs the shell (and the website's screens, like Operations and AVL).
+  const cloud = a.kind === "cloud" || farewell;
   console.log(`\n• Packaging ${a.name} (${a.bundleId})…`);
   const out = path.join(release, "apps", id);
   fs.rmSync(out, { recursive: true, force: true });
@@ -62,12 +65,13 @@ for (const id of ids) {
     dmg: { ...base.dmg, title: a.name, artifactName: `${a.artifact}-\${version}.\${ext}` },
   };
   if (cloud) delete config.mac.x64ArchFiles; // no NDI or Micboard inside
-  await build({ targets: Platform.MAC.createTarget(["dmg", "zip"], process.env.SUNDAYS_ARCH === "arm64" ? Arch.arm64 : Arch.universal), config, publish: "never" });
-  for (const f of [`${a.artifact}-${version}.dmg`, `${a.artifact}-${version}-mac.zip`]) {
+  // Nobody downloads a retired app new, so its farewell is only the updater's zip.
+  await build({ targets: Platform.MAC.createTarget(farewell ? ["zip"] : ["dmg", "zip"], process.env.SUNDAYS_ARCH === "arm64" ? Arch.arm64 : Arch.universal), config, publish: "never" });
+  for (const f of farewell ? [`${a.artifact}-${version}-mac.zip`] : [`${a.artifact}-${version}.dmg`, `${a.artifact}-${version}-mac.zip`]) {
     const src = path.join(out, f);
     if (!fs.existsSync(src)) throw new Error(`${f} wasn’t made`);
     fs.copyFileSync(src, path.join(release, f));
   }
-  console.log(`  ✓ ${a.artifact}-${version}.dmg and -mac.zip`);
+  console.log(`  ✓ ${a.artifact}-${version}${farewell ? "-mac.zip (farewell)" : ".dmg and -mac.zip"}`);
 }
 console.log(`\n✓ ${ids.length} app${ids.length === 1 ? "" : "s"} in desktop/release`);
