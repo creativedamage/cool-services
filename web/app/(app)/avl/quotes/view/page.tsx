@@ -147,16 +147,16 @@ function Builder({ page }: { page: QuotePage }) {
   }
   async function send(emailTo: string | null) {
     try {
-      const next = await ops<QuoteDTO & { emailedTo: string | null }>(`/quotes/${q.id}/events`, { json: { event: "SEND", emailTo } });
+      const next = await ops<QuoteDTO & { emailedTo: string | null; emailError?: string | null }>(`/quotes/${q.id}/events`, { json: { event: "SEND", emailTo } });
       setQ(next); setSending(null);
-      if (emailTo && !next.emailedTo) toast.warning("Locked, but the email didn’t go: email is turned off for your organization. Copy the link instead.");
+      if (emailTo && !next.emailedTo) toast.warning(`Locked, but the email didn’t go. ${next.emailError ?? ""} Copy the client link to share it for now.`, { duration: 15000 });
       else toast.success(next.emailedTo ? `Sent to ${next.emailedTo}` : "Locked. Copy the client link to share it.");
       void refresh();
     } catch (e) { setError((e as Error).message); setSending(null); }
   }
   async function emailAgain(to: string) {
     try { const r = await ops<{ emailedTo: string }>(`/quotes/${q.id}/email`, { json: { to } }); toast.success(`Sent to ${r.emailedTo}`); setSending(null); }
-    catch (e) { toast.error((e as Error).message); }
+    catch (e) { toast.error((e as Error).message, { duration: 15000 }); }
   }
   async function makeJob() {
     if (dirty) return setError("Save your changes first.");

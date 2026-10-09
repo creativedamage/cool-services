@@ -4,6 +4,10 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.38.2
+Proposal emails say why they didn’t go.
+- **Proposal emails say why they didn’t go.** If no email service is set up (or email is off), sending a proposal now says so and where to fix it, instead of showing “Sent”.
+
 ## 1.38.1
 Wider quantity box on quotes and kits.
 - The quantity box on quotes and kits is wider, so 3- and 4-digit quantities show in full.

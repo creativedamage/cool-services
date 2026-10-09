@@ -462,10 +462,10 @@ route("POST", "/quotes/:id/events", async ({ req, params, body }) => {
   const q = await applyEvent({ quoteId: params.id, event, actor: "staff", actorId: u.id, note: note ?? (event === "SEND" ? "Pricing locked for the customer" : null) });
   // A converted proposal is a job.
   if (event === "CONVERT") await jobFromQuote(q.id, u.id);
-  const emailedTo = event === "SEND" && emailTo ? await emailProposal(q.id, emailTo) : null;
+  const { emailedTo, emailError } = event === "SEND" && emailTo ? await emailProposal(q.id, emailTo) : { emailedTo: null, emailError: null };
   const verb = { SEND: "Sent quote", REVISE: "Revised quote", REOPEN: "Reopened quote", CONVERT: "Converted quote", MARK_ACCEPTED: "Recorded acceptance", MARK_CHANGES: "Recorded change request", MARK_DECLINED: "Recorded decline" }[event];
   await logActivity({ actorId: u.id, action: verb, detail: emailedTo ? `${q.number} · emailed to ${emailedTo}` : q.number, area: "AVL", entityType: "Quote", entityId: q.id, href: `/avl/quotes/view?id=${q.id}`, campusId: q.campusId });
-  return { ...(await quoteDTO(params.id)), emailedTo };
+  return { ...(await quoteDTO(params.id)), emailedTo, emailError };
 });
 
 /** Email the proposal link (again) to the client, or to another address. */
@@ -475,8 +475,8 @@ route("POST", "/quotes/:id/email", async ({ req, params, body }) => {
   const [q] = await sql`select status, number from ops.quotes where id = ${params.id}`;
   if (!q) throw new HttpError(404, "Quote not found");
   if (q.status === "DRAFT") throw new HttpError(409, "Send (lock) the proposal first.");
-  const emailedTo = await emailProposal(params.id, to);
-  if (!emailedTo) throw new HttpError(409, "Email is turned off for this organization (Operations → Settings → Organization → Email). Copy the link instead.");
+  const { emailedTo, emailError } = await emailProposal(params.id, to);
+  if (!emailedTo) throw new HttpError(409, `${emailError} Copy the link instead.`);
   await logActivity({ actorId: u.id, action: "Emailed proposal", detail: `${q.number} · ${emailedTo}`, area: "AVL", entityType: "Quote", entityId: params.id, href: `/avl/quotes/view?id=${params.id}` });
   return { emailedTo };
 });

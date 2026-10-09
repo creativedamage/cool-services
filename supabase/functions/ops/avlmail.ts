@@ -15,17 +15,26 @@ import { effectiveTotals, loadQuote, proposalUrl } from "./quotes.ts";
 const money = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const first = (n?: string | null) => (n ?? "").trim().split(/\s+/)[0] || "there";
 
-async function queue(messages: (Message & { kind: string })[], fromName: string) {
-  if (!messages.length) return;
+/** Queue emails to go once the change is saved. Returns why they can't go (null: they're on their way). */
+async function queue(messages: (Message & { kind: string })[], fromName: string): Promise<string | null> {
+  if (!messages.length) return null;
   const m = await mailSettings();
-  if (m.provider === "off") return;
+  if (m.provider === "off") return OFF;
   const { sender, why } = await senderFor(m, (m.fromName as string) || fromName);
   const id = orgId();
   afterCommit(async () => {
     const ok = sender?.viaSundays ? await underDailyLimit({ orgId: id }) : true;
     for (const msg of messages) await send(ok ? sender : null, { ...msg, replyTo: msg.replyTo ?? (m.replyTo || null) }, { orgId: id, kind: msg.kind }, ok ? why : "Today’s limit for Sundays’ email relay was reached.");
   });
+  return sender ? null : setupHint(why);
 }
+
+const OFF = "Email is turned off for your organization (Operations → Settings → Organization → Email).";
+/** What to do about a missing sender, in words. */
+const setupHint = (why: string | null) =>
+  why?.includes("relay")
+    ? "No email service is set up yet. Add a Brevo or Resend API key in Operations → Settings → Organization → Email (or set up Sundays’ relay in Sundays admin → Email)."
+    : `${why ?? "No email sender."} (Operations → Settings → Organization → Email)`;
 
 /** The business's name on AVL emails: its AVL name, else the organization's. */
 async function businessName() {
@@ -33,14 +42,14 @@ async function businessName() {
   return { name: (avl.name as string) || (org.name as string) || "Your AV team", replyTo: (avl.email as string) || null };
 }
 
-/** Email the proposal link to the client. Returns where it went (null: no address, or email is off). */
-export async function emailProposal(quoteId: string, to?: string | null): Promise<string | null> {
+/** Email the proposal link to the client. Returns where it's going, or why it can't go. */
+export async function emailProposal(quoteId: string, to?: string | null): Promise<{ emailedTo: string | null; emailError: string | null }> {
   try {
     const m = await mailSettings();
-    if (m.provider === "off") return null;
+    if (m.provider === "off") return { emailedTo: null, emailError: OFF };
     const q = await loadQuote(quoteId);
     const address = (to?.trim() || q.customer.email || "").trim();
-    if (!isEmail(address)) return null;
+    if (!isEmail(address)) return { emailedTo: null, emailError: "There’s no email address to send it to." };
     const biz = await businessName();
     const t = effectiveTotals(q);
     const { html, text } = render({
@@ -54,11 +63,11 @@ export async function emailProposal(quoteId: string, to?: string | null): Promis
       footer: `Sent by Sundays for ${biz.name}. Questions? Reply to this email.`,
       accent: "#0F766E",
     });
-    await queue([{ kind: "avl.proposal", to: { email: address, name: q.customer.contactName }, subject: `Proposal ${q.number}: ${q.title}`, html, text, replyTo: biz.replyTo }], biz.name);
-    return address;
+    const err = await queue([{ kind: "avl.proposal", to: { email: address, name: q.customer.contactName }, subject: `Proposal ${q.number}: ${q.title}`, html, text, replyTo: biz.replyTo }], biz.name);
+    return err ? { emailedTo: null, emailError: err } : { emailedTo: address, emailError: null };
   } catch (e) {
     console.error("proposal email failed", e, ctx()?.orgId);
-    return null;
+    return { emailedTo: null, emailError: "The email couldn’t be prepared. Try again, or copy the link instead." };
   }
 }
 
