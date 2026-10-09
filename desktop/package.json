@@ -1,7 +1,7 @@
 {
   "name": "sundays",
   "productName": "Sundays",
-  "version": "1.38.2",
+  "version": "1.39.0",
   "description": "Volunteer workflows and service scheduling, powered by Planning Center.",
   "author": "Wayne Goodman Productions",
   "private": true,
