@@ -1,7 +1,7 @@
 "use client";
 /** The quote builder: line items from vendor price lists, margins, totals, and the quote's life. */
 import clsx from "clsx";
-import { ArrowDown, ArrowLeft, ArrowUp, Copy, ExternalLink, FileSignature, Hammer, History, Mail, Package, Printer, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Copy, ExternalLink, FileSignature, FolderPlus, Hammer, History, Mail, Package, Plus, Printer, Search, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { computeTotals, lineTotals, priceForMargin } from "@shared/ops/math";
 import { availableEvents, isDeletable, isEditable, type QuoteEventType } from "@shared/ops/state-machine";
 import type { CatalogProduct, LineItemDraft, PublicQuote, QuoteDTO, QuotePage } from "@shared/ops/types";
-import { isAlternate, isOption, marginFor, normalizeOptions, optionGroups, type KitLine, type KitRow, type LaborRate } from "@shared/ops/estimating";
+import { isAlternate, isOption, isPackage, marginFor, normalizeOptions, optionGroups, PACKAGE_GROUP, PACKAGE_LETTERS, packageLabel, type KitLine, type KitRow, type LaborRate } from "@shared/ops/estimating";
 import { fmtMoney, fmtPct, ops, useOps, useOpsRefresh } from "@/lib/ops";
 import { ErrorBox, Field, Loading, MoneyInput, PercentInput, QuoteStatusBadge } from "@/components/ops/OpsUi";
 import { Modal, Spinner } from "@/components/ui";
@@ -47,46 +47,76 @@ function Builder({ page }: { page: QuotePage }) {
   const groups = useMemo(() => optionGroups(lines), [lines]);
   const notIncluded = lines.filter((i) => i.selected === false).reduce((t, i) => t + i.quantity * i.unitPriceCents, 0);
   const [kitPicker, setKitPicker] = useState(false);
+  // Sections: lines are grouped under them. A new (still empty) section lives here until a line is in it.
+  const [extraSections, setExtraSections] = useState<string[]>([]);
+  const [target, setTarget] = useState<string | null>(null);
+  const [focusSection, setFocusSection] = useState<string | null>(null);
+  const secOf = (i: { section?: string | null }) => i.section?.trim() || "";
+  const sections = [...new Set([...q.items.map(secOf), ...extraSections])];
   const [viewVersion, setViewVersion] = useState<number | null>(null);
 
   const patch = (p: Partial<QuoteDTO>) => { setQ((prev) => ({ ...prev, ...p })); setDirty(true); };
   const patchItem = (key: string, p: Partial<LineItemDraft>) => patch({ items: q.items.map((i) => (i.key === key ? { ...i, ...p } : i)) });
+  /** Up or down within its section. */
   const move = (key: string, dir: -1 | 1) => {
-    const i = q.items.findIndex((x) => x.key === key), j = i + dir;
+    const i = q.items.findIndex((x) => x.key === key);
+    const sec = secOf(q.items[i]);
+    let j = i + dir;
+    while (j >= 0 && j < q.items.length && secOf(q.items[j]) !== sec) j += dir;
     if (j < 0 || j >= q.items.length) return;
     const items = [...q.items]; [items[i], items[j]] = [items[j], items[i]]; patch({ items });
+  };
+  const addSection = () => {
+    let n = 1, name = "New section";
+    while (sections.includes(name)) name = `New section ${++n}`;
+    setExtraSections([...extraSections, name]); setFocusSection(name);
+  };
+  const renameSection = (from: string, to: string) => {
+    const name = to.trim();
+    if (!name || name === from) return;
+    if (sections.includes(name) && !window.confirm(`There's already a “${name}” section. Put these lines in it?`)) return;
+    setExtraSections(extraSections.map((x) => (x === from ? name : x)).filter((x, i, a) => a.indexOf(x) === i));
+    if (q.items.some((i) => secOf(i) === from)) patch({ items: q.items.map((i) => (secOf(i) === from ? { ...i, section: name } : i)) });
+  };
+  const removeSection = (sec: string) => {
+    const n = q.items.filter((i) => secOf(i) === sec).length;
+    if (n && !window.confirm(`Remove “${sec || "Other"}” and its ${n} line${n === 1 ? "" : "s"}?`)) return;
+    setExtraSections(extraSections.filter((x) => x !== sec));
+    if (n) patch({ items: q.items.filter((i) => secOf(i) !== sec) });
   };
   const sellFor = (p: CatalogProduct) => priceForMargin(p.costCents, marginFor({ manufacturer: p.manufacturer, category: p.category, vendorId: p.vendor.id }, markupRules, defaultMarginBps).marginBps);
   const addFromCatalog = (p: CatalogProduct, qty: number) => {
     setQ((prev) => {
       const existing = prev.items.find((i) => i.productId === p.id);
       const items = existing ? prev.items.map((i) => (i === existing ? { ...i, quantity: i.quantity + qty } : i)) : [...prev.items, {
-        key: uid(), productId: p.id, isCustom: false, section: guessSection(p.category), sku: p.sku, name: [p.manufacturer, p.name].filter(Boolean).join(" "),
+        key: uid(), productId: p.id, isCustom: false, section: target ?? guessSection(p.category), sku: p.sku, name: [p.manufacturer, p.name].filter(Boolean).join(" "),
         description: p.model ? `Model ${p.model}` : p.description, quantity: qty, unitCostCents: p.costCents, unitPriceCents: sellFor(p), taxable: true,
       }];
       return { ...prev, items };
     });
     setDirty(true);
   };
-  const addCustom = (kind: "item" | "labor") => patch({ items: [...q.items, kind === "labor"
-    ? { key: uid(), productId: null, isCustom: true, section: "Labor", sku: null, name: "Installation labor (hours)", description: null, quantity: 1, unitCostCents: 0, unitPriceCents: laborRateCents, taxable: false }
-    : { key: uid(), productId: null, isCustom: true, section: "Misc", sku: null, name: "Custom item", description: null, quantity: 1, unitCostCents: 0, unitPriceCents: 0, taxable: true }] });
-  const addLabor = (r: LaborRate) => patch({ items: [...q.items, { key: uid(), productId: null, isCustom: true, section: "Labor", sku: null, name: r.name, description: r.description, quantity: 1, unitCostCents: r.costCents, unitPriceCents: r.priceCents, taxable: r.taxable }] });
+  const addCustom = (kind: "item" | "labor", section?: string) => patch({ items: [...q.items, kind === "labor"
+    ? { key: uid(), productId: null, isCustom: true, section: section ?? "Labor", sku: null, name: "Installation labor (hours)", description: null, quantity: 1, unitCostCents: 0, unitPriceCents: laborRateCents, taxable: false }
+    : { key: uid(), productId: null, isCustom: true, section: section ?? "Misc", sku: null, name: "Custom item", description: null, quantity: 1, unitCostCents: 0, unitPriceCents: 0, taxable: true }] });
+  const addLabor = (r: LaborRate, section?: string) => patch({ items: [...q.items, { key: uid(), productId: null, isCustom: true, section: section ?? "Labor", sku: null, name: r.name, description: r.description, quantity: 1, unitCostCents: r.costCents, unitPriceCents: r.priceCents, taxable: r.taxable }] });
   /** A kit's lines, or the kit as one line (its lines summed). */
   const addKit = (kit: KitRow, kl: KitLine[], asOne: boolean) => {
-    const section = kit.section || kit.name;
+    const section = target ?? (kit.section || kit.name);
     const add: LineItemDraft[] = asOne
       ? [{ key: uid(), productId: null, isCustom: true, section, sku: null, name: kit.name, description: kit.description, quantity: 1, kitName: kit.name,
           unitCostCents: kl.reduce((t, l) => t + l.quantity * l.unitCostCents, 0), unitPriceCents: kl.reduce((t, l) => t + l.quantity * l.unitPriceCents, 0), taxable: kl.some((l) => l.taxable) }]
-      : kl.map((l) => ({ key: uid(), productId: l.productId, isCustom: l.isCustom, section: l.labor ? "Labor" : section, sku: l.sku, name: l.name, description: l.description,
+      : kl.map((l) => ({ key: uid(), productId: l.productId, isCustom: l.isCustom, section: l.labor && !target ? "Labor" : section, sku: l.sku, name: l.name, description: l.description,
           quantity: l.quantity, unitCostCents: l.unitCostCents, unitPriceCents: l.unitPriceCents, taxable: l.taxable, kitName: kit.name }));
     patch({ items: [...q.items, ...add] });
     toast.success(`${kit.name} added`);
   };
   /** Options: standard, an optional add-on group, or an alternate (a choice in a group). */
-  const setOption = (it: LineItemDraft, kind: "STD" | "ADD_ON" | "ALT") => patchItem(it.key, kind === "STD" ? { optionGroup: null, optionChoice: null, selected: true }
-    : kind === "ADD_ON" ? { optionGroup: it.optionGroup || "Optional add-on", optionChoice: null, selected: it.selected ?? true }
-    : { optionGroup: it.optionGroup || "Choose one", optionChoice: it.optionChoice || "Option A" });
+  /** Options: standard (in every option), Option A–D, an optional add-on group, or an alternate in a group of your own. */
+  const setOption = (it: LineItemDraft, kind: string) => patchItem(it.key, kind === "STD" ? { optionGroup: null, optionChoice: null, selected: true }
+    : (PACKAGE_LETTERS as readonly string[]).includes(kind) ? { optionGroup: PACKAGE_GROUP, optionChoice: kind }
+    : kind === "ADD_ON" ? { optionGroup: isPackage(it) ? "Optional add-on" : it.optionGroup || "Optional add-on", optionChoice: null, selected: it.selected ?? true }
+    : { optionGroup: isPackage(it) || !it.optionGroup ? "Choose one" : it.optionGroup, optionChoice: isPackage(it) ? "Good" : it.optionChoice || "Good" });
   const includeAddOn = (group: string, on: boolean) => patch({ items: q.items.map((i) => (i.optionGroup?.trim() === group && !isAlternate(i) ? { ...i, selected: on } : i)) });
   const pickChoice = (group: string, choice: string) => patch({ items: q.items.map((i) => (i.optionGroup?.trim() === group && isAlternate(i) ? { ...i, selected: i.optionChoice?.trim() === choice } : i)) });
   const [marginAll, setMarginAll] = useState<string | null>(null);
@@ -202,6 +232,7 @@ function Builder({ page }: { page: QuotePage }) {
                     </select>
                   ) : <button className="btn-outline" onClick={() => addCustom("labor")}>+ Labor</button>}
                   <button className="btn-outline" onClick={() => setKitPicker(true)}><Package size={13} /> Kit</button>
+                  <button className="btn-outline" onClick={addSection}><FolderPlus size={13} /> Section</button>
                   <button className="btn-ghost" onClick={() => setMarginAll(String(defaultMarginBps / 100))}>Set margin…</button>
                 </div>
               )}
@@ -211,30 +242,65 @@ function Builder({ page }: { page: QuotePage }) {
                 <thead className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted [&_th]:px-3 [&_th]:py-2.5">
                   <tr><th className="w-32">Section</th><th className="min-w-[320px]">Item</th><th className="w-20">Qty</th><th className="w-32 text-right">Unit cost</th><th className="w-32 text-right">Unit price</th><th className="w-24 text-right">Margin</th><th className="w-28 text-right">Ext. price</th><th className="w-12">Tax</th><th className="w-20" /></tr>
                 </thead>
-                <tbody className="divide-y divide-line [&_td]:px-3 [&_td]:py-2.5">
-                  {q.items.map((it, idx) => {
+                <tbody className="[&_td]:px-3 [&_td]:py-2.5">
+                  {sections.map((sec) => {
+                    const rows = q.items.map((it, idx) => ({ it, idx })).filter(({ it }) => secOf(it) === sec);
+                    const sub = rows.reduce((t, { idx }) => t + (lines[idx].selected === false ? 0 : lines[idx].quantity * lines[idx].unitPriceCents), 0);
+                    return (
+                      <SectionRows key={sec || "_none"}>
+                        <tr className="border-t-2 border-line bg-hover/40">
+                          <td colSpan={9} className="!py-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {editable ? <SectionName name={sec} autoFocus={focusSection === sec} onRename={(to) => renameSection(sec, to)} />
+                                : <span className="text-[13px] font-semibold uppercase tracking-[0.05em]">{sec || "Other"}</span>}
+                              <span className="text-xs text-ink-faint">{rows.length} line{rows.length === 1 ? "" : "s"} · {fmtMoney(sub)}</span>
+                              {editable && (
+                                <span className="ml-3 flex flex-wrap gap-1">
+                                  <button className="btn-ghost py-1 text-xs" onClick={() => { setTarget(sec); setPicker(true); }}><Search size={12} /> Catalog</button>
+                                  <button className="btn-ghost py-1 text-xs" onClick={() => addCustom("item", sec)}><Plus size={12} /> Custom line</button>
+                                  {laborRates.length > 0 && (
+                                    <select className="rounded-md border border-line bg-canvas px-1.5 py-1 text-xs text-ink-soft" value="" onChange={(e) => { const r = laborRates.find((x) => x.id === e.target.value); if (r) addLabor(r, sec); }} aria-label="Add labor to this section">
+                                      <option value="">+ Labor…</option>{laborRates.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                    </select>
+                                  )}
+                                  <button className="btn-ghost py-1 text-xs" onClick={() => { setTarget(sec); setKitPicker(true); }}><Package size={12} /> Kit</button>
+                                  <button className="btn-ghost p-1 text-bad/70 hover:text-bad" onClick={() => removeSection(sec)} aria-label={`Remove section ${sec}`}><Trash2 size={13} /></button>
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {rows.map(({ it, idx }, k) => {
                     const lt = lineTotals(it);
                     const low = it.unitCostCents > 0 && lt.marginBps < 1500;
                     const n = lines[idx];
-                    const kind = isAlternate(n) ? "ALT" : isOption(n) ? "ADD_ON" : "STD";
+                    const kind = isPackage(n) ? n.optionChoice!.trim() : isAlternate(n) ? "ALT" : isOption(n) ? "ADD_ON" : "STD";
+                    const custom = kind === "ALT" || kind === "ADD_ON";
                     return (
-                      <tr key={it.key} className={clsx("align-top", kind !== "STD" && "bg-violet-soft/30 [&>td:first-child]:border-l-2 [&>td:first-child]:border-violet", n.selected === false && "[&_td]:opacity-70")}>
-                        <td><input list="ops-sections" className="input py-1" disabled={!editable} value={it.section ?? ""} onChange={(e) => patchItem(it.key, { section: e.target.value || null })} /></td>
+                      <tr key={it.key} className={clsx("border-t border-line align-top", kind !== "STD" && "bg-violet-soft/30 [&>td:first-child]:border-l-2 [&>td:first-child]:border-violet", n.selected === false && "[&_td]:opacity-70")}>
+                        <td>
+                          {kind !== "STD" && kind !== "ALT" && kind !== "ADD_ON" && <span className="mb-1 inline-block rounded bg-violet px-1.5 py-0.5 text-[10px] font-bold text-white">{packageLabel(kind)}</span>}
+                          <select className="input py-1 text-xs" disabled={!editable} value={sec} onChange={(e) => patchItem(it.key, { section: e.target.value || null })} aria-label="Section">
+                            {sections.map((x) => <option key={x || "_none"} value={x}>{x || "Other"}</option>)}
+                          </select>
+                        </td>
                         <td>
                           <input className="input py-1 font-medium" disabled={!editable} value={it.name} onChange={(e) => patchItem(it.key, { name: e.target.value })} />
                           <input className="input mt-1 py-1 text-xs" placeholder="Description (the customer sees this)" disabled={!editable} value={it.description ?? ""} onChange={(e) => patchItem(it.key, { description: e.target.value || null })} />
                           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-faint">
                             <span>{it.isCustom ? "Custom line" : `Catalog · ${it.sku}`}{it.kitName ? ` · from kit ${it.kitName}` : ""}</span>
-                            {(editable || kind !== "STD") && <select className="rounded border border-line bg-canvas px-1 py-0.5 text-[11px] text-ink-soft" disabled={!editable} value={kind} onChange={(e) => setOption(it, e.target.value as "STD" | "ADD_ON" | "ALT")} aria-label="Option">
-                              <option value="STD">Standard</option><option value="ADD_ON">Optional add-on</option><option value="ALT">Alternate (choose one)</option>
+                            {(editable || kind !== "STD") && <select className="rounded border border-line bg-canvas px-1 py-0.5 text-[11px] text-ink-soft" disabled={!editable} value={kind} onChange={(e) => setOption(it, e.target.value)} aria-label="Option">
+                              <option value="STD">In every option</option>
+                              {PACKAGE_LETTERS.map((l) => <option key={l} value={l}>Option {l}</option>)}
+                              <option value="ADD_ON">Optional add-on</option><option value="ALT">Alternate (own group)</option>
                             </select>}
-                            {kind !== "STD" && <>
+                            {custom && <>
                               <input list="ops-option-groups" className="w-36 rounded border border-line bg-canvas px-1.5 py-0.5 text-[11px] text-ink" disabled={!editable} value={it.optionGroup ?? ""} placeholder="Group" title="Option group" onChange={(e) => patchItem(it.key, { optionGroup: e.target.value })} />
                               {kind === "ALT" && <input className="w-28 rounded border border-line bg-canvas px-1.5 py-0.5 text-[11px] text-ink" disabled={!editable} value={it.optionChoice ?? ""} placeholder="Choice (Good…)" title="Choice" onChange={(e) => patchItem(it.key, { optionChoice: e.target.value })} />}
-                              {kind === "ADD_ON"
-                                ? <label className="flex items-center gap-1 text-ink-soft"><input type="checkbox" disabled={!editable} checked={n.selected !== false} onChange={(e) => includeAddOn(n.optionGroup!, e.target.checked)} /> Included</label>
-                                : <label className="flex items-center gap-1 text-ink-soft"><input type="radio" disabled={!editable} checked={n.selected !== false} onChange={() => pickChoice(n.optionGroup!, n.optionChoice!)} /> Default pick</label>}
                             </>}
+                            {kind === "ADD_ON"
+                              ? <label className="flex items-center gap-1 text-ink-soft"><input type="checkbox" disabled={!editable} checked={n.selected !== false} onChange={(e) => includeAddOn(n.optionGroup!, e.target.checked)} /> Included</label>
+                              : kind !== "STD" && <label className="flex items-center gap-1 text-ink-soft"><input type="radio" disabled={!editable} checked={n.selected !== false} onChange={() => pickChoice(n.optionGroup!, n.optionChoice!)} /> Default pick</label>}
                           </div>
                         </td>
                         <td><input type="number" min={1} className="input py-1" disabled={!editable} value={it.quantity} onChange={(e) => patchItem(it.key, { quantity: Math.max(1, parseInt(e.target.value) || 1) })} /></td>
@@ -248,14 +314,18 @@ function Builder({ page }: { page: QuotePage }) {
                         <td className="pt-4 text-right font-medium tabular-nums">{fmtMoney(lt.priceCents)}</td>
                         <td className="pt-4"><input type="checkbox" disabled={!editable} checked={it.taxable} onChange={(e) => patchItem(it.key, { taxable: e.target.checked })} /></td>
                         <td className="whitespace-nowrap pt-3">{editable && (<>
-                          <button className="p-1 text-ink-faint hover:text-ink disabled:opacity-30" disabled={idx === 0} onClick={() => move(it.key, -1)} aria-label="Move up"><ArrowUp size={13} /></button>
-                          <button className="p-1 text-ink-faint hover:text-ink disabled:opacity-30" disabled={idx === q.items.length - 1} onClick={() => move(it.key, 1)} aria-label="Move down"><ArrowDown size={13} /></button>
+                          <button className="p-1 text-ink-faint hover:text-ink disabled:opacity-30" disabled={k === 0} onClick={() => move(it.key, -1)} aria-label="Move up"><ArrowUp size={13} /></button>
+                          <button className="p-1 text-ink-faint hover:text-ink disabled:opacity-30" disabled={k === rows.length - 1} onClick={() => move(it.key, 1)} aria-label="Move down"><ArrowDown size={13} /></button>
                           <button className="p-1 text-bad/80 hover:text-bad" onClick={() => patch({ items: q.items.filter((x) => x.key !== it.key) })} aria-label="Remove"><X size={13} /></button>
                         </>)}</td>
                       </tr>
                     );
+                        })}
+                        {!rows.length && <tr className="border-t border-line"><td colSpan={9} className="py-5 text-center text-xs text-ink-faint">Nothing in this section yet. Add from the catalog, a custom line, labor or a kit.</td></tr>}
+                      </SectionRows>
+                    );
                   })}
-                  {!q.items.length && <tr><td colSpan={9} className="py-12 text-center text-ink-faint">No line items yet. Add products from a vendor price list, or a custom line.</td></tr>}
+                  {!q.items.length && !extraSections.length && <tr><td colSpan={9} className="py-12 text-center text-ink-faint">No line items yet. Add products from a vendor price list, a custom line, or start a section.</td></tr>}
                 </tbody>
               </table>
               <datalist id="ops-sections">{SECTIONS.map((s) => <option key={s} value={s} />)}</datalist>
@@ -263,8 +333,8 @@ function Builder({ page }: { page: QuotePage }) {
               {groups.length > 0 && (
                 <div className="border-t border-line bg-violet-soft/20 px-3 py-2.5 text-xs text-ink-soft">
                   <b className="text-ink">Client choices:</b>{" "}
-                  {groups.map((g) => g.kind === "ADD_ON" ? `${g.group} (optional, ${g.choices[0].selected ? "included" : "not included"})` : `${g.group} (${g.choices.map((c) => c.choice).join(" / ")})`).join(" · ")}.
-                  {" "}The client can change these on the proposal link before signing; the total follows.
+                  {groups.map((g) => g.kind === "ADD_ON" ? `${g.group} (optional, ${g.choices[0].selected ? "included" : "not included"})` : g.group === PACKAGE_GROUP ? `${g.choices.map((c) => packageLabel(c.choice)).join(" / ")} (pick one)` : `${g.group} (${g.choices.map((c) => c.choice).join(" / ")})`).join(" · ")}.
+                  {" "}The client can change these on the proposal link before signing; the total follows. When it&apos;s accepted, what wasn&apos;t picked comes off the proposal (the version sent keeps it).
                 </div>
               )}
             </div>
@@ -351,8 +421,8 @@ function Builder({ page }: { page: QuotePage }) {
         </aside>
       </div>
 
-      {picker && <CatalogPicker vendors={vendors} priceOf={sellFor} onAdd={addFromCatalog} onClose={() => setPicker(false)} />}
-      {kitPicker && <KitPicker kits={kits} onAdd={addKit} onClose={() => setKitPicker(false)} />}
+      {picker && <CatalogPicker vendors={vendors} priceOf={sellFor} onAdd={addFromCatalog} onClose={() => { setPicker(false); setTarget(null); }} />}
+      {kitPicker && <KitPicker kits={kits} onAdd={addKit} onClose={() => { setKitPicker(false); setTarget(null); }} />}
       {viewVersion != null && <VersionModal quoteId={q.id} version={viewVersion} onClose={() => setViewVersion(null)} />}
       {askNote && <NoteModal event={askNote} onClose={() => setAskNote(null)} onSubmit={(n) => fire(askNote, n)} />}
       {sending && <SendModal again={sending === "email"} revision={q.status === "CHANGES_REQUESTED"} defaultTo={customer?.email ?? ""} onClose={() => setSending(null)}
@@ -426,6 +496,19 @@ function NoteModal({ event, onClose, onSubmit }: { event: QuoteEventType; onClos
         <div className="flex justify-end gap-2"><button type="button" className="btn-ghost" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={busy}>{busy && <Spinner />}{LABELS[event]}</button></div>
       </form>
     </Modal>
+  );
+}
+
+const SectionRows = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+
+/** A section's name, renamed when you leave the box (so typing doesn't move lines around). */
+function SectionName({ name, autoFocus, onRename }: { name: string; autoFocus?: boolean; onRename: (to: string) => void }) {
+  const [v, setV] = useState(name);
+  useEffect(() => setV(name), [name]);
+  return (
+    <input className="w-56 rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-[13px] font-semibold uppercase tracking-[0.05em] hover:border-line focus:border-accent focus:bg-surface focus:outline-none"
+      list="ops-sections" value={v} placeholder="Other" autoFocus={autoFocus} onFocus={(e) => autoFocus && e.target.select()} aria-label="Section name"
+      onChange={(e) => setV(e.target.value)} onBlur={() => { if (v.trim() !== name) onRename(v); }} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
   );
 }
 

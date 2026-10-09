@@ -4,14 +4,17 @@
  * by section, totals and terms. Never cost, margin or internal notes.
  */
 import type { PrintData, PublicQuote } from "@shared/ops/types";
-import { isOption, optionGroups } from "@shared/ops/estimating";
+import { applySelections, isOption, optionGroups, PACKAGE_GROUP, packageLabel, selectionsOf } from "@shared/ops/estimating";
+import { computeTotals } from "@shared/ops/math";
 import { fmtMoney } from "@/lib/ops";
 
 /** On the client's page the options can be chosen; printed, they show what's chosen. */
 export interface Chooser { addOn: (group: string, on: boolean) => void; pick: (group: string, choice: string) => void }
 
 export function ProposalDoc({ data: { quote, org, logo }, signature, chooser }: { data: PrintData; signature?: React.ReactNode; chooser?: Chooser }) {
-  const groups = optionGroups(quote.items);
+  const all = optionGroups(quote.items);
+  const pkg = all.find((g) => g.group === PACKAGE_GROUP && g.kind === "ALTERNATES") ?? null;
+  const groups = all.filter((g) => g !== pkg);
   const addr = [org.addressLine1, org.addressLine2, [org.city, org.state, org.postalCode].filter(Boolean).join(", ")].filter(Boolean);
   return (
     <article>
@@ -40,7 +43,9 @@ export function ProposalDoc({ data: { quote, org, logo }, signature, chooser }: 
       </header>
       <h1 className="mt-6 text-2xl font-semibold">{quote.title}</h1>
       {quote.introNotes && <p className="mt-2 whitespace-pre-wrap text-[#475569]">{quote.introNotes}</p>}
+      {pkg && <Packages quote={quote} group={pkg} chooser={chooser} />}
       <div className="mt-6 space-y-6">
+        {pkg && quote.items.some((i) => !isOption(i)) && <h2 className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">{pkg.choices.length > 1 ? "Included with every option" : "Also included"}</h2>}
         {groupBySection(quote.items.filter((i) => !isOption(i))).map(([section, items]) => (
           <section key={section} className="break-inside-avoid">
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#0b6bcb]">{section}</h2>
@@ -62,7 +67,7 @@ export function ProposalDoc({ data: { quote, org, logo }, signature, chooser }: 
       </div>
       {groups.length > 0 && (
         <div className="mt-8 space-y-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[#0b6bcb]">Options{chooser ? ": choose what you'd like" : ""}</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[#0b6bcb]">{pkg ? "Add-ons" : "Options"}{chooser ? ": choose what you'd like" : ""}</h2>
           {groups.map((g) => (
             <section key={g.group} className="break-inside-avoid rounded-lg border border-[#e2e8f0] p-3">
               <div className="mb-2 flex items-baseline justify-between gap-3">
@@ -118,6 +123,44 @@ export function ProposalDoc({ data: { quote, org, logo }, signature, chooser }: 
         </section>
       )}
     </article>
+  );
+}
+
+/** Option A, B, C…: side by side, each with what's in it and the proposal's total if it's the one. */
+function Packages({ quote, group, chooser }: { quote: PublicQuote; group: ReturnType<typeof optionGroups<PublicQuote["items"][number]>>[number]; chooser?: Chooser }) {
+  const base = selectionsOf(quote.items);
+  const totalWith = (choice: string) => computeTotals(applySelections(quote.items, { ...base, [PACKAGE_GROUP]: choice }).map((i) => ({ ...i, unitCostCents: 0 })), quote.pricing).totalCents;
+  const one = group.choices.length === 1;
+  return (
+    <section className="mt-6 break-inside-avoid">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#0b6bcb]">{one ? "Your option" : chooser ? "Choose your option" : "Options"}</h2>
+      <div className={`grid gap-3 ${one ? "" : group.choices.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
+        {group.choices.map((c) => {
+          const amount = c.items.reduce((t, i) => t + i.quantity * i.unitPriceCents, 0);
+          return (
+            <label key={c.choice} className={`flex flex-col rounded-xl border-2 p-4 ${c.selected ? "border-[#0f766e] bg-[#f0fdfa]" : "border-[#e2e8f0] bg-white"} ${chooser && !one ? "cursor-pointer hover:border-[#5eead4]" : ""}`}>
+              <span className="flex items-center gap-2">
+                {chooser && !one && <input type="radio" name="opt-package" className="no-print h-4 w-4 accent-[#0f766e]" checked={c.selected} onChange={() => chooser.pick(group.group, c.choice!)} />}
+                <span className="text-lg font-semibold">{packageLabel(c.choice)}</span>
+                {c.selected && <span className="ml-auto rounded-full bg-[#0f766e] px-2 py-0.5 text-[11px] font-semibold text-white">{one ? "Chosen" : chooser ? "Selected" : "Chosen"}</span>}
+              </span>
+              <span className="mt-2 flex-1 space-y-1.5">
+                {c.items.map((i) => (
+                  <span key={i.id} className="block text-sm text-[#334155]">
+                    <span className="flex justify-between gap-2"><span>{i.quantity > 1 ? `${i.quantity} × ` : ""}{i.name}</span><span className="shrink-0 tabular-nums text-[#64748b]">{fmtMoney(i.quantity * i.unitPriceCents)}</span></span>
+                    {i.description && <span className="block text-xs text-[#64748b]">{i.description}</span>}
+                  </span>
+                ))}
+              </span>
+              <span className="mt-3 block border-t border-[#e2e8f0] pt-2 text-sm">
+                <span className="flex justify-between"><span className="text-[#64748b]">This option</span><span className="tabular-nums">{fmtMoney(amount)}</span></span>
+                {!one && <span className="flex justify-between font-semibold"><span>Proposal total</span><span className="tabular-nums">{fmtMoney(totalWith(c.choice!))}</span></span>}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

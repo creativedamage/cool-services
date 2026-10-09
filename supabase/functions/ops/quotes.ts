@@ -84,7 +84,12 @@ export async function applyEvent(opts: { quoteId: string; event: QuoteEventType;
         if (q.signature) await tx`delete from ops.quote_signatures where quote_id = ${q.id}`;
         break;
       }
-      case "ACCEPT": case "MARK_ACCEPTED": data.acceptedAt = now; break;
+      case "ACCEPT": case "MARK_ACCEPTED":
+        data.acceptedAt = now;
+        // What was chosen becomes the proposal: options and add-ons not picked are dropped (the
+        // version sent keeps everything that was offered).
+        await tx`delete from ops.quote_items where quote_id = ${q.id} and selected = false`;
+        break;
       case "DECLINE": case "MARK_DECLINED": data.declinedAt = now; break;
       case "CONVERT": data.convertedAt = now; break;
       case "REVISE": case "REOPEN":

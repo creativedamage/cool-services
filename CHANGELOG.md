@@ -4,6 +4,15 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.38.0
+Proposal options A, B, C and sections on quotes.
+- **Option A, B, C on proposals.** Mark any line as Option A, B, C or D (or "in every option"). The
+  client sees the options side by side with the proposal total for each, picks one and signs. When a
+  proposal is accepted, the options and add-ons they didn't pick come off it, so the proposal and the
+  job are exactly what was chosen (the version sent still shows everything that was offered).
+- **Sections on quotes.** Lines are grouped under their sections. Add a section with one click, rename
+  it in place, and add catalog items, custom lines, labor or a kit straight into it.
+
 ## 1.37.0
 Sundays AVL projects: schedules, crew, tasks, daily logs with photos, job files and time.
 - **Job schedule.** Plan a job in phases (Design, Order, Pre-wire, Install, Commission, Training, or

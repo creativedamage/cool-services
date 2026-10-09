@@ -80,6 +80,18 @@ export function normalizeOptions<T extends OptionLine>(items: T[]): T[] {
   });
 }
 
+/**
+ * Whole-proposal options: lines marked Option A, B, C or D are alternatives the client picks one of
+ * (an alternates group named "Options" with the letter as the choice). Lines in no option are in
+ * every option. When the proposal is accepted, the options not chosen are dropped from it (the
+ * version sent keeps them).
+ */
+export const PACKAGE_GROUP = "Options";
+export const PACKAGE_LETTERS = ["A", "B", "C", "D"] as const;
+export const isPackage = (i: OptionLine) => isAlternate(i) && i.optionGroup!.trim() === PACKAGE_GROUP;
+export const packageLetter = (i: OptionLine) => (isPackage(i) ? i.optionChoice!.trim() : null);
+export const packageLabel = (choice: string | null | undefined) => (choice && choice.length <= 2 ? `Option ${choice}` : choice ?? "");
+
 export interface OptionGroup<T> { group: string; kind: "ADD_ON" | "ALTERNATES"; choices: { choice: string | null; items: T[]; selected: boolean }[] }
 /** The option groups on a proposal, in the order they first appear. */
 export function optionGroups<T extends OptionLine>(items: T[]): OptionGroup<T>[] {
