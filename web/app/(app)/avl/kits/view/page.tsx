@@ -112,7 +112,7 @@ function Editor({ id, setup, initial }: { id: string; setup: PricingSetup; initi
             <div className="overflow-x-auto">
               <table className="w-full min-w-[860px] text-sm">
                 <thead className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted [&_th]:px-3 [&_th]:py-2.5">
-                  <tr><th>Line</th><th className="w-20">Qty</th><th className="w-32 text-right">Unit cost</th><th className="w-36 text-right">Unit price</th><th className="w-28 text-right">Ext. price</th><th className="w-12">Tax</th><th className="w-20" /></tr>
+                  <tr><th>Line</th><th className="w-24">Qty</th><th className="w-32 text-right">Unit cost</th><th className="w-36 text-right">Unit price</th><th className="w-28 text-right">Ext. price</th><th className="w-12">Tax</th><th className="w-20" /></tr>
                 </thead>
                 <tbody className="divide-y divide-line [&_td]:px-3 [&_td]:py-2.5">
                   {items.map((it, idx) => {
@@ -127,7 +127,7 @@ function Editor({ id, setup, initial }: { id: string; setup: PricingSetup; initi
                             {it.live?.missing && <span className="text-warn">{it.kind === "PRODUCT" ? "No longer in the price list: using the saved cost" : "Labor rate removed: using the saved cost"}</span>}
                           </div>
                         </td>
-                        <td><input type="number" min={1} className="input py-1" value={it.quantity} onChange={(e) => patch(it.id, { quantity: Math.max(1, parseInt(e.target.value) || 1) })} /></td>
+                        <td><input type="number" min={1} className="input min-w-[5.5rem] py-1 tabular-nums" value={it.quantity} onChange={(e) => patch(it.id, { quantity: Math.max(1, parseInt(e.target.value) || 1) })} /></td>
                         <td>{it.kind === "CUSTOM" ? <MoneyInput cents={it.unitCostCents} onChange={(c) => patch(it.id, { unitCostCents: c ?? 0 })} />
                           : <div className="pt-1.5 text-right tabular-nums text-ink-soft">{fmtMoney(p.cost)}</div>}</td>
                         <td>

@@ -240,7 +240,7 @@ function Builder({ page }: { page: QuotePage }) {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1120px] text-sm">
                 <thead className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted [&_th]:px-3 [&_th]:py-2.5">
-                  <tr><th className="w-32">Section</th><th className="min-w-[320px]">Item</th><th className="w-20">Qty</th><th className="w-32 text-right">Unit cost</th><th className="w-32 text-right">Unit price</th><th className="w-24 text-right">Margin</th><th className="w-28 text-right">Ext. price</th><th className="w-12">Tax</th><th className="w-20" /></tr>
+                  <tr><th className="w-32">Section</th><th className="min-w-[320px]">Item</th><th className="w-24">Qty</th><th className="w-32 text-right">Unit cost</th><th className="w-32 text-right">Unit price</th><th className="w-24 text-right">Margin</th><th className="w-28 text-right">Ext. price</th><th className="w-12">Tax</th><th className="w-20" /></tr>
                 </thead>
                 <tbody className="[&_td]:px-3 [&_td]:py-2.5">
                   {sections.map((sec) => {
@@ -303,7 +303,7 @@ function Builder({ page }: { page: QuotePage }) {
                               : kind !== "STD" && <label className="flex items-center gap-1 text-ink-soft"><input type="radio" disabled={!editable} checked={n.selected !== false} onChange={() => pickChoice(n.optionGroup!, n.optionChoice!)} /> Default pick</label>}
                           </div>
                         </td>
-                        <td><input type="number" min={1} className="input py-1" disabled={!editable} value={it.quantity} onChange={(e) => patchItem(it.key, { quantity: Math.max(1, parseInt(e.target.value) || 1) })} /></td>
+                        <td><input type="number" min={1} className="input min-w-[5.5rem] py-1 tabular-nums" disabled={!editable} value={it.quantity} onChange={(e) => patchItem(it.key, { quantity: Math.max(1, parseInt(e.target.value) || 1) })} /></td>
                         <td><MoneyInput cents={it.unitCostCents} disabled={!editable} onChange={(c) => patchItem(it.key, { unitCostCents: c ?? 0 })} /></td>
                         <td><MoneyInput cents={it.unitPriceCents} disabled={!editable} onChange={(c) => patchItem(it.key, { unitPriceCents: c ?? 0 })} /></td>
                         <td>{it.unitCostCents > 0 ? (

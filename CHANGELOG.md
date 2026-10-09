@@ -4,6 +4,10 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.38.1
+Wider quantity box on quotes and kits.
+- The quantity box on quotes and kits is wider, so 3- and 4-digit quantities show in full.
+
 ## 1.38.0
 Proposal options A, B, C and sections on quotes.
 - **Option A, B, C on proposals.** Mark any line as Option A, B, C or D (or "in every option"). The
