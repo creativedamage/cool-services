@@ -37,6 +37,8 @@ export interface OpsNav {
   ops: boolean; avl: boolean; avlManager: boolean; avlPending: number; avlName: string | null; avlChurch: boolean;
   /** AVL Crew: only the jobs they're on, no prices. */
   avlCrew: boolean;
+  /** Purchase orders waiting for this person's approval (AVL Managers). */
+  poApprovals?: number;
   /** Modules this organization has. */
   modules: ModuleKey[];
   /** Sundays super admin (acting in this org as admin). */

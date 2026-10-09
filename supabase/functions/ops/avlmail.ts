@@ -12,11 +12,11 @@ import { isEmail, render, send, senderFor, SITE, underDailyLimit, type Message }
 import { mailSettings } from "./notify.ts";
 import { effectiveTotals, loadQuote, proposalUrl } from "./quotes.ts";
 
-const money = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const first = (n?: string | null) => (n ?? "").trim().split(/\s+/)[0] || "there";
+export const money = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const first = (n?: string | null) => (n ?? "").trim().split(/\s+/)[0] || "there";
 
 /** Queue emails to go once the change is saved. Returns why they can't go (null: they're on their way). */
-async function queue(messages: (Message & { kind: string })[], fromName: string): Promise<string | null> {
+export async function queue(messages: (Message & { kind: string })[], fromName: string): Promise<string | null> {
   if (!messages.length) return null;
   const m = await mailSettings();
   if (m.provider === "off") return OFF;
@@ -37,7 +37,7 @@ const setupHint = (why: string | null) =>
     : `${why ?? "No email sender."} (Operations → Settings → Organization → Email)`;
 
 /** The business's name on AVL emails: its AVL name, else the organization's. */
-async function businessName() {
+export async function businessName() {
   const [avl, org] = await Promise.all([getAvl(), getOrg()]);
   return { name: (avl.name as string) || (org.name as string) || "Your AV team", replyTo: (avl.email as string) || null };
 }

@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
-  ArrowLeft, CalendarRange, Clock3, CreditCard, Gauge, Layers, ShieldHalf, Activity, AudioLines, Boxes, Briefcase, Building, Building2, ClipboardList, FileText, Hammer, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Target, Package, Percent, Users, UsersRound, Mail } from "lucide-react";
+  ArrowLeft, CalendarRange, Clock3, CreditCard, Gauge, Layers, ShieldHalf, Activity, AudioLines, Boxes, Briefcase, Building, Building2, ClipboardList, FileText, Hammer, Inbox, LayoutGrid, LogOut, Plus, Search, Settings2, Tags, Target, Package, Percent, Users, UsersRound, Mail, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { OpsMe } from "@shared/ops/types";
@@ -91,6 +91,7 @@ export function AvlNav() {
       ...(n.avlChurch ? [] : [{ href: "/avl/leads", label: "Leads", icon: Target }, { href: "/avl/clients", label: "Clients", icon: Briefcase }, { href: "/avl/quotes", label: "Quotes", icon: FileText }]),
       { href: "/avl/jobs", label: "Jobs", icon: Hammer },
       { href: "/avl/schedule", label: "Schedule", icon: CalendarRange },
+      { href: "/avl/purchasing", label: "Purchasing", icon: ShoppingCart, badge: n.poApprovals ?? 0, tone: "warn" as const },
       { href: "/avl/time", label: "Time", icon: Clock3 },
     ] },
     { title: "Pricing", items: [

@@ -4,6 +4,27 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.39.0
+Sundays AVL purchasing and job costing: purchase orders, receiving, work orders, vendor bills and change orders.
+- **Purchase orders from the budget.** Pick budget lines on a job and Sundays makes one draft PO per
+  vendor, with quantities and costs filled in. Add catalog items or custom lines, shipping and tax.
+- **PO approval.** Every PO goes to an AVL Manager to approve before it's sent. Approvers get an email
+  and a count on Purchasing in the menu; a rejected PO goes back to its creator with the reason.
+- **Send POs to vendors.** Email a PO with a link to a clean printable copy, or mark it ordered if you
+  placed it another way.
+- **Receiving.** Record what arrived, in full or in part. The PO shows what's still outstanding.
+- **Work orders for subcontractors.** Send a work order with the scope and dates; the sub accepts it
+  online. Mark it done when the work is finished.
+- **Vendor bills.** Enter a bill from a PO or work order (lines fill in from what's left to bill) or on
+  its own, attach the scan, and mark it paid. Each line can go against a budget line.
+- **Change orders.** Add or credit lines after the sale. The client reviews and signs online (or an
+  AVL Manager records how they agreed), and the approved lines join the job's budget.
+- **Job costing.** A new tab on every job compares each budget line with what's committed (POs, work
+  orders), what's actually spent (bills and logged time) and the projected cost and margin. Mark a
+  line final once all its costs are in.
+- **Purchasing page.** AVL → Purchasing shows every PO, work order and bill, with what's waiting for
+  approval, on order and unpaid.
+
 ## 1.38.2
 Proposal emails say why they didn’t go.
 - **Proposal emails say why they didn’t go.** If no email service is set up (or email is off), sending a proposal now says so and where to fix it, instead of showing “Sent”.

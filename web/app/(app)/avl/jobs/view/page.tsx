@@ -27,11 +27,12 @@ import { JobFiles } from "@/components/avl/project/JobFiles";
 import { JobTime } from "@/components/avl/project/Time";
 import { fmtRange, phaseHex } from "@/components/avl/project/Gantt";
 import { Faces } from "@/components/avl/project/bits";
+import { JobChangesTab, JobCostingTab, JobPurchasingTab } from "@/components/avl/purchasing/JobTabs";
 
 export default function Page() { return <Suspense><JobView /></Suspense>; }
 
-type Tab = "dashboard" | "budget" | "profit" | "schedule" | "tasks" | "logs" | "files" | "time" | "documents";
-const TABS: Tab[] = ["dashboard", "budget", "profit", "schedule", "tasks", "logs", "files", "time", "documents"];
+type Tab = "dashboard" | "budget" | "costing" | "profit" | "purchasing" | "changes" | "schedule" | "tasks" | "logs" | "files" | "time" | "documents";
+const TABS: Tab[] = ["dashboard", "budget", "costing", "profit", "purchasing", "changes", "schedule", "tasks", "logs", "files", "time", "documents"];
 
 function JobView() {
   const sp = useSearchParams();
@@ -45,8 +46,10 @@ function JobView() {
   const church = businessType === "CHURCH";
   const tabs: [Tab, string][] = [
     ["dashboard", crewView ? "Overview" : "Dashboard"],
-    ...(crewView ? [] : [["budget", "Budget"]] as [Tab, string][]),
+    ...(crewView ? [] : [["budget", "Budget"], ["costing", "Job costing"]] as [Tab, string][]),
     ...(crewView || church ? [] : [["profit", "Profit"]] as [Tab, string][]),
+    ...(crewView ? [] : [["purchasing", "Purchasing"]] as [Tab, string][]),
+    ...(crewView || church ? [] : [["changes", "Change orders"]] as [Tab, string][]),
     ["schedule", "Schedule"], ["tasks", "Tasks"], ["logs", "Daily logs"], ["files", "Files"], ["time", "Time"],
     ...(crewView ? [] : [["documents", "Documents"]] as [Tab, string][]),
   ];
@@ -83,6 +86,9 @@ function JobView() {
       {tab === "time" && <JobTime page={d.data} />}
       {tab === "budget" && <Budget key={job.id} page={d.data} church={church} onSaved={() => void d.refetch()} />}
       {tab === "profit" && <Profit page={d.data} />}
+      {tab === "costing" && <JobCostingTab page={d.data} church={church} />}
+      {tab === "purchasing" && <JobPurchasingTab page={d.data} />}
+      {tab === "changes" && <JobChangesTab page={d.data} />}
       {tab === "documents" && <Documents page={d.data} />}
       {editing && <EditJob page={d.data} church={church} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); void d.refetch(); }} />}
     </div>
@@ -548,7 +554,7 @@ function Profit({ page }: { page: JobPage }) {
       ]} />
       {table("By cost group", groups)}
       {table("By kind of cost", types)}
-      <p className="text-[11px] text-ink-faint">Budgeted figures. Once purchase orders, bills and time come in (purchasing and job costing), actual cost and variance show here too.</p>
+      <p className="text-[11px] text-ink-faint">Budgeted figures. For what’s committed and spent so far, and the projected margin, see Job costing.</p>
     </div>
   );
 }

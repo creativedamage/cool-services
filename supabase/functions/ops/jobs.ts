@@ -26,6 +26,7 @@ const toItem = (r: Record<string, any>): BudgetItem => ({
   id: r.id, parentId: r.parentId ?? null, kind: r.kind, name: r.name, description: r.description ?? null, costType: r.costType,
   quantity: Number(r.quantity), unit: r.unit ?? null, unitCostCents: Number(r.unitCostCents), unitPriceCents: Number(r.unitPriceCents),
   taxable: r.taxable, productId: r.productId ?? null, quoteItemId: r.quoteItemId ?? null, sortOrder: r.sortOrder,
+  changeOrderId: r.changeOrderId ?? null, final: !!r.final,
 });
 export async function budgetOf(jobId: string, db: Db = sql): Promise<BudgetItem[]> {
   return (await db`select * from ops.budget_items where job_id = ${jobId} order by sort_order, id`).map(toItem);
@@ -166,6 +167,9 @@ export const BudgetSchema = z.array(z.object({
   unitCostCents: money, unitPriceCents: money,
   taxable: z.boolean(),
   productId: z.string().max(60).nullish(),
+  // Shown with the item; changed elsewhere (job costing, change orders).
+  changeOrderId: z.string().max(60).nullish(),
+  final: z.boolean().optional(),
 }).strict()).max(3000);
 
 /**
@@ -197,6 +201,13 @@ export async function saveBudget(jobId: string, items: z.infer<typeof BudgetSche
       }
     }
     const keep = [...ids.values()];
+    // Lines that purchase orders, work orders or bills point at stay (set the quantity to 0 instead).
+    const used = await tx`select b.name from ops.budget_items b where b.job_id = ${jobId} and b.kind = 'ITEM' ${keep.length ? tx`and b.id <> all(${keep})` : tx``}
+      and (exists (select 1 from ops.purchase_order_items x join ops.purchase_orders po on po.id = x.po_id where x.budget_item_id = b.id and po.status <> 'CANCELLED')
+        or exists (select 1 from ops.work_order_items x join ops.work_orders w on w.id = x.work_order_id where x.budget_item_id = b.id and w.status <> 'CANCELLED')
+        or exists (select 1 from ops.vendor_bill_lines x join ops.vendor_bills v on v.id = x.bill_id where x.budget_item_id = b.id and v.status <> 'VOID'))
+      limit 3`;
+    if (used.length) throw new HttpError(409, `${used.map((u) => `“${u.name}”`).join(", ")} ${used.length === 1 ? "is" : "are"} on a purchase order, work order or bill, so ${used.length === 1 ? "it" : "they"} can't be removed. Set the quantity to 0 instead, or cancel the order first.`);
     await tx`delete from ops.budget_items where job_id = ${jobId} ${keep.length ? tx`and id <> all(${keep})` : tx``}`;
     if (items.length) {
       const rows = items.map((it, i) => ({

@@ -49,6 +49,10 @@ export interface BudgetItem {
   productId: string | null;
   quoteItemId: string | null;
   sortOrder: number;
+  /** Added by this change order. */
+  changeOrderId?: string | null;
+  /** All its costs are in (job costing uses actual cost as the projection). */
+  final?: boolean;
 }
 
 export interface Money { costCents: number; priceCents: number; profitCents: number; marginBps: number }

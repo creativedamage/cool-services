@@ -33,6 +33,11 @@ import { checkinLevelFor, CHECKIN_RANK } from "./lib/checkin.ts";
 import { applyEvent, createQuote, effectiveTotals, liveTotals, loadQuote, quoteDTO, saveQuote, toPublicQuote, type FullQuote } from "./quotes.ts";
 import { BudgetSchema, budgetOf, createJob, jobDetail, jobDocuments, jobFromQuote, jobRows, JobSchema, saveBudget } from "./jobs.ts";
 import { emailProposal, notifyAnswer } from "./avlmail.ts";
+import {
+  acceptWo, BillSchema, billDetail, canApprovePo, clientCoPage, coDetail, coEvent, CoSchema, CoSignSchema, coRows, costing, createBill, createCo, createPo, createWo,
+  declineCo, defaultCoTax, deletePo, FromBudgetSchema, orderable, poDetail, poEvent, PoSchema, posFromBudget, publicWoPage, purchasingPage, receivePo, ReceiveSchema,
+  saveBill, saveCo, savePo, saveWo, setBillStatus, setFinal, signCo, vendorPoPage, withToken, woDetail, woEvent, WoSchema,
+} from "./purchasing.ts";
 import { activityRows, ActivitySchema, clientActivityWhere, createLead, dueAtDate, ensureClient, followUps, leadDetail, leadGetsJob, leadRows, LeadSchema, moveLead, sourceReport, sourcesInUse } from "./crm.ts";
 import { kitDetail, kitLines, kitRows, KitSchema, laborRates, LaborRatesSchema, markupRules, MarkupRulesSchema, saveKit, saveLaborRates, saveMarkupRules } from "./estimating.ts";
 import { applySelections, optionGroups } from "./lib/estimating.ts";
@@ -210,7 +215,7 @@ async function meInOrg() {
   const ops = hasOpsAccess(u);
   const avlOn = hasModule("avl") && hasAvlField(u);
   const handles = ops && (await handlesRequests(u));
-  const [[{ n: queueCount }], [{ n: pendingUsers }], [campus], [{ n: avlPending }], avl] = await Promise.all([
+  const [[{ n: queueCount }], [{ n: pendingUsers }], [campus], [{ n: avlPending }], avl, [{ n: poApprovals }]] = await Promise.all([
     handles ? sql`select count(*)::int as n from ops.requests r where ${workQueueWhere(u, { openOnly: true })}` : [{ n: 0 }],
     ops && atLeast(u, "MANAGER")
       ? sql`select count(*)::int as n from ops.users where pending and source <> 'PLATFORM' ${seesAllCampuses(u) ? sql`` : sql`and (campus_id = ${u.campusId} or campus_id is null)`}`
@@ -218,12 +223,13 @@ async function meInOrg() {
     u.campusId && hasModule("campuses") ? sql`select name from ops.campuses where id = ${u.campusId}` : [],
     avlOn && isAvlManager(u) ? sql`select count(*)::int as n from ops.users where pending and source <> 'PLATFORM'` : [{ n: 0 }],
     avlOn ? getAvl() : null,
+    avlOn && can(u, "AVL_PURCHASING") ? sql`select count(*)::int as n from ops.purchase_orders where status = 'PENDING_APPROVAL'` : [{ n: 0 }],
   ]);
   return {
     status: "ok" as const, user: u, org,
     nav: {
       handlesRequests: handles, queueCount, pendingUsers, manager: ops && atLeast(u, "MANAGER"), admin: isAdmin(u), campusName: campus?.name ?? null,
-      ops, avl: avlOn, avlManager: avlOn && isAvlManager(u), avlPending, avlName: avl?.name ?? null, avlChurch: avl?.businessType === "CHURCH", avlCrew: avlOn && isAvlCrew(u), modules: reqCtx()!.modules, platform: !!u.platform,
+      ops, avl: avlOn, avlManager: avlOn && isAvlManager(u), avlPending, avlName: avl?.name ?? null, avlChurch: avl?.businessType === "CHURCH", avlCrew: avlOn && isAvlCrew(u), poApprovals, modules: reqCtx()!.modules, platform: !!u.platform,
     },
   };
 }
@@ -907,6 +913,222 @@ route("GET", "/quotes/:id/versions/:v", async ({ req, params }) => {
   if (!v) throw new HttpError(404, "That version isn't here.");
   return { version: v.version, sentAt: new Date(v.sentAt).toISOString(), sentBy: v.sentBy ?? null, totalCents: Number(v.totalCents), quote: v.snapshot };
 });
+
+/* ───────────── AVL: purchasing and job costing ───────────── */
+
+const poHref = (id: string) => `/avl/purchasing/po?id=${id}`;
+const woHref = (id: string) => `/avl/purchasing/wo?id=${id}`;
+const coHref = (id: string) => `/avl/jobs/change-order?id=${id}`;
+const billHref = (id: string) => `/avl/purchasing/bill?id=${id}`;
+
+route("GET", "/purchasing", async ({ req }) => purchasingPage(await avl(req), null));
+
+route("GET", "/jobs/:id/purchasing", async ({ req, params }) => {
+  const u = await avl(req);
+  await jobAccess(u, params.id);
+  const [page, lines, changeOrders] = await Promise.all([purchasingPage(u, params.id), orderable(params.id), coRows(params.id)]);
+  return { ...page, orderable: lines, changeOrders };
+});
+route("GET", "/jobs/:id/costing", async ({ req, params }) => {
+  await jobAccess(await avl(req), params.id);
+  return costing(params.id);
+});
+route("PUT", "/budget-items/:id/final", async ({ req, params, body }) => {
+  await avl(req);
+  const { final } = z.object({ final: z.boolean() }).parse(await body());
+  await setFinal(params.id, final);
+});
+
+route("POST", "/jobs/:id/pos-from-budget", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const made = await posFromBudget(params.id, FromBudgetSchema.parse(await body()), u.id);
+  for (const p of made) await logActivity({ actorId: u.id, action: "Made purchase order", detail: `${p.number} · ${p.vendor}`, area: "AVL", entityType: "PurchaseOrder", entityId: p.id, href: poHref(p.id) });
+  return made;
+});
+route("POST", "/pos", async ({ req, body }) => {
+  const u = await avl(req);
+  const p = await createPo(PoSchema.parse(await body()), u.id);
+  await logActivity({ actorId: u.id, action: "Made purchase order", detail: p.number, area: "AVL", entityType: "PurchaseOrder", entityId: p.id, href: poHref(p.id) });
+  return p;
+});
+route("GET", "/pos/:id", async ({ req, params }) => {
+  const u = await avl(req);
+  const po = await poDetail(params.id);
+  const [vendors, jobs, budget] = await Promise.all([
+    sql`select id, name, rep_email from ops.vendors where active or id = ${po.vendor?.id ?? ""} order by name`,
+    sql`select id, number, name from ops.jobs where status in ('PLANNING', 'IN_PROGRESS', 'ON_HOLD') or id = ${po.job?.id ?? ""} order by number desc limit 500`,
+    po.job ? budgetOf(po.job.id) : [],
+  ]);
+  return { po, vendors: vendors.map((v) => ({ id: v.id, name: v.name, repEmail: v.repEmail ?? null })), jobs, budget, canApprove: canApprovePo(u), me: u.id };
+});
+route("PUT", "/pos/:id", async ({ req, params, body }) => {
+  await avl(req);
+  await savePo(params.id, PoSchema.parse(await body()));
+  return poDetail(params.id);
+});
+route("DELETE", "/pos/:id", async ({ req, params }) => {
+  const u = await avl(req);
+  const number = await deletePo(params.id);
+  await logActivity({ actorId: u.id, action: "Deleted purchase order", detail: number, area: "AVL" });
+});
+route("POST", "/pos/:id/events", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const { event, note, emailTo } = z.object({
+    event: z.enum(["SUBMIT", "APPROVE", "REJECT", "SEND", "MARK_ORDERED", "CANCEL", "REOPEN"]),
+    note: z.string().max(5000).nullish(), emailTo: z.string().max(200).nullish(),
+  }).parse(await body());
+  const { po } = await poEvent(params.id, event, u, { note, emailTo });
+  const verb = { SUBMIT: "Sent purchase order for approval", APPROVE: "Approved purchase order", REJECT: "Sent purchase order back", SEND: "Emailed purchase order", MARK_ORDERED: "Ordered", CANCEL: "Cancelled purchase order", REOPEN: "Reopened purchase order" }[event];
+  await logActivity({ actorId: u.id, action: verb, detail: `${po.number} · ${po.vendor?.name ?? ""}${event === "SEND" ? ` · to ${po.sentTo}` : ""}`, area: "AVL", entityType: "PurchaseOrder", entityId: po.id, href: poHref(po.id) });
+  return po;
+});
+route("POST", "/pos/:id/receive", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const po = await receivePo(params.id, u, ReceiveSchema.parse(await body()));
+  await logActivity({ actorId: u.id, action: "Received", detail: `${po.number} · ${po.status === "RECEIVED" ? "everything is in" : "part of the order"}`, area: "AVL", entityType: "PurchaseOrder", entityId: po.id, href: poHref(po.id) });
+  return po;
+});
+
+route("POST", "/jobs/:id/work-orders", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const w = await createWo(params.id, WoSchema.parse(await body()), u.id);
+  await logActivity({ actorId: u.id, action: "Made work order", detail: w.number, area: "AVL", entityType: "WorkOrder", entityId: w.id, href: woHref(w.id) });
+  return w;
+});
+route("GET", "/work-orders/:id", async ({ req, params }) => {
+  await avl(req);
+  const wo = await woDetail(params.id);
+  const [vendors, budget] = await Promise.all([sql`select id, name, rep_email from ops.vendors where active or id = ${wo.vendor?.id ?? ""} order by name`, budgetOf(wo.job.id)]);
+  return { wo, vendors: vendors.map((v) => ({ id: v.id, name: v.name, repEmail: v.repEmail ?? null })), budget };
+});
+route("PUT", "/work-orders/:id", async ({ req, params, body }) => {
+  await avl(req);
+  await saveWo(params.id, WoSchema.parse(await body()));
+  return woDetail(params.id);
+});
+route("DELETE", "/work-orders/:id", async ({ req, params }) => {
+  const u = await avl(req);
+  const [w] = await sql`delete from ops.work_orders where id = ${params.id} and status in ('DRAFT', 'CANCELLED') and not exists (select 1 from ops.vendor_bills b where b.work_order_id = ops.work_orders.id) returning number`;
+  if (!w) throw new HttpError(409, "Only a draft or cancelled work order with no bills can be deleted.");
+  await logActivity({ actorId: u.id, action: "Deleted work order", detail: w.number, area: "AVL" });
+});
+route("POST", "/work-orders/:id/events", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const { event, emailTo } = z.object({ event: z.enum(["SEND", "MARK_SENT", "MARK_ACCEPTED", "DONE", "CANCEL", "REOPEN"]), emailTo: z.string().max(200).nullish() }).parse(await body());
+  const wo = await woEvent(params.id, event, u, { emailTo });
+  const verb = { SEND: "Emailed work order", MARK_SENT: "Sent work order", MARK_ACCEPTED: "Work order accepted", DONE: "Work order done", CANCEL: "Cancelled work order", REOPEN: "Reopened work order" }[event];
+  await logActivity({ actorId: u.id, action: verb, detail: `${wo.number} · ${wo.title}`, area: "AVL", entityType: "WorkOrder", entityId: wo.id, href: woHref(wo.id) });
+  return wo;
+});
+
+route("POST", "/bills", async ({ req, body }) => {
+  const u = await avl(req);
+  const id = await createBill(BillSchema.parse(await body()), u.id);
+  const b = await billDetail(id);
+  await logActivity({ actorId: u.id, action: "Entered bill", detail: `${b.vendor?.name ?? ""}${b.billNumber ? ` #${b.billNumber}` : ""} · ${(b.totalCents / 100).toFixed(2)}`, area: "AVL", entityType: "VendorBill", entityId: id, href: billHref(id) });
+  return b;
+});
+route("GET", "/bills/:id", async ({ req, params }) => {
+  await avl(req);
+  const bill = await billDetail(params.id);
+  const [vendors, budget, po, wo] = await Promise.all([
+    sql`select id, name, rep_email from ops.vendors where active or id = ${bill.vendor?.id ?? ""} order by name`,
+    bill.job ? budgetOf(bill.job.id) : [],
+    bill.po ? poDetail(bill.po.id) : null,
+    bill.workOrder ? woDetail(bill.workOrder.id) : null,
+  ]);
+  return { bill, vendors: vendors.map((v) => ({ id: v.id, name: v.name, repEmail: v.repEmail ?? null })), budget, po, wo };
+});
+route("PUT", "/bills/:id", async ({ req, params, body }) => {
+  await avl(req);
+  await saveBill(params.id, BillSchema.parse(await body()));
+  return billDetail(params.id);
+});
+route("POST", "/bills/:id/status", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const { status } = z.object({ status: z.enum(["OPEN", "PAID", "VOID"]) }).parse(await body());
+  await setBillStatus(params.id, status);
+  const b = await billDetail(params.id);
+  await logActivity({ actorId: u.id, action: status === "PAID" ? "Marked bill paid" : status === "VOID" ? "Voided bill" : "Reopened bill", detail: `${b.vendor?.name ?? ""}${b.billNumber ? ` #${b.billNumber}` : ""}`, area: "AVL", entityType: "VendorBill", entityId: b.id, href: billHref(b.id) });
+  return b;
+});
+route("DELETE", "/bills/:id", async ({ req, params }) => {
+  const u = await avl(req);
+  const [b] = await sql`delete from ops.vendor_bills where id = ${params.id} returning bill_number`;
+  if (!b) throw new HttpError(404, "Bill not found");
+  await logActivity({ actorId: u.id, action: "Deleted bill", detail: b.billNumber ?? "", area: "AVL" });
+});
+
+route("POST", "/jobs/:id/change-orders", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const raw0 = (await body()) as Record<string, unknown>;
+  const input = CoSchema.parse({ taxBps: await defaultCoTax(params.id), ...raw0 });
+  const c = await createCo(params.id, input, u.id);
+  await logActivity({ actorId: u.id, action: "Made change order", detail: `${c.number} · ${input.title}`, area: "AVL", entityType: "ChangeOrder", entityId: c.id, href: coHref(c.id) });
+  return c;
+});
+route("GET", "/change-orders/:id", async ({ req, params }) => {
+  const u = await avl(req);
+  const co = await coDetail(params.id);
+  const [[j], groups, vendors, biz] = await Promise.all([
+    sql`select cu.email, cu.contact_name from ops.jobs j left join ops.customers cu on cu.id = j.customer_id where j.id = ${co.job.id}`,
+    sql`select name from ops.budget_items where job_id = ${co.job.id} and kind = 'GROUP' and parent_id is null order by sort_order`,
+    sql`select id, name from ops.vendors where active order by name`,
+    getAvl(),
+  ]);
+  return { co, clientEmail: j?.email ?? null, groups: groups.map((g) => g.name as string), canApprove: can(u, "QUOTE_APPROVE"), vendors, defaultMarginBps: biz.defaultMarginBps as number };
+});
+route("PUT", "/change-orders/:id", async ({ req, params, body }) => {
+  await avl(req);
+  await saveCo(params.id, CoSchema.parse(await body()));
+  return coDetail(params.id);
+});
+route("DELETE", "/change-orders/:id", async ({ req, params }) => {
+  const u = await avl(req);
+  const [c] = await sql`delete from ops.change_orders where id = ${params.id} and status in ('DRAFT', 'CANCELLED') returning number`;
+  if (!c) throw new HttpError(409, "Only a draft or cancelled change order can be deleted.");
+  await logActivity({ actorId: u.id, action: "Deleted change order", detail: c.number, area: "AVL" });
+});
+route("POST", "/change-orders/:id/events", async ({ req, params, body }) => {
+  const u = await avl(req);
+  const { event, note, emailTo } = z.object({ event: z.enum(["SEND", "MARK_SENT", "MARK_APPROVED", "REVISE", "CANCEL"]), note: z.string().max(5000).nullish(), emailTo: z.string().max(200).nullish() }).parse(await body());
+  const co = await coEvent(params.id, event, u, { note, emailTo });
+  const verb = { SEND: "Emailed change order", MARK_SENT: "Sent change order", MARK_APPROVED: "Recorded change order approval", REVISE: "Revised change order", CANCEL: "Cancelled change order" }[event];
+  await logActivity({ actorId: u.id, action: verb, detail: `${co.number} · ${co.title}`, area: "AVL", entityType: "ChangeOrder", entityId: co.id, href: coHref(co.id) });
+  return co;
+});
+
+// The vendor's copy of a PO, the installer's work order, and the client's change order: no sign-in.
+route("GET", "/public/vendor-po/:token", async ({ params }) => withToken("purchase_orders", params.token, "purchase order", vendorPoPage), "public");
+route("GET", "/public/work-orders/:token", async ({ params }) => withToken("work_orders", params.token, "work order", publicWoPage), "public");
+route("POST", "/public/work-orders/:token/accept", async ({ params, body }) => {
+  const { name } = z.object({ name: z.string().trim().min(2, "Type your name.").max(120) }).parse(await body());
+  return withToken("work_orders", params.token, "work order", async (id) => {
+    await acceptWo(id, name);
+    const wo = await woDetail(id);
+    await logActivity({ actorId: null, actorLabel: name, action: "Work order accepted", detail: `${wo.number} · ${wo.title}`, area: "AVL", entityType: "WorkOrder", entityId: id, href: woHref(id) });
+    return publicWoPage(id);
+  });
+}, "public");
+route("GET", "/public/change-orders/:token", async ({ params }) => withToken("change_orders", params.token, "change order", clientCoPage), "public");
+route("POST", "/public/change-orders/:token/sign", async ({ req, params, body }) => {
+  const input = CoSignSchema.parse(await body());
+  return withToken("change_orders", params.token, "change order", async (id) => {
+    await signCo(id, input, clientIp(req), (req.headers.get("user-agent") ?? "").slice(0, 300));
+    const co = await coDetail(id);
+    await logActivity({ actorId: null, actorLabel: `${input.name} (client)`, action: "Client signed change order", detail: `${co.number} · ${co.title}`, area: "AVL", entityType: "ChangeOrder", entityId: id, href: coHref(id) });
+    return clientCoPage(id);
+  });
+}, "public");
+route("POST", "/public/change-orders/:token/decline", async ({ params, body }) => {
+  const { name, note } = z.object({ name: z.string().trim().max(120).nullish(), note: z.string().trim().max(5000).nullish() }).parse(await body());
+  return withToken("change_orders", params.token, "change order", async (id) => {
+    await declineCo(id, name?.trim() || "The client", note?.trim() || null);
+    const co = await coDetail(id);
+    await logActivity({ actorId: null, actorLabel: `${name?.trim() || "Client"} (client)`, action: "Client declined change order", detail: `${co.number} · ${co.title}`, area: "AVL", entityType: "ChangeOrder", entityId: id, href: coHref(id) });
+    return clientCoPage(id);
+  });
+}, "public");
 
 /* ───────────── AVL: leads (CRM) ───────────── */
 
