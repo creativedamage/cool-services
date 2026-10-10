@@ -378,19 +378,23 @@ event and the team's location; `staffRows()` turns a plan's staff check-ins into
 
 ## 5v. Mic board & stage display (1.18)
 
-- `shared/board.ts`: settings and `DisplayState` (view, banner, service, tiles, Micboard).
+- `shared/board.ts`: settings and `DisplayState` (view, banner, service, tiles, the middle: logo URL and clock source).
 - `server/src/lib/board.ts`: picks the service (`serviceTypeId` or any; the first upcoming plan that
   isn't over), the view (manual, or auto from the plan's rehearsal/service times), and builds tiles
   from the mic setup + this plan's assignments + `micStatuses()` (receivers read at most every 2 s,
   shared with `/api/mics/status`; the ULX-D sample now also gives `audioLevel`). Status: no receiver /
-  offline / TX off / critical (interference, ≤1 bar or ≤30 min) / low (≤2 bars or ≤60 min) / ok. Pictures:
-  `customImages["person:<id>"|"mic:<channelId>"]` (uploaded files) and/or the roster's Planning Center
-  photo. The state is shared for 1.5 s however many displays poll it. Uses the access of whoever last
+  offline / TX off / critical (interference, ≤1 bar or ≤30 min) / low (≤2 bars or ≤60 min) / ok. Pictures (1.40):
+  a backgrounds library (`backgrounds`, files in `<DATA_DIR>/files`) picked through
+  `customImages["person:<id>"|"mic:<channelId>"]`, else a background named like the person, else the
+  roster's Planning Center photo. Each tile also carries its label color (`tileColor`, else
+  `TILE_COLORS` by Mic setup order) and your line (`tileText`). The library's files and the logo sync
+  to your other Macs as their own sync keys (`f:<file id>`, a data: URL, sent once; `sync.ts`). The state is shared for 1.5 s however many displays poll it. Uses the access of whoever last
   opened the Mic board.
 - `server/src/routes/board.ts`: `/api/board` (signed in: settings, pictures) and `/api/board-out`
-  (no sign-in: `/state`, `/image/<file>` limited to board pictures). The LAN
+  (no sign-in: `/state`, `/image/<file>` limited to the library and the logo). The LAN
   listener serves `/display` (`displayout.html`) and `/api/board-out` when the network display is on,
   and lets `/api/clock-out` through for the Clock view.
 - Web: `/micboard` (control + preview + settings drawer), `/displayout` (polls every 2 s),
-  `components/board/` (`MicBoard` tiles sized with container units, `DisplayView` with the banner,
-  Micboard in an iframe, and the clock through `ClockFace`). Desktop: `boardOut.ts` opens the second-display window.
+  `components/board/` (`SideStage`: photo cards half down each side and the logo over the clock, all
+  in container units; `DisplayView` with the banner and the full Clock view through `ClockFace`).
+  Micboard (built in until then) was removed in 1.40; receivers are always read directly (`shure.ts`). Desktop: `boardOut.ts` opens the second-display window.

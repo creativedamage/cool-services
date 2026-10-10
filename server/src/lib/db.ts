@@ -301,7 +301,7 @@ export const extras = {
   set(key: string, value: unknown) { const d = load(); d.extras = { ...(d.extras ?? {}), [key]: value }; save(); },
 };
 
-/** Uploaded files (mic board pictures) in <DATA_DIR>/files. */
+/** Uploaded files (mic board backgrounds and logo) in <DATA_DIR>/files. */
 export const files = {
   dir: () => path.resolve(process.cwd(), config.dataDir, "files"),
   save(buf: Buffer, ext: "png" | "jpg" | "webp"): string {
@@ -309,6 +309,12 @@ export const files = {
     fs.mkdirSync(files.dir(), { recursive: true });
     fs.writeFileSync(path.join(files.dir(), id), buf, { mode: 0o600 });
     return id;
+  },
+  /** A file from another Mac, under the id it has there (settings sync). */
+  saveAs(id: string, buf: Buffer) {
+    if (!/^[0-9a-f-]{36}\.(png|jpg|webp)$/.test(id)) return;
+    fs.mkdirSync(files.dir(), { recursive: true });
+    fs.writeFileSync(path.join(files.dir(), id), buf, { mode: 0o600 });
   },
   path(id: string): string | null {
     if (!/^[0-9a-f-]{36}\.(png|jpg|webp)$/.test(id)) return null;

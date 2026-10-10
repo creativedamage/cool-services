@@ -8,7 +8,7 @@
  *
  * - engine apps (Sundays, Services, Workflows, Paging) run the Sundays server on this Mac. They
  *   share one data folder and one running server: whichever opens first hosts it, the others use
- *   it, so sign-in, settings, the weekend and Micboard are the same in all of them.
+ *   it, so sign-in, settings, the weekend and the mic board are the same in all of them.
  * - FOH is an FOH companion (its own data, linked to the main computer).
  * - Operations and AVL are Sundays' cloud apps (the website's screens in a Mac window).
  *

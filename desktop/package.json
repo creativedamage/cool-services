@@ -51,9 +51,9 @@
       ],
       "identity": "-",
       "artifactName": "Sundays-${version}-mac.${ext}",
-      "x64ArchFiles": "{**/app/native/**,**/Resources/micboard/**}",
+      "x64ArchFiles": "{**/app/native/**}",
       "extendInfo": {
-        "NSLocalNetworkUsageDescription": "Sundays and Micboard talk to your Shure receivers, ProPresenter, consoles and iPads on the church network."
+        "NSLocalNetworkUsageDescription": "Sundays talks to your Shure receivers, ProPresenter, consoles and iPads on the church network."
       }
     },
     "dmg": {
@@ -64,15 +64,6 @@
     "afterSign": "build/after-sign.cjs",
     "asarUnpack": [
       "app/native/**"
-    ],
-    "extraResources": [
-      {
-        "from": "micboard-runtime",
-        "to": "micboard",
-        "filter": [
-          "**/*"
-        ]
-      }
     ]
   },
   "sundays": {

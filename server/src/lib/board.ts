@@ -1,5 +1,5 @@
 /**
- * The stage display: mic board (Micboard) or clock, chosen in the app or following the service (the
+ * The stage display: mic board or clock, chosen in the app or following the service (the
  * mic board from before each rehearsal and service until it ends, the idle choice otherwise).
  *
  * The board joins three things: the mic setup (which mic is on which receiver channel), this
@@ -7,15 +7,16 @@
  * audio; read-only, see shure.ts). Names and photos come from the service's roster in Planning
  * Center, or from pictures uploaded in Sundays.
  */
-import crypto from "node:crypto";
-import { DEFAULT_BOARD, type BoardSettings, type BoardTile, type DisplayState, type DisplayView, type TileStatus } from "../../../shared/board.js";
+import fs from "node:fs";
+import path from "node:path";
+import { DEFAULT_BOARD, TILE_COLORS, type BoardBackground, type BoardSettings, type BoardTile, type DisplayState, type DisplayView, type TileStatus } from "../../../shared/board.js";
 import type { ChannelStatus, DisplayInfo, PlanDetail, ReceiverStatus } from "../../../shared/types.js";
 import { pcoForUser } from "../auth/oauth.js";
 import type { PcoApi } from "../pco/api.js";
-import { cache, extras, mics } from "./db.js";
+import { config } from "../config.js";
+import { cache, extras, files, logEvent, mics } from "./db.js";
 import { readReceiver } from "./shure.js";
 import { weekend, weekendPlan, onWeekendChange } from "./weekend.js";
-import { backgroundsRev, micboardData, micboardRunning, micboardStatus, personGroup, setMicboardLayoutSource, setMicboardPlanSource, statusesFromMicboard } from "./micboard.js";
 
 interface Stored { settings: BoardSettings; owner: { userId: string; demo: boolean } | null; open?: { serviceTypeId: string; planId: string } | null }
 const KEY = "board";
@@ -26,7 +27,19 @@ function load(): Stored {
   settings.hidden ??= [];
   settings.banner = { ...DEFAULT_BOARD.banner, ...s.settings?.banner };
   settings.screen = { ...DEFAULT_BOARD.screen, ...s.settings?.screen };
-  settings.micboard = { ...DEFAULT_BOARD.micboard, ...s.settings?.micboard };
+  settings.center = { ...DEFAULT_BOARD.center, ...s.settings?.center };
+  settings.backgrounds ??= [];
+  settings.tileText ??= {};
+  settings.tileColor ??= {};
+  settings.customImages ??= {};
+  delete (settings as { micboard?: unknown }).micboard; // Micboard was removed in 1.40
+  // Pictures uploaded before the library (1.40) join it, so they sync and can be picked again.
+  for (const id of new Set(Object.values(settings.customImages))) {
+    if (!settings.backgrounds.some((b) => b.id === id)) {
+      const p = files.path(id);
+      if (p) settings.backgrounds.push({ id, name: "Picture", bytes: fs.statSync(p).size, at: fs.statSync(p).mtime.toISOString() });
+    }
+  }
   // Stage plots were removed in 1.22: a display set to the stage plot shows the mic board.
   if ((settings.mode as string) === "stageplot") settings.mode = "micboard";
   if ((settings.autoIdle as string) === "stageplot") settings.autoIdle = "micboard";
@@ -58,8 +71,9 @@ export function saveBoardSettings(patch: Partial<BoardSettings>) {
   const cur = stored.settings;
   stored.settings = {
     ...cur, ...patch,
-    banner: { ...cur.banner, ...patch.banner }, screen: { ...cur.screen, ...patch.screen }, micboard: { ...cur.micboard, ...patch.micboard },
+    banner: { ...cur.banner, ...patch.banner }, screen: { ...cur.screen, ...patch.screen }, center: { ...cur.center, ...patch.center },
     customImages: patch.customImages ?? cur.customImages, hidden: patch.hidden ?? cur.hidden ?? [],
+    backgrounds: patch.backgrounds ?? cur.backgrounds, tileText: patch.tileText ?? cur.tileText, tileColor: patch.tileColor ?? cur.tileColor,
   };
   persist();
   memo = null;
@@ -91,22 +105,12 @@ export const boardDisplays = () => displays;
 
 /* ───────────── Receivers ───────────── */
 
-/**
- * Every receiver with an IP. While Micboard runs, from Micboard (it's already talking to the
- * receivers); otherwise read directly, at most every 2 seconds however many screens are watching.
- */
+/** Every receiver with an IP, read directly (read-only, shure.ts), at most every 2 seconds however many screens are watching. */
 export async function micStatuses(): Promise<ReceiverStatus[]> {
   const rxs = mics.setup().receivers.filter((r) => r.ip);
-  const d = micboardRunning() ? await micboardData().catch(() => null) : null;
-  // Micboard's readings for the receivers it's connected to; every other receiver (not in Micboard
-  // yet, a model Micboard doesn't support like SLX-D, or one Micboard can't reach) is read directly,
-  // as before Micboard was built in.
-  const fromMb = d ? statusesFromMicboard(d).filter((s) => s.ok) : [];
-  const direct = rxs.filter((r) => !fromMb.some((s) => s.receiverId === r.id));
-  if (!direct.length) return fromMb;
-  const key = `mics:status:${direct.map((r) => r.id).join(",")}`;
-  const read = await cache.wrap(key, 2, () => Promise.all(direct.map((r) => readReceiver(r))));
-  return rxs.map((r) => fromMb.find((s) => s.receiverId === r.id) ?? read.find((s) => s.receiverId === r.id)!).filter(Boolean);
+  if (!rxs.length) return [];
+  const key = `mics:status:${rxs.map((r) => r.id).join(",")}`;
+  return cache.wrap(key, 2, () => Promise.all(rxs.map((r) => readReceiver(r))));
 }
 
 function statusOf(c: ChannelStatus | undefined, rxOk: boolean | null): { status: TileStatus; note: string | null } {
@@ -144,7 +148,7 @@ export function displayState(): Promise<DisplayState> {
   if (memo && Date.now() - memo.at < 1500) return memo.p;
   const p = build().catch((e): DisplayState => ({
     view: stored.settings.mode === "auto" ? stored.settings.autoIdle : stored.settings.mode, mode: stored.settings.mode, reason: "",
-    settings: { banner: stored.settings.banner, columns: stored.settings.columns, imageStyle: stored.settings.imageStyle }, micboard: null, service: null, tiles: [],
+    settings: centerSettings(stored.settings), service: null, tiles: [],
     error: (e as Error).message, at: new Date().toISOString(),
   }));
   memo = { at: Date.now(), p };
@@ -168,29 +172,17 @@ export function boardPlan(): Promise<PlanDetail | null> {
   planMemo = { at: Date.now(), key, p };
   return p;
 }
-// Micboard's names and photos follow the same service.
-setMicboardPlanSource(async () => {
-  const plan = await boardPlan();
-  if (!plan) return null;
-  return {
-    assignments: mics.plan(plan.id).assignments,
-    photos: new Map(plan.roster.map((m) => [m.personId, m.avatarUrl ?? null])),
-  };
-});
+/** What the display needs from the settings (the logo as an address, not the picture itself). */
+function centerSettings(s: BoardSettings): DisplayState["settings"] {
+  const logo = s.center.logoId && files.path(s.center.logoId) ? imageUrl(s.center.logoId) : null;
+  return { banner: s.banner, columns: s.columns, names: s.names ?? "first", center: { logo, clock: s.center.clock, seconds: s.center.seconds, date: s.center.date } };
+}
 
-setMicboardLayoutSource(() => ({ stack: stored.settings.stack ?? true, group: stored.settings.micboard?.group ?? 0 }));
-
-/**
- * Micboard's #hash: group, TV view and info drawer, backgrounds (see Micboard's js/app.js). With
- * One tile per person, the group is Sundays' own (micboard.ts → syncPersonGroup), built from yours.
- */
-function micboardHash(m: BoardSettings["micboard"], stack: boolean) {
-  const parts: string[] = [];
-  const pg = stack ? personGroup() : null;
-  const group = pg?.group ?? m.group;
-  if (group) parts.push(`group=${group}`);
-  if (m.view !== "desk") { parts.push(`tvmode=${m.view}`); if (m.backgrounds !== "NONE") parts.push(`bgmode=${m.backgrounds}`); }
-  return parts.length ? `#${parts.join("&")}` : "";
+/** A background named like the person ("Eddie", "eddie smith") is theirs without picking it. */
+const plain = (x: string) => x.trim().toLowerCase().replace(/\s+/g, " ");
+function namedBackground(s: BoardSettings, person: { name: string; firstName: string }): string | null {
+  const full = plain(person.name), first = plain(person.firstName);
+  return (s.backgrounds.find((b) => plain(b.name) === full) ?? s.backgrounds.find((b) => plain(b.name) === first))?.id ?? null;
 }
 
 async function build(): Promise<DisplayState> {
@@ -205,9 +197,12 @@ async function build(): Promise<DisplayState> {
   const roster = new Map((plan?.roster ?? []).map((m) => [m.personId, m]));
 
   const hidden = new Set(s.hidden ?? []);
+  const known = new Set(s.backgrounds.map((b) => b.id));
+  const pick = (id: string | undefined) => (id && known.has(id) ? id : null);
   let tiles: BoardTile[] = setup.channels
-    .filter((c) => s.kinds.includes(c.kind) && !hidden.has(c.id))
-    .map((c) => {
+    .map((c, i) => ({ c, i })) // i: its place in Mic setup, for its color
+    .filter(({ c }) => s.kinds.includes(c.kind) && !hidden.has(c.id))
+    .map(({ c, i }) => {
       const rx = setup.receivers.find((r) => r.id === c.receiverId) ?? null;
       const rs = rx?.ip ? statuses.find((x) => x.receiverId === rx.id) : undefined;
       const ch = rs?.channels.find((x) => x.channel === c.channel);
@@ -215,7 +210,8 @@ async function build(): Promise<DisplayState> {
       const member = a ? roster.get(a.personId) : undefined;
       const name = a?.name ?? null;
       const { status, note } = statusOf(ch, rx?.ip ? (rs ? rs.ok : false) : null);
-      const custom = (a && s.customImages[`person:${a.personId}`]) || s.customImages[`mic:${c.id}`] || null;
+      const custom = (a && pick(s.customImages[`person:${a.personId}`])) || pick(s.customImages[`mic:${c.id}`])
+        || (a && name ? namedBackground(s, { name, firstName: name.trim().split(/\s+/)[0] ?? name }) : null) || null;
       const pcoPhoto = member?.avatarUrl ?? null;
       const image = s.images === "none" ? null
         : s.images === "custom" ? (custom ? imageUrl(custom) : null)
@@ -230,6 +226,7 @@ async function build(): Promise<DisplayState> {
         audio: ch?.txOn ? ch.audioLevel ?? null : null,
         muted: Boolean(ch?.muted), frequencyMHz: ch?.frequencyMHz ?? null, txModel: ch?.txModel ?? null,
         networked: Boolean(rx?.ip), extras: [],
+        color: s.tileColor[c.id] || TILE_COLORS[i % TILE_COLORS.length], text: s.tileText[c.id]?.trim() || null,
       };
     })
     .filter((t) => !s.hideUnassigned || t.person);
@@ -252,17 +249,8 @@ async function build(): Promise<DisplayState> {
 
   const now = Date.now();
   const next = plan?.times.filter((t) => t.kind === "service" && Date.parse(t.endsAt || t.startsAt) > now).sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
-  const mb = micboardStatus();
-  const mbData = micboardRunning() ? await micboardData().catch(() => null) : null;
   return {
-    view, mode: s.mode, reason, settings: { banner: s.banner, columns: s.columns, imageStyle: s.imageStyle },
-    micboard: mb.run === "off" || mb.run === "companion" ? null : {
-      running: micboardRunning(), port: mb.port, hash: micboardHash(s.micboard ?? DEFAULT_BOARD.micboard, s.stack ?? true), error: mb.error,
-      // Micboard reads its pictures when its page loads, and doesn't redraw a group it was opened
-      // on when that group changes: a new picture, or a change to who's on the board, reloads it.
-      rev: mbData ? crypto.createHash("sha1").update([...mbData.jpg, ...mbData.mp4].sort().join("|") + `#${backgroundsRev()}`
-        + ((s.stack ?? true) ? `#${personGroup()?.slots.join(",") ?? ""}` : "")).digest("hex").slice(0, 12) : "",
-    },
+    view, mode: s.mode, reason, settings: centerSettings(s),
     service: plan ? {
       planId: plan.id, serviceTypeId: plan.serviceTypeId, title: plan.title, serviceTypeName: plan.serviceTypeName,
       when: new Date(plan.sortDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }),
@@ -273,7 +261,71 @@ async function build(): Promise<DisplayState> {
   };
 }
 
-/** Files the display may show without signing in: the board's pictures. */
+/** Files the display may show without signing in: the backgrounds library and the logo. */
 export function publicImage(fileId: string): boolean {
-  return Object.values(stored.settings.customImages).includes(fileId);
+  const s = stored.settings;
+  return s.center.logoId === fileId || s.backgrounds.some((b) => b.id === fileId);
 }
+
+/* ───────────── Backgrounds library and logo (the files sync to your other Macs, sync.ts) ───────────── */
+
+const MAX_BACKGROUNDS = 60;
+type Pic = { data: Buffer; ext: "png" | "jpg" | "webp" };
+export function pictureFrom(dataUrl: string): Pic {
+  const m = dataUrl.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/);
+  if (!m) throw Object.assign(new Error("Use a PNG, JPG or WebP picture"), { status: 400 });
+  const data = Buffer.from(m[2], "base64");
+  // Each picture syncs to your other Macs on its own, and the sync takes up to about 650 KB.
+  if (data.length > 650_000) throw Object.assign(new Error("That picture is too big (over 650 KB after shrinking). Try a smaller one."), { status: 400 });
+  return { data, ext: m[1] === "jpeg" ? "jpg" : (m[1] as "png" | "webp") };
+}
+
+export function addBackground(name: string, pic: Pic): BoardBackground {
+  const s = stored.settings;
+  if (s.backgrounds.length >= MAX_BACKGROUNDS) throw Object.assign(new Error(`The library holds ${MAX_BACKGROUNDS} pictures. Remove some first.`), { status: 400 });
+  const id = files.save(pic.data, pic.ext);
+  const bg = { id, name: name.trim() || "Picture", bytes: pic.data.length, at: new Date().toISOString() };
+  saveBoardSettings({ backgrounds: [...s.backgrounds, bg] });
+  return bg;
+}
+export function renameBackground(id: string, name: string) {
+  saveBoardSettings({ backgrounds: stored.settings.backgrounds.map((b) => (b.id === id ? { ...b, name: name.trim() || b.name } : b)) });
+}
+/** Out of the library, and off every person and mic it was picked for. */
+export function removeBackground(id: string) {
+  const s = stored.settings;
+  const p = s.center.logoId === id ? null : files.path(id);
+  if (p) fs.rmSync(p, { force: true });
+  saveBoardSettings({
+    backgrounds: s.backgrounds.filter((b) => b.id !== id),
+    customImages: Object.fromEntries(Object.entries(s.customImages).filter(([, v]) => v !== id)),
+  });
+}
+export function setLogo(pic: Pic | null) {
+  saveBoardSettings({ center: { ...stored.settings.center, logoId: pic ? files.save(pic.data, pic.ext) : null } });
+}
+/** The files other Macs need: every background and the logo. */
+export function syncedFiles(): string[] {
+  const s = stored.settings;
+  return [...s.backgrounds.map((b) => b.id), ...(s.center.logoId ? [s.center.logoId] : [])];
+}
+
+/**
+ * Micboard (removed in 1.40) kept the pictures you gave it, named after people. Bring yours into
+ * the library once, under the same names, so they still show behind those people.
+ */
+function importMicboardBackgrounds() {
+  if (extras.get("boardImportedMicboard", false)) return;
+  extras.set("boardImportedMicboard", true);
+  const mine = extras.get<{ custom?: string[] }>("micboardBackgrounds", {}).custom ?? [];
+  const dir = path.resolve(process.cwd(), config.dataDir, "micboard");
+  let added = 0;
+  for (const file of mine.filter((f) => /\.jpg$/i.test(f))) {
+    const src = [path.join(dir, "backgrounds-originals", file), path.join(dir, "backgrounds", file)].find((p) => fs.existsSync(p));
+    if (!src) continue;
+    const name = file.replace(/\.jpg$/i, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    try { addBackground(name.replace(/\b\w/g, (c) => c.toUpperCase()), { data: fs.readFileSync(src), ext: "jpg" }); added++; } catch { /* library full */ }
+  }
+  if (added) logEvent(`mic board: ${added} background${added === 1 ? "" : "s"} from Micboard added to the library`);
+}
+importMicboardBackgrounds();

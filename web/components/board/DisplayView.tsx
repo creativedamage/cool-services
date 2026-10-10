@@ -1,7 +1,7 @@
 "use client";
 /**
  * The stage display as it appears on a TV / stage screen / second display: the banner across the
- * top (your message or mission statement), then the mic board (Micboard) or the clock.
+ * top (your message or mission statement, if it's on), then the mic board or the clock.
  * Sized by its container, so the same thing works full screen and as a preview in the app.
  */
 import { useEffect, useRef, useState } from "react";
@@ -9,6 +9,7 @@ import type { BoardTile, DisplayState } from "@shared/board";
 import { ClockFace } from "@/components/clock/ClockFace";
 import { useClockStream } from "@/components/clock/useClock";
 import type { TileHistory } from "./MicBoard";
+import { SideStage } from "./SideStage";
 
 /** Recent audio and RF readings per mic (kept on this screen) for the graphs; `at` changes with new readings. */
 export function useTileHistory(tiles: BoardTile[], at: string) {
@@ -70,33 +71,13 @@ function ClockView() {
   return <ClockFace state={out.state} now={now} showTimeOfDay={out.showTimeOfDay} title={out.title} infoHeading={out.infoHeading} />;
 }
 
-/**
- * The mic board is Micboard itself (creativedamage/micboard, running inside Sundays on this
- * Mac): its own page, from the same computer this page came from, at Micboard's port.
- */
-function MicboardFrame({ s }: { s: DisplayState }) {
-  const [host, setHost] = useState<string | null>(null);
-  useEffect(() => { setHost(`${location.protocol}//${location.hostname}`); }, []);
-  const m = s.micboard;
-  if (!m) return <Empty text="Micboard is off. Turn it on in Preferences → Micboard." />;
-  if (!m.running) return <Empty text={m.error ?? "Starting Micboard…"} />;
-  if (!host) return null;
-  const src = `${host}:${m.port}/${m.hash}`;
-  // A new hash or new background pictures load Micboard's page again (it reads them when it opens).
-  return <iframe key={`${src}|${m.rev}`} src={src} title="Micboard" className="absolute inset-0 h-full w-full border-0 bg-black" allow="fullscreen" />;
-}
-
-function Empty({ text }: { text: string }) {
-  return <div className="flex h-full w-full items-center justify-center p-[4cqw] text-center text-white/60" style={{ fontSize: "3cqh" }}>{text}</div>;
-}
-
 export function DisplayView({ s, now }: { s: DisplayState; now: number }) {
   const [ref] = useSize<HTMLDivElement>();
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-black text-white [container-type:size]" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif" }}>
       <Banner s={s} now={now} />
       <div ref={ref} className="relative min-h-0 flex-1" style={{ padding: 0 }}>
-        {s.view === "micboard" && <MicboardFrame s={s} />}
+        {s.view === "micboard" && <SideStage s={s} now={now} />}
         {s.view === "clock" && <ClockView />}
       </div>
     </div>

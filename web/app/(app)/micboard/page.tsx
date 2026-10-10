@@ -1,17 +1,17 @@
 "use client";
 /**
  * Mic board & stage display. Choose what the display shows (Auto: the mic board around rehearsals and
- * services; or pick one), change the banner message, and set pictures. The preview is exactly
- * what the network display and the second display show.
+ * services; or pick one), and set up the board: your logo and the clock in the middle, the
+ * backgrounds library (synced to every Mac you sign in on), and each mic's color, line and picture.
+ * The preview is exactly what the network display and the second display show.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { Copy, Eye, EyeOff, ImagePlus, Plus, Trash2, WifiOff, MicVocal, MonitorUp, RotateCcw, Settings2, Sparkles, Timer, Tv, Wifi, X } from "lucide-react";
+import { Copy, Eye, EyeOff, ImagePlus, Plus, Trash2, WifiOff, MicVocal, MonitorUp, Settings2, Sparkles, Timer, Tv, Upload, Wifi, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { BoardMic, BoardSettings, DisplayMode } from "@shared/board";
+import { TILE_COLORS, type BoardMic, type BoardSettings, type BoardTile, type DisplayMode } from "@shared/board";
 import { Api } from "@/lib/api";
-import { openPrefs } from "@/lib/prefs";
 import { DisplayView } from "@/components/board/DisplayView";
 import { Drawer, Spinner } from "@/components/ui";
 
@@ -23,18 +23,33 @@ const MODES: { mode: DisplayMode; label: string; icon: typeof Tv; hint: string }
 ];
 const VIEW_NAME = { micboard: "Mic board", clock: "Clock" } as const;
 
-/** Shrink a picture to at most 900 px on its long side (a JPEG), so boards load fast on TVs. */
-async function shrink(file: File): Promise<string> {
+/**
+ * Shrink a picture for the board: backgrounds to at most 1600 px on their long side (a JPEG), a logo
+ * to 900 px (a PNG, so it stays see-through). Each one syncs to your other Macs on its own, so it's
+ * kept under about 600 KB.
+ */
+async function shrink(file: File, kind: "background" | "logo"): Promise<string> {
   const url = URL.createObjectURL(file);
   try {
-    const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-    const k = Math.min(1, 900 / Math.max(img.naturalWidth, img.naturalHeight));
-    const c = document.createElement("canvas");
-    c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
-    c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL("image/jpeg", 0.86);
+    const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("That file isn’t a picture this browser can open.")); i.src = url; });
+    const draw = (max: number) => {
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+      return c;
+    };
+    const fits = (d: string) => d.length * 0.75 < 600_000;
+    if (kind === "logo") {
+      for (const max of [900, 700, 500]) { const d = draw(max).toDataURL("image/png"); if (fits(d)) return d; }
+      return draw(500).toDataURL("image/webp", 0.9);
+    }
+    for (const [max, q] of [[1600, 0.84], [1600, 0.72], [1280, 0.72], [1000, 0.7]] as const) { const d = draw(max).toDataURL("image/jpeg", q); if (fits(d)) return d; }
+    return draw(800).toDataURL("image/jpeg", 0.65);
   } finally { URL.revokeObjectURL(url); }
 }
+const fileName = (f: File) => f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+const bgUrl = (id: string) => `/api/board-out/image/${encodeURIComponent(id)}`;
 
 export default function MicBoardPage() {
   const qc = useQueryClient();
@@ -94,7 +109,7 @@ export default function MicBoardPage() {
           <DisplayView s={state} now={now} />
         </div>
         <p className="mt-2 text-center text-[11px] text-ink-faint">
-          This is what the display shows. The mic board is Micboard (click into it to use it; press s there for its settings). Who’s on each mic comes from the service’s Mics panel.
+          This is what the display shows. Who’s on each mic comes from the service’s Mics panel; logo, clock, backgrounds and each mic’s color and line are in Display settings.
         </p>
         <NetworkPanel on={s.lan} urls={q.data.urls} onTurnOn={() => save.mutate({ lan: true })} />
       </div>
@@ -142,19 +157,12 @@ function NetworkPanel({ on, urls, onTurnOn }: { on: boolean; urls: string[]; onT
   );
 }
 
-function SettingsDrawer({ s, data, onSave, onClose }: {
-  s: BoardSettings; data: NonNullable<Awaited<ReturnType<typeof Api.stageDisplay>>>;
-  onSave: (p: Parameters<typeof Api.saveBoard>[0]) => void; onClose: () => void;
-}) {
-  const qc = useQueryClient();
+
+type Save = (p: Parameters<typeof Api.saveBoard>[0]) => void;
+type Data = NonNullable<Awaited<ReturnType<typeof Api.stageDisplay>>>;
+
+function SettingsDrawer({ s, data, onSave, onClose }: { s: BoardSettings; data: Data; onSave: Save; onClose: () => void }) {
   const types = useQuery({ queryKey: ["serviceTypes"], queryFn: Api.serviceTypes, staleTime: 10 * 60_000 });
-  const upload = useMutation({
-    mutationFn: async ({ key, file }: { key: string; file: File }) => Api.boardImage(key, await shrink(file)),
-    onSuccess: (settings) => { qc.setQueryData(KEY, (v: any) => v && { ...v, settings }); toast.success("Picture saved"); },
-    onError: (e) => toast.error("Couldn’t save the picture", { description: (e as Error).message }),
-  });
-  const remove = useMutation({ mutationFn: Api.removeBoardImage, onSuccess: (settings) => qc.setQueryData(KEY, (v: any) => v && { ...v, settings }) });
-  const tiles = data.state.tiles;
   const copy = (t: string) => void navigator.clipboard.writeText(t).then(() => toast.success("Copied"));
 
   return (
@@ -163,7 +171,13 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
         <h2 className="font-semibold">Display settings</h2>
         <button className="btn-ghost p-1.5" onClick={onClose}><X size={16} /></button>
       </header>
-      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5 text-sm">
+      <div className="min-h-0 flex-1 space-y-7 overflow-y-auto p-5 text-sm">
+        <CenterSection s={s} onSave={onSave} />
+        <CardsSection s={s} onSave={onSave} />
+        <LibrarySection s={s} />
+        <MicsSection s={s} mics={data.mics} onSave={onSave} />
+        <PeopleSection s={s} tiles={data.state.tiles} />
+
         <section className="space-y-2">
           <h3 className="label">Service</h3>
           <div className="flex rounded-lg border border-line p-0.5">
@@ -172,12 +186,10 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
                 className={clsx("flex-1 rounded-md px-2 py-1.5 text-xs", (s.follow ?? "weekend") === v ? "bg-accent text-white" : "text-ink-soft hover:bg-hover")}>{label}</button>
             ))}
           </div>
-          {(s.follow ?? "weekend") === "weekend" && (
-            <p className="text-[11px] text-ink-faint">Uses the weekend picked in the sidebar. It stays on that weekend until someone picks another.{data.state.service ? <> Now: <span className="text-ink-soft">{data.state.service.serviceTypeName} · {data.state.service.when}</span></> : null}</p>
-          )}
-          {(s.follow ?? "weekend") === "open" && (
-            <p className="text-[11px] text-ink-faint">Open a service under Services and the board switches to it.{data.state.service ? <> Now: <span className="text-ink-soft">{data.state.service.serviceTypeName} · {data.state.service.when}</span></> : null}</p>
-          )}
+          <p className="text-[11px] text-ink-faint">
+            {(s.follow ?? "weekend") === "weekend" ? "Uses the weekend picked in the sidebar. It stays on that weekend until someone picks another." : "Open a service under Services and the board switches to it."}
+            {data.state.service ? <> Now: <span className="text-ink-soft">{data.state.service.serviceTypeName} · {data.state.service.when}</span></> : null}
+          </p>
           <label className="block"><span className="text-xs text-ink-muted">{(s.follow ?? "weekend") === "open" ? "Until you open one, the weekend’s service of" : "The weekend’s service of"}</span>
             <select className="input mt-1" value={s.serviceTypeId ?? ""} onChange={(e) => onSave({ serviceTypeId: e.target.value || null })}>
               <option value="">Any type</option>
@@ -211,10 +223,6 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
           <label className="flex items-center gap-2"><input type="checkbox" checked={s.banner.showClock} onChange={(e) => onSave({ banner: { showClock: e.target.checked } })} /> Show the time on the right</label>
         </section>
 
-        <MicboardDisplaySection s={s} onSave={onSave} />
-
-        <MicsSection s={s} mics={data.mics} onSave={onSave} />
-
         <section className="space-y-2">
           <h3 className="label">Where it shows</h3>
           <label className="flex items-center gap-2"><input type="checkbox" checked={s.lan} onChange={(e) => onSave({ lan: e.target.checked })} /> On the church network (any TV or stage screen with a browser)</label>
@@ -233,44 +241,217 @@ function SettingsDrawer({ s, data, onSave, onClose }: {
   );
 }
 
-/** Show or hide each mic, stack a person's mics on one tile, and add mics that aren't on the network. */
-function MicsSection({ s, mics, onSave }: {
-  s: BoardSettings; mics: BoardMic[]; onSave: (p: Parameters<typeof Api.saveBoard>[0]) => void;
-}) {
+/** Settings saved through these come back as the new settings; put them where the page reads them. */
+function useSetSettings() {
   const qc = useQueryClient();
+  return (settings: BoardSettings) => { qc.setQueryData(KEY, (v: any) => v && { ...v, settings }); void qc.invalidateQueries({ queryKey: KEY }); };
+}
+const failed = (what: string) => (e: unknown) => toast.error(`Couldn’t ${what}`, { description: (e as Error).message });
+
+function Segmented<T extends string>({ value, options, onChange }: { value: T; options: readonly (readonly [T, string])[]; onChange: (v: T) => void }) {
+  return (
+    <div className="flex rounded-lg border border-line p-0.5">
+      {options.map(([v, label]) => (
+        <button key={v} onClick={() => onChange(v)} className={clsx("flex-1 rounded-md px-2 py-1.5 text-xs", value === v ? "bg-accent text-white" : "text-ink-soft hover:bg-hover")}>{label}</button>
+      ))}
+    </div>
+  );
+}
+
+/** The middle of the board: your logo over the clock. */
+function CenterSection({ s, onSave }: { s: BoardSettings; onSave: Save }) {
+  const set = useSetSettings();
+  const logo = useMutation({ mutationFn: async (f: File | null) => Api.boardLogo(f ? await shrink(f, "logo") : null), onSuccess: set, onError: failed("save the logo") });
+  const c = s.center;
+  return (
+    <section className="space-y-3">
+      <h3 className="label">Middle of the board</h3>
+      <div className="flex items-center gap-3">
+        <div className="flex h-16 w-32 shrink-0 items-center justify-center rounded-lg border border-line bg-[#0E0E0F] p-2">
+          {c.logoId
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={bgUrl(c.logoId)} alt="Your logo" className="max-h-full max-w-full object-contain" />
+            : <span className="text-[11px] text-ink-faint">No logo</span>}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="btn-outline cursor-pointer py-1 text-xs"><Upload size={13} /> {c.logoId ? "Change logo" : "Add your logo"}
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) logo.mutate(f); }} />
+          </label>
+          {c.logoId && <button className="btn-ghost justify-start py-1 text-xs text-ink-muted" onClick={() => logo.mutate(null)}><Trash2 size={13} /> Remove</button>}
+        </div>
+      </div>
+      <p className="text-[11px] text-ink-faint">Shown over the clock. A PNG with a see-through background looks best on the dark board.</p>
+      <label className="block"><span className="text-xs text-ink-muted">Clock</span>
+        <div className="mt-1"><Segmented value={c.clock} options={[["time", "Time of day"], ["production", "Production clock"]] as const} onChange={(v) => onSave({ center: { clock: v } })} /></div>
+      </label>
+      {c.clock === "time" ? (
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2"><input type="checkbox" checked={c.seconds} onChange={(e) => onSave({ center: { seconds: e.target.checked } })} /> Seconds</label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={c.date} onChange={(e) => onSave({ center: { date: e.target.checked } })} /> The date under it</label>
+        </div>
+      ) : (
+        <p className="text-[11px] text-ink-faint">Just the production clock’s main timer (counting down, or whatever it’s set to), with the name of the timer you loaded under it. Load and start timers on the Clock page; nothing else from the clock shows here.</p>
+      )}
+    </section>
+  );
+}
+
+function CardsSection({ s, onSave }: { s: BoardSettings; onSave: Save }) {
+  return (
+    <section className="space-y-3">
+      <h3 className="label">Cards</h3>
+      <label className="block"><span className="text-xs text-ink-muted">Names</span>
+        <div className="mt-1"><Segmented value={s.names ?? "first"} options={[["first", "First names"], ["full", "Full names"]] as const} onChange={(v) => onSave({ names: v })} /></div>
+      </label>
+      <label className="block"><span className="text-xs text-ink-muted">Pictures</span>
+        <select className="input mt-1" value={s.images} onChange={(e) => onSave({ images: e.target.value as BoardSettings["images"] })}>
+          <option value="custom-then-pco">Their background, else their Planning Center photo</option>
+          <option value="custom">Backgrounds only</option>
+          <option value="pco">Planning Center photos only</option>
+          <option value="none">No pictures</option>
+        </select>
+      </label>
+      <label className="block"><span className="text-xs text-ink-muted">Cards across each side</span>
+        <select className="input mt-1" value={s.columns} onChange={(e) => onSave({ columns: Number(e.target.value) })}>
+          <option value={0}>Fit automatically</option>
+          {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </label>
+      <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5" checked={s.stack ?? true} onChange={(e) => onSave({ stack: e.target.checked })} />
+        <span>One card per person
+          <span className="block text-[11px] text-ink-faint">Someone on more than one mic (a vocal and their acoustic’s pack) gets one card, labeled “VOX 1 + AG PACK”, with a battery for each.</span>
+        </span>
+      </label>
+      <p className="text-[11px] text-ink-faint">Mics fill the left side first, then the right, in Mic setup order. Each card’s battery is read from its Shure receiver (read-only); a low battery gets a yellow edge, one to change now a flashing red one.</p>
+    </section>
+  );
+}
+
+/** The backgrounds library: pictures you upload once, on every Mac you sign in on. */
+function LibrarySection({ s }: { s: BoardSettings }) {
+  const set = useSetSettings();
+  const [busy, setBusy] = useState(0);
+  const add = async (list: FileList) => {
+    const fs_ = [...list];
+    setBusy(fs_.length);
+    for (const f of fs_) {
+      try { const r = await Api.addBoardBackground(fileName(f), await shrink(f, "background")); set(r.settings); }
+      catch (e) { failed(`add ${f.name}`)(e); }
+      setBusy((n) => n - 1);
+    }
+  };
+  const rename = useMutation({ mutationFn: ({ id, name }: { id: string; name: string }) => Api.renameBoardBackground(id, name), onSuccess: set, onError: failed("rename it") });
+  const remove = useMutation({ mutationFn: Api.removeBoardBackground, onSuccess: set, onError: failed("remove it") });
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h3 className="label">Backgrounds</h3>
+        <label className={clsx("btn-outline cursor-pointer py-1 text-xs", busy > 0 && "pointer-events-none opacity-60")}><ImagePlus size={13} /> {busy > 0 ? `Adding ${busy}…` : "Add pictures"}
+          <input type="file" multiple accept="image/png,image/jpeg,image/webp,image/heic" className="hidden" onChange={(e) => { if (e.target.files?.length) void add(e.target.files); e.target.value = ""; }} />
+        </label>
+      </div>
+      <p className="text-[11px] text-ink-faint">Your backgrounds folder: upload once and every Mac you sign in on has them. A background named like a person (“Eddie”, or “Eddie Smith”) shows behind them automatically; or pick one for a mic or a person below.</p>
+      {s.backgrounds.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-xs text-ink-muted">No backgrounds yet.</p>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {s.backgrounds.map((b) => (
+            <div key={b.id} className="group relative overflow-hidden rounded-lg border border-line bg-hover">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={bgUrl(b.id)} alt="" className="aspect-[4/5] w-full object-cover" />
+              <button className="absolute right-1 top-1 rounded-md bg-black/60 p-1 text-white opacity-0 transition group-hover:opacity-100" title="Remove from the library"
+                onClick={() => { if (window.confirm(`Remove “${b.name}” from the backgrounds on every Mac?`)) remove.mutate(b.id); }}><Trash2 size={12} /></button>
+              <input className="w-full bg-transparent px-1.5 py-1 text-[11px] outline-none focus:bg-surface" defaultValue={b.name} maxLength={80}
+                onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== b.name) rename.mutate({ id: b.id, name: v }); }}
+                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** A background from the library, or automatic. */
+function BgSelect({ s, value, onChange, auto = "Automatic" }: { s: BoardSettings; value: string | undefined; onChange: (id: string | null) => void; auto?: string }) {
+  const known = value && s.backgrounds.some((b) => b.id === value) ? value : "";
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="h-7 w-6 shrink-0 overflow-hidden rounded border border-line bg-hover">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {known && <img src={bgUrl(known)} alt="" className="h-full w-full object-cover" />}
+      </span>
+      <select className="input min-w-0 flex-1 py-1 text-xs" value={known} onChange={(e) => onChange(e.target.value || null)}>
+        <option value="">{auto}</option>
+        {s.backgrounds.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+      </select>
+    </div>
+  );
+}
+
+/** Each mic: on the board or not, its color, your line under its name, its picture. Plus mics that aren't on the network. */
+function MicsSection({ s, mics, onSave }: { s: BoardSettings; mics: BoardMic[]; onSave: Save }) {
+  const qc = useQueryClient();
+  const set = useSetSettings();
   const [label, setLabel] = useState("");
   const [kind, setKind] = useState<BoardMic["kind"]>("pack");
   const refresh = () => qc.invalidateQueries({ queryKey: KEY });
   const add = useMutation({
     mutationFn: () => Api.addBoardMic(label.trim(), kind),
     onSuccess: () => { setLabel(""); void refresh(); toast.success("Mic added", { description: "Put someone on it in the service’s Mics panel." }); },
-    onError: (e) => toast.error("Couldn’t add the mic", { description: (e as Error).message }),
+    onError: failed("add the mic"),
   });
   const del = useMutation({ mutationFn: Api.removeBoardMic, onSuccess: () => void refresh() });
+  const pick = useMutation({ mutationFn: ({ key, id }: { key: string; id: string | null }) => Api.pickBoardImage(key, id), onSuccess: set, onError: failed("pick it") });
+  const [text, setText] = useState<Record<string, string>>({});
   const hidden = new Set(s.hidden ?? []);
   const toggle = (id: string) => onSave({ hidden: hidden.has(id) ? [...hidden].filter((x) => x !== id) : [...hidden, id] });
+  const saveText = (id: string) => {
+    const v = (text[id] ?? s.tileText[id] ?? "").trim();
+    if (v === (s.tileText[id] ?? "")) return;
+    const next = { ...s.tileText };
+    if (v) next[id] = v; else delete next[id];
+    onSave({ tileText: next });
+  };
+  const half = Math.ceil(mics.filter((m) => !hidden.has(m.id)).length / 2);
+  let shown = 0;
 
   return (
     <section className="space-y-2">
-      <h3 className="label">FOH companion mic strip</h3>
-      <p className="text-[11px] text-ink-faint">One tile per person (under Mic board above) stacks a person’s other mics under their mic name here too.</p>
+      <h3 className="label">Mics on the board</h3>
       <div className="divide-y divide-line rounded-lg border border-line">
         {mics.length === 0 && <p className="px-3 py-2 text-xs text-ink-muted">No mics yet. Add receivers in Settings → Mic setup, or add a mic below.</p>}
-        {mics.map((m) => (
-          <div key={m.id} className={clsx("flex items-center gap-2 px-3 py-1.5", hidden.has(m.id) && "opacity-50")}>
-            <button className="btn-ghost p-1" title={hidden.has(m.id) ? "Show on the board" : "Hide from the board"} onClick={() => toggle(m.id)}>
-              {hidden.has(m.id) ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
-            <span className="min-w-0 flex-1 truncate">{m.label}</span>
-            <span className="text-[11px] text-ink-faint">{m.kind === "vocal" ? "Vocal" : m.kind === "pack" ? "Pack" : "Other"}</span>
-            {m.networked
-              ? <span className="flex items-center gap-1 text-[11px] text-ok" title="Read from its receiver"><Wifi size={11} /> Network</span>
-              : <>
-                  <span className="flex items-center gap-1 text-[11px] text-ink-muted" title="Not on the network: shows who has it, no battery or RF"><WifiOff size={11} /> Not networked</span>
-                  <button className="btn-ghost p-1 text-ink-muted hover:text-bad" title="Remove this mic" onClick={() => del.mutate(m.id)}><Trash2 size={13} /></button>
-                </>}
-          </div>
-        ))}
+        {mics.map((m, i) => {
+          const off = hidden.has(m.id);
+          const side = off ? null : ++shown <= half ? "Left" : "Right";
+          const color = s.tileColor[m.id] || TILE_COLORS[i % TILE_COLORS.length];
+          return (
+            <div key={m.id} className={clsx("space-y-1.5 px-3 py-2", off && "opacity-50")}>
+              <div className="flex items-center gap-2">
+                <button className="btn-ghost p-1" title={off ? "Show on the board" : "Hide from the board"} onClick={() => toggle(m.id)}>{off ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                <label className="relative h-5 w-5 shrink-0 cursor-pointer overflow-hidden rounded-full border border-line" style={{ background: color }} title="Label color">
+                  <input type="color" className="absolute inset-0 cursor-pointer opacity-0" value={color} onChange={(e) => onSave({ tileColor: { ...s.tileColor, [m.id]: e.target.value } })} />
+                </label>
+                <span className="min-w-0 flex-1 truncate font-medium">{m.label}</span>
+                {side && <span className="text-[11px] text-ink-faint">{side}</span>}
+                {m.networked
+                  ? <span className="flex items-center gap-1 text-[11px] text-ok" title="Battery read from its receiver"><Wifi size={11} /></span>
+                  : <>
+                      <span className="flex items-center gap-1 text-[11px] text-ink-muted" title="Not on the network: shows who has it, no battery"><WifiOff size={11} /></span>
+                      <button className="btn-ghost p-1 text-ink-muted hover:text-bad" title="Remove this mic" onClick={() => del.mutate(m.id)}><Trash2 size={13} /></button>
+                    </>}
+              </div>
+              {!off && (
+                <div className="grid grid-cols-2 gap-2 pl-8">
+                  <input className="input py-1 text-xs" placeholder="Your line under the name" maxLength={60}
+                    value={text[m.id] ?? s.tileText[m.id] ?? ""} onChange={(e) => setText({ ...text, [m.id]: e.target.value })}
+                    onBlur={() => saveText(m.id)} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+                  <BgSelect s={s} value={s.customImages[`mic:${m.id}`]} auto="Their picture" onChange={(id) => pick.mutate({ key: `mic:${m.id}`, id })} />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (label.trim()) add.mutate(); }}>
         <input className="input flex-1" placeholder="Add a mic that isn’t on the network (e.g. AG 1)" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} />
@@ -279,59 +460,29 @@ function MicsSection({ s, mics, onSave }: {
         </select>
         <button className="btn-primary px-3" disabled={!label.trim() || add.isPending}><Plus size={14} /></button>
       </form>
-      <p className="text-[11px] text-ink-faint">Who’s on each mic comes from the service’s Mics panel, so put Adam on “AG 1” there and it stacks onto his tile.</p>
+      <p className="text-[11px] text-ink-faint">A mic’s own picture is for whoever is on it. Who’s on each mic comes from the service’s Mics panel, so put Adam on “AG 1” there and it joins his card.</p>
     </section>
   );
 }
 
-/** The Micboard group Sundays keeps for One tile per person (server/src/lib/micboard.ts). */
-const PERSON_GROUP_TITLE = "Sundays · one per person";
-
-/** How the display shows Micboard: group, TV view and info drawer, backgrounds. */
-function MicboardDisplaySection({ s, onSave }: { s: BoardSettings; onSave: (p: Parameters<typeof Api.saveBoard>[0]) => void }) {
-  const mb = useQuery({ queryKey: ["micboard"], queryFn: Api.micboard, refetchInterval: 5000 });
-  const m = s.micboard;
-  const set = (p: Partial<BoardSettings["micboard"]>) => onSave({ micboard: { ...m, ...p } });
+/** A background for a person, wherever they are on the board. */
+function PeopleSection({ s, tiles }: { s: BoardSettings; tiles: BoardTile[] }) {
+  const set = useSetSettings();
+  const pick = useMutation({ mutationFn: ({ key, id }: { key: string; id: string | null }) => Api.pickBoardImage(key, id), onSuccess: set, onError: failed("pick it") });
+  const people = [...new Map(tiles.filter((t) => t.person).map((t) => [t.person!.id, t.person!])).values()].sort((a, b) => a.name.localeCompare(b.name));
+  if (!people.length || !s.backgrounds.length) return null;
   return (
     <section className="space-y-2">
-      <h3 className="label">Mic board (Micboard)</h3>
-      <p className="text-[11px] text-ink-faint">
-        The mic board is Micboard, running inside Sundays{mb.data?.status.version ? ` (version ${mb.data.status.version})` : ""}. Set up receivers, groups and names in Micboard itself (press <b>s</b> for its settings);
-        names, Planning Center photos and your own backgrounds are in <button className="text-accent hover:underline" onClick={() => void openPrefs("micboard")}>Preferences → Micboard</button>.
-      </p>
-      <label className="block"><span className="text-xs text-ink-muted">Group</span>
-        <select className="input mt-1" value={m.group} onChange={(e) => set({ group: Number(e.target.value) })}>
-          <option value={0}>All mics</option>
-          {(mb.data?.groups ?? []).filter((g) => g.title !== PERSON_GROUP_TITLE).map((g) => <option key={g.group} value={g.group}>{g.group}: {g.title || "Untitled"} ({g.slots})</option>)}
-        </select>
-      </label>
-      <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5" checked={s.stack ?? true} onChange={(e) => onSave({ stack: e.target.checked })} />
-        <span>One tile per person
-          <span className="block text-[11px] text-ink-faint">
-            Someone on more than one mic (a vocal and their acoustic guitar’s pack) shows once, on their vocal mic, named “Vox 1 + AG Pack”.
-            A folded-in pack comes back as its own tile while its battery is low (3 bars or fewer), so a dying pack is never hidden.
-            Sundays keeps this as its own Micboard group (“{PERSON_GROUP_TITLE}”), made from the group above.
-          </span></span>
-      </label>
-      <label className="block"><span className="text-xs text-ink-muted">View</span>
-        <select className="input mt-1" value={m.view} onChange={(e) => set({ view: e.target.value as BoardSettings["micboard"]["view"] })}>
-          <option value="elinfo11">TV: names, status bar and details</option>
-          <option value="elinfo10">TV: names and details</option>
-          <option value="elinfo01">TV: names and status bar</option>
-          <option value="elinfo00">TV: names only</option>
-          <option value="desk">Desk view</option>
-        </select>
-      </label>
-      {m.view !== "desk" && (
-        <label className="block"><span className="text-xs text-ink-muted">Backgrounds behind the names</span>
-          <div className="mt-1 flex rounded-lg border border-line p-0.5">
-            {([["IMG", "Pictures"], ["MP4", "Videos"], ["NONE", "None"]] as const).map(([v, label]) => (
-              <button key={v} onClick={() => set({ backgrounds: v })}
-                className={clsx("flex-1 rounded-md px-2 py-1.5 text-xs", m.backgrounds === v ? "bg-accent text-white" : "text-ink-soft hover:bg-hover")}>{label}</button>
-            ))}
+      <h3 className="label">People on this service</h3>
+      <div className="divide-y divide-line rounded-lg border border-line">
+        {people.map((p) => (
+          <div key={p.id} className="flex items-center gap-2 px-3 py-1.5">
+            <span className="min-w-0 flex-1 truncate">{p.name}</span>
+            <div className="w-44"><BgSelect s={s} value={s.customImages[`person:${p.id}`]} onChange={(id) => pick.mutate({ key: `person:${p.id}`, id })} /></div>
           </div>
-        </label>
-      )}
+        ))}
+      </div>
+      <p className="text-[11px] text-ink-faint">Their background on any mic, any service. Automatic: one named like them, else their Planning Center photo.</p>
     </section>
   );
 }

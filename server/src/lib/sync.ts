@@ -12,26 +12,27 @@
  *
  * What syncs: Preferences (theme, logo, start-up view, Waves snapshot numbers), mics & packs and who's
  * on them, run sheet views, the Mic board / display and Clock setups, the Dashboard, campuses,
- * team groups, Parent paging, ProPresenter computers, the console, Smaart, Micboard and Resi, and
+ * team groups, Parent paging, ProPresenter computers, the console, Smaart and Resi, the mic board backgrounds, and
  * the picked weekend.
  * What stays on each Mac: how it's used (Full / Service Mode / FOH Companion, and the Service Mode
  * PIN), which screens and network pages it shows, its MIDI output, FOH companion links, sign-ins,
  * and Planning Center's own data (that's already in Planning Center).
  */
 import crypto from "node:crypto";
+import fs from "node:fs";
 import { SYNC_URL } from "../../../shared/cloud.js";
 import type { SyncStatus } from "../../../shared/types.js";
 import { usingPat } from "../config.js";
 import { decrypt } from "./crypto.js";
-import { extras, logEvent, mics, pagingStore, runSheetViews, settings, syncRaw, tokens as tokenStore, users } from "./db.js";
+import { extras, files, logEvent, mics, pagingStore, runSheetViews, settings, syncRaw, tokens as tokenStore, users } from "./db.js";
 import { accessTokenFor } from "../auth/oauth.js";
-import { applyBoardSync, boardSyncValue } from "./board.js";
+import { applyBoardSync, boardSyncValue, syncedFiles } from "./board.js";
 import { applyClockSync, clockSyncValue } from "./clock.js";
 import { resiSettings, saveResiSettings } from "./resi.js";
-import { saveMicboardSettings, micboardSettings } from "./micboard.js";
 import { setWeekend, weekend } from "./weekend.js";
 
-interface Item { key: string; read: () => unknown; write: (v: unknown) => void }
+/** `read` is what's compared to see if it changed; `payload` (if different) is what's sent. */
+interface Item { key: string; read: () => unknown; write: (v: unknown) => void; payload?: () => unknown }
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 /** A plain extras key, synced as a whole. */
 const extra = (key: string, fallback: unknown = null): Item => ({ key: `x:${key}`, read: () => extras.get(key, fallback), write: (v) => extras.set(key, v) });
@@ -78,16 +79,33 @@ const ITEMS: Item[] = [
       });
     },
   },
-  {
-    // Micboard: names and photos; its port and on/off are this Mac's.
-    key: "micboard",
-    read: () => { const { port: _p, enabled: _e, ...rest } = micboardSettings(); return rest; },
-    write: (v) => { const x = obj(v); const { port: _p, enabled: _e, ...rest } = x; void saveMicboardSettings(rest); },
-  },
   { key: "weekend", read: () => weekend(), write: (v) => { if (v === null || typeof v === "string") setWeekend(v as string | null); } },
   extra("dashboard"), extra("home"), extra("campuses"), extra("teamGroups"), extra("knownTeams"),
   extra("volunteerCheckIn"), extra("proMachines"), extra("console"), extra("smaart"),
 ];
+
+/**
+ * The mic board's pictures (backgrounds library, logo): one sync key per file ("f:<file id>"), its
+ * contents as a data: URL. A file never changes under its id, so it's sent once and compared by id.
+ */
+const FILE_KEY = /^f:([0-9a-f-]{36}\.(png|jpg|webp))$/;
+const MIME = { png: "image/png", jpg: "image/jpeg", webp: "image/webp" } as const;
+function fileItem(id: string): Item {
+  return {
+    key: `f:${id}`,
+    read: () => id,
+    payload: () => {
+      const p = files.path(id);
+      return p ? `data:${MIME[id.split(".").pop() as keyof typeof MIME]};base64,${fs.readFileSync(p).toString("base64")}` : null;
+    },
+    write: (v) => {
+      const m = typeof v === "string" ? v.match(/^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/) : null;
+      if (m && !files.path(id)) files.saveAs(id, Buffer.from(m[1], "base64"));
+    },
+  };
+}
+const allItems = (): Item[] => [...ITEMS, ...syncedFiles().filter((id) => files.path(id)).map(fileItem)];
+const itemFor = (key: string): Item | undefined => ITEMS.find((i) => i.key === key) ?? (FILE_KEY.test(key) ? fileItem(key.slice(2)) : undefined);
 
 /* ───────────── State ───────────── */
 
@@ -125,7 +143,7 @@ type Remote = { key: string; value: unknown; updatedAt: string; device: string |
 
 /** Take a change from another Mac (if it's newer than ours). */
 function apply(r: Remote): boolean {
-  const item = ITEMS.find((i) => i.key === r.key);
+  const item = itemFor(r.key);
   if (!item) return false;
   const mine = st.meta[r.key];
   if (mine && Date.parse(mine.at) >= Date.parse(r.updatedAt)) return false;
@@ -168,18 +186,29 @@ export async function syncNow(opts: { pull?: boolean } = {}): Promise<SyncStatus
       st.since = res.now;
       lastPull = Date.now();
       // Settings this Mac has never synced: a first sync only fills in, it doesn't clobber.
-      if (first) for (const i of ITEMS) st.meta[i.key] ??= { hash: "", at: new Date(0).toISOString() };
+      if (first) for (const i of allItems()) st.meta[i.key] ??= { hash: "", at: new Date(0).toISOString() };
     }
 
     // Up: settings whose value changed since we last sent/received them.
     const now = new Date().toISOString();
-    const out = ITEMS.map((i) => ({ i, v: i.read() })).filter(({ i, v }) => st.meta[i.key]?.hash !== hash(v));
-    if (out.length) {
+    const out = allItems().map((i) => ({ i, v: i.read() })).filter(({ i, v }) => st.meta[i.key]?.hash !== hash(v));
+    // Sent in batches of about 3 MB (pictures are a few hundred KB each).
+    const batches: { i: Item; v: unknown; send: unknown }[][] = [[]];
+    let size = 0;
+    for (const o of out) {
+      const send = o.i.payload ? o.i.payload() : o.v;
+      if (send === null && o.i.payload) continue; // the file isn't on this Mac
+      const n = JSON.stringify(send ?? null).length;
+      if (size + n > 3_000_000 && batches.at(-1)!.length) { batches.push([]); size = 0; }
+      batches.at(-1)!.push({ ...o, send });
+      size += n;
+    }
+    for (const batch of batches.filter((b) => b.length)) {
       status = { ...status, state: "syncing" };
       const res = await call<{ saved: string[]; newer: Remote[]; now: string }>(token, {
-        op: "push", device: st.device, items: out.map(({ i, v }) => ({ key: i.key, value: v, updatedAt: now })),
+        op: "push", device: st.device, items: batch.map(({ i, send }) => ({ key: i.key, value: send, updatedAt: now })),
       });
-      for (const k of res.saved) { const it = out.find((o) => o.i.key === k)!; st.meta[k] = { hash: hash(it.v), at: now }; }
+      for (const k of res.saved) { const it = batch.find((o) => o.i.key === k)!; st.meta[k] = { hash: hash(it.v), at: now }; }
       for (const r of res.newer) if (apply(r)) changed++;
     }
     persist();

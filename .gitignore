@@ -6,7 +6,6 @@ web/out
 next-env.d.ts
 *.tsbuildinfo
 desktop/app
-desktop/micboard-runtime
 desktop/release
 .DS_Store
 *.p12

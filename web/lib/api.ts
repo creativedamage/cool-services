@@ -7,7 +7,7 @@ import type {
 import type { UpdateStatus } from "@shared/updates";
 import type { AppId } from "@shared/apps";
 import type { ClockOutputSettings, ClockPreset, ClockState, ClockView } from "@shared/clock";
-import type { BoardMic, BoardSettings, DisplayState } from "@shared/board";
+import type { BoardBackground, BoardMic, BoardSettings, DisplayState } from "@shared/board";
 
 export type SettingsPatch = Partial<Omit<AppSettings, "waves">> & {
   waves?: Partial<AppSettings["waves"]>;
@@ -93,10 +93,14 @@ export const Api = {
   boardOpenPlan: (serviceTypeId: string, planId: string) => api<{ ok: true }>("/board/open", { method: "POST", json: { serviceTypeId, planId } }),
   addBoardMic: (label: string, kind: BoardMic["kind"]) => api<{ id: string }>("/board/mics", { method: "POST", json: { label, kind } }),
   removeBoardMic: (id: string) => api<{ ok: true }>(`/board/mics/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  saveBoard: (p: Partial<Omit<BoardSettings, "banner" | "screen">> & { banner?: Partial<BoardSettings["banner"]>; screen?: Partial<BoardSettings["screen"]> }) =>
+  saveBoard: (p: Partial<Omit<BoardSettings, "banner" | "screen" | "center">> & { banner?: Partial<BoardSettings["banner"]>; screen?: Partial<BoardSettings["screen"]>; center?: Partial<Omit<BoardSettings["center"], "logoId">> }) =>
     api<BoardSettings>("/board/settings", { method: "PUT", json: p }),
-  boardImage: (key: string, dataUrl: string) => api<BoardSettings>("/board/images", { method: "POST", json: { key, dataUrl } }),
-  removeBoardImage: (key: string) => api<BoardSettings>(`/board/images/${encodeURIComponent(key)}`, { method: "DELETE" }),
+  /** Pick a background for "person:<id>" or "mic:<channel id>" (null: automatic). */
+  pickBoardImage: (key: string, backgroundId: string | null) => api<BoardSettings>("/board/images", { method: "PUT", json: { key, backgroundId } }),
+  addBoardBackground: (name: string, dataUrl: string) => api<{ background: BoardBackground; settings: BoardSettings }>("/board/backgrounds", { method: "POST", json: { name, dataUrl } }),
+  renameBoardBackground: (id: string, name: string) => api<BoardSettings>(`/board/backgrounds/${encodeURIComponent(id)}`, { method: "PUT", json: { name } }),
+  removeBoardBackground: (id: string) => api<BoardSettings>(`/board/backgrounds/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  boardLogo: (dataUrl: string | null) => (dataUrl ? api<BoardSettings>("/board/logo", { method: "POST", json: { dataUrl } }) : api<BoardSettings>("/board/logo", { method: "DELETE" })),
   clock: () => api<ClockView>("/clock"),
   clockAction: (a: Record<string, unknown> & { type: string }) => api<ClockState>("/clock/action", { method: "POST", json: a }),
   saveClockPresets: (list: ClockPreset[]) => api<ClockPreset[]>("/clock/presets", { method: "PUT", json: list }),
@@ -162,20 +166,6 @@ export const Api = {
   saveResiSettings: (p: { enabled?: boolean; clientId?: string; clientSecret?: string; encoderIds?: string[] }) =>
     api<{ settings: ResiSettingsView; status: ResiStatus }>("/resi/settings", { method: "PUT", json: p }),
   testResi: () => api<{ status: ResiStatus; encoders: { id: string; name: string }[] }>("/resi/test", { method: "POST" }),
-  micboard: () => api<MicboardView>("/micboard"),
-  saveMicboard: (p: Partial<MicboardView["settings"]>) => api<MicboardView["settings"]>("/micboard/settings", { method: "PUT", json: p }),
-  restartMicboard: () => api<{ ok: true }>("/micboard/restart", { method: "POST" }),
-  syncMicboard: () => api<MicboardView["sync"]>("/micboard/sync", { method: "POST" }),
-  openMicboardFolder: (which: "backgrounds" | "config") => api<{ ok: true }>("/micboard/open-folder", { method: "POST", json: { which } }),
-  micboardBackgrounds: () => api<MicboardBackground[]>("/micboard/backgrounds"),
-  addMicboardBackground: (name: string, dataUrl: string) => api<{ file: string; list: MicboardBackground[] }>("/micboard/backgrounds", { method: "POST", json: { name, dataUrl } }),
-  addMicboardVideo: async (name: string, file: File) => {
-    const r = await fetch(`/api/micboard/backgrounds/video?name=${encodeURIComponent(name)}`, { method: "POST", headers: { "Content-Type": "video/mp4" }, body: file, credentials: "include" });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.message ?? `HTTP ${r.status}`);
-    return j as { file: string; list: MicboardBackground[] };
-  },
-  removeMicboardBackground: (file: string) => api<MicboardBackground[]>(`/micboard/backgrounds/${encodeURIComponent(file)}`, { method: "DELETE" }),
   companionStrip: () => api<{ settings: CompanionStrip; displays: DisplayInfo[] }>("/companion-client/strip"),
   saveCompanionStrip: (p: Partial<CompanionStrip>) => api<{ settings: CompanionStrip; displays: DisplayInfo[] }>("/companion-client/strip", { method: "PUT", json: p }),
   companionTuning: (slot: string) => api<{ ok: boolean; snapshot?: number; error?: string }>("/companion-client/tuning", { method: "POST", json: { slot } }),
@@ -300,15 +290,3 @@ export const planQuery = (st: string, plan: string) => ({
   staleTime: 15_000,
 });
 
-/* Micboard inside Sundays (Preferences → Micboard). */
-export interface MicboardView {
-  settings: { enabled: boolean; port: number; names: "first" | "full" | "off"; pcoPhotos: boolean; readable: boolean };
-  status: { run: "off" | "starting" | "running" | "error" | "missing" | "companion"; error: string | null; version: string | null; port: number; log: string[]; folder: string };
-  sync: { at: string; error: string | null; names: number; photos: number };
-  urls: string[];
-  groups: { group: number; title: string; slots: number }[];
-  slots: number;
-  canOpenFolder: boolean;
-  onBoard: string[];
-}
-export interface MicboardBackground { file: string; name: string; kind: "image" | "video"; source: "yours" | "pco" | "folder"; bytes: number; at: string }

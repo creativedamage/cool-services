@@ -58,5 +58,5 @@ micsRouter.put("/plans/:plan", h(async (req, res) => {
  * Shared for 2 seconds so several open windows don't each poll the receivers.
  */
 micsRouter.get("/status", h(async (_req, res) => {
-  res.json(await micStatuses()); // from Micboard while it runs
+  res.json(await micStatuses());
 }));

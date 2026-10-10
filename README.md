@@ -13,7 +13,7 @@ On the release page, download **Sundays-<version>.dmg**, open it and drag Sunday
 Applications. After that, Sundays updates itself (Sundays → Check for Updates).
 
 **Was Cool Services.** Sundays is the new name (1.24). Updating from Cool Services keeps everything:
-the app becomes **Sundays.app** in Applications, and your sign-in, settings, notes and Micboard
+the app becomes **Sundays.app** in Applications, and your sign-in, settings and notes
 move to `~/Library/Application Support/Sundays` by themselves.
 
 ![A service in Sundays: tuning keys, mics and packs, and the roster](docs/screenshots/service.png)
@@ -39,7 +39,7 @@ move to `~/Library/Application Support/Sundays` by themselves.
 </tr>
 <tr>
 <td><img src="docs/screenshots/clock-output.png" alt="Clock output"><br><b>Clock output</b>: the same clock as an NDI source, on the network or on a second display.</td>
-<td><img src="docs/screenshots/micboard-display.png" alt="Mic board display"><br><b>Mic board</b>: every wireless mic with who's on it, battery, RF and audio, on any screen in the building.</td>
+<td><img src="docs/screenshots/micboard-display.png" alt="Mic board display"><br><b>Mic board</b>: every wireless mic with who's on it, their picture and battery, around your logo and the clock, on any screen in the building.</td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/micboard.png" alt="Mic board control"><br><b>Stage display control</b>: switch between the mic board and the clock (or let rehearsal and service times decide), and set the banner message.</td>
@@ -97,11 +97,11 @@ Screenshots use the built-in sample data (Sign in → "Or explore with sample da
   Center Live item). Saved **timers** start with a click, a number key, a schedule, or when the one
   before ends. Outputs: **NDI®**, the church network (any browser), a second display, and Stream Deck
   / Companion links.
-- **Mic board & stage display** (sidebar → Mic board): [Micboard](https://github.com/creativedamage/micboard)
-  built in (creativedamage/micboard, unchanged), with names and photos from Planning Center and your
-  own backgrounds (Preferences → Micboard), on the network at `http://<this Mac>:8058`. The stage
-  display adds a banner message across the top and can show the mic board or the clock, chosen in
-  the app or automatically (the mic board around rehearsals and services).
+- **Mic board & stage display** (sidebar → Mic board): a photo card for every wireless mic, half
+  down each side, with who's on it (from Planning Center), a battery read from its Shure receiver, and
+  your own backgrounds (synced to every Mac you sign in on). In the middle: your logo over the time of
+  day or the production clock's countdown. The stage display can show the mic board or the clock,
+  chosen in the app or automatically (the mic board around rehearsals and services).
   Open it on any other computer or TV at `http://<this Mac>/display`.
 - **Tuning**: every song's key, big, across the top of each service in service order ("Song 1 · A",
   "Song 2 · Db"). With Waves SuperRack connected in Settings, pressing a key recalls that key's
@@ -430,39 +430,28 @@ workflow with that person in Planning Center, and it appears under their My work
 
 ## Mic board & stage display
 
-Sidebar → **Mic board**. The big preview is exactly what the display shows, and the mic board in it
-is live: click into it to use it.
+Sidebar → **Mic board**. The big preview is exactly what the display shows. Everything below is in
+**Display settings** on that page.
 
-### Micboard, built in
+### The mic board
 
-The mic board is **[Micboard](https://github.com/creativedamage/micboard)** (creativedamage/micboard,
-the fork that builds and runs on current Node and Python). Its code is in `vendor/micboard`,
-unchanged, and runs inside Sundays with its own Python, which comes with the app. Nothing to
-install.
-
-- **On the network:** Micboard's own page is at `http://<this Mac>:8058` for any phone, tablet, TV or
-  computer on the church network (the address and a QR code are in Preferences → Micboard). The first
-  time, macOS may ask whether Python can accept incoming connections: choose **Allow**.
-- **Set it up in Micboard itself:** receivers (it discovers Shure receivers on the network), slots,
-  groups, TV view and extended names. Press <kbd>s</kbd> in Micboard for its settings and
-  <kbd>?</kbd> for its shortcuts. Its config and log live in
-  `~/Library/Application Support/Sundays/micboard`.
-- **Mic setup follows Micboard:** the first time, Micboard starts with the receivers and mics already in Mic setup. After that, each Micboard slot shows up in Mic setup by itself (matched by
-  receiver IP and channel; nothing of yours is renamed or removed), so you can put people on it in a
-  service's Mics panel. While Micboard runs, Sundays reads the receivers' battery, RF and audio
-  from Micboard instead of connecting to them a second time.
-- **Names from Planning Center:** who's on each mic in the service the Mic board follows goes to
-  Micboard as that mic's name (Micboard's extended names): first names, full names where two people
-  share one, or full names always. Names you type in Micboard for mics nobody's on are left alone. A
-  mic whose receiver name has no ID in it gets its Mic setup name ("HH01") as its ID.
-- **Backgrounds** (Preferences → Micboard): Micboard shows a picture (or a video, in Safari) behind
-  each name in TV view, matched by the name: `Mollie` → `mollie.jpg`. Add your own there (pick a
-  name on Micboard now, or type one), or open the folder in Finder. **Planning Center photos** fill in
-  for anyone you haven't added a picture for (turn that off if you like); yours always win.
-- **On the display** (Display settings → Mic board): which Micboard group, TV view with its info
-  drawer (names, status bar, details) or the desk view, and pictures, videos or no backgrounds.
-- To update Micboard to the newest version of creativedamage/micboard: `npm run micboard:update`,
-  then build or release as usual.
+- **Cards:** one per mic, filled down the left side first and then the right, in Mic setup order.
+  Each card has the mic's name in its color across the top (pick the color per mic), a line of your
+  own under it ("Worship leader"), the battery at the top right, the picture, and who's on it
+  (first or full names, from the service's Mics panel).
+- **One card per person:** someone on more than one mic (a vocal and their acoustic's pack) gets one
+  card labeled "VOX 1 + AG PACK", with a battery for each mic.
+- **Battery:** read from the Shure receiver (read-only, see Mic setup below). A low battery gives the
+  card a yellow edge and a "Low battery" strip; one to change now, a flashing red edge. "OFF" means
+  the transmitter is off. Mics that aren't on the network show who has them, without a battery.
+- **The middle:** your logo (Add your logo; a PNG with a see-through background looks best) over the
+  clock: **Time of day** (seconds and the date are optional) or **Production clock**, which shows just
+  the production clock's main timer and, under it, the name of the timer you loaded.
+- **Backgrounds:** your backgrounds folder. Add pictures once and every Mac you sign in on has them
+  (they sync with your other settings). A background named like a person ("Eddie", "Eddie Smith")
+  shows behind them automatically; or pick one for a mic (whoever's on it) or for a person (on any
+  mic). Otherwise the card shows their Planning Center photo. Backgrounds you'd added to Micboard
+  before 1.40 come into the library by themselves, under the same names.
 
 ### The stage display
 
@@ -474,14 +463,14 @@ install.
 - **Which service**: **The service I have open** (default): open a service under Services and the
   board switches to it; until you open one, it shows the next service. Or **Always the next service**
   (of a type you choose, or any type).
-- **FOH companion mic strip** (Display settings): show or hide each mic on the companion's strip,
-  stack a person's mics on one tile, and add mics that aren't on the network.
+- **Mics on the board** (Display settings): show or hide each mic (on the board and the FOH companion's
+  strip), and add mics that aren't on the network.
 
 **On another computer (the display endpoint).** Sundays runs on your main Mac; the display
 computer only needs a browser. On the Mic board page, **Show it on another computer → Turn on the
 network display**, then open the address it shows (like `http://192.168.1.20/display`) on the
-other computer and make the browser full screen. It shows the banner with Micboard below it and
-follows every change you make. Or open Micboard by itself at `http://<this Mac>:8058`. Both computers
+other computer and make the browser full screen. It shows exactly the preview and
+follows every change you make. Both computers
 must be on the same network; give the main Mac a fixed IP (a DHCP reservation) so the address doesn't
 change, and set the network port to 80 (Preferences → Network Connections → Kids & Nursery iPads)
 to drop the `:port`. A second display plugged into the main Mac works too (Display settings → Where it
@@ -680,17 +669,12 @@ Download it from https://www.planningcenter.com/logos and save the full-colour i
    (e.g. Vox 1 → Worship Leader, Vox 2–4 → Vocals, AG Pack → Acoustic Guitar).
 4. On each service, click **Auto-assign** or pick people by hand. Assignments stay in Sundays.
 
-With Micboard running (it is by default), set up receivers in Micboard instead: its slots appear in
-Mic setup by themselves, and Sundays reads the receivers through Micboard.
-
 **Read-only:** the app only asks receivers questions (Shure's `GET` commands on TCP port 2202):
 battery bars, minutes left, charge, transmitter model, frequency, antennas and signal. It never
 sets channel names or anything else. The one exception is ULX-D, QLX-D and SLX-D, which have no
 plain question for antenna and RF readings. For those, the app briefly turns on meter reports
 (`METER_RATE`) for its own connection and turns them off again. This doesn't change any audio,
-RF or channel settings. Micboard (built in) does the same for its own connection: it reads the
-receivers and turns on their meter reports, and keeps extended names in its own config, not on the
-receivers.
+RF or channel settings.
 
 ## Project layout
 
@@ -700,11 +684,9 @@ server/src/app.ts          Built-in server: API + UI on 127.0.0.1
 server/src/auth/oauth.ts   Sign in with Planning Center (OAuth + PKCE), sessions
 server/src/pco/            Planning Center client, People/Services calls, app registration
 server/src/lib/db.ts       Local data file (users, tokens, sessions, staff notes, mics, history)
-server/src/lib/shure.ts    Shure receiver status, read-only (TCP 2202), when Micboard isn't running
-server/src/lib/micboard.ts Runs Micboard (vendor/micboard) and adapts to it: data, slots, names, backgrounds
-vendor/micboard/           creativedamage/micboard, unchanged (git subtree; npm run micboard:update)
-desktop/micboard-runtime/  Built Micboard + Python (→ Sundays.app/Contents/Resources/micboard)
-desktop/micboard-build.mjs Builds Micboard's page and adds it, its Python and Tornado to the app
+server/src/lib/shure.ts    Shure receiver status, read-only (TCP 2202)
+server/src/lib/board.ts    Mic board / stage display: cards, backgrounds library, logo
+web/components/board/SideStage.tsx  The mic board as the display draws it
 server/src/lib/propresenter.ts  ProPresenter API client + finding it on the network
 server/src/routes/pro.ts   ProPresenter control (slides, timers, stage) for any computer
 server/src/lib/smaart.ts   Smaart v9 API client (SPL readings)

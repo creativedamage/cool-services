@@ -7,7 +7,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { BoardMic } from "../../../shared/board.js";
 import { files, mics } from "../lib/db.js";
-import { boardDisplays, boardSettings, displayState, publicImage, saveBoardSettings, setBoardOwner, setOpenPlan } from "../lib/board.js";
+import { addBackground, boardDisplays, boardSettings, displayState, pictureFrom, publicImage, removeBackground, renameBackground, saveBoardSettings, setBoardOwner, setLogo, setOpenPlan } from "../lib/board.js";
 import { kioskAddresses } from "./paging.js";
 
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
@@ -31,8 +31,10 @@ boardRouter.put("/settings", (req, res) => {
     mode: z.enum(["auto", "micboard", "clock"]), autoIdle: View, follow: z.enum(["open", "weekend", "next"]).transform((v) => (v === "next" ? "weekend" as const : v)), serviceTypeId: z.string().max(40).nullable(),
     banner: z.object({ enabled: z.boolean(), text: z.string().max(400), scroll: z.boolean(), size: z.enum(["s", "m", "l"]), background: Color, color: Color, showService: z.boolean(), showClock: z.boolean() }).partial(),
     images: z.enum(["custom-then-pco", "pco", "custom", "none"]), imageStyle: z.enum(["background", "icon", "none"]),
-    kinds: z.array(z.enum(["vocal", "pack", "other"])).max(3), hideUnassigned: z.boolean(), columns: z.number().int().min(0).max(12),
-    hidden: z.array(z.string().max(60)).max(500), stack: z.boolean(),
+    kinds: z.array(z.enum(["vocal", "pack", "other"])).max(3), hideUnassigned: z.boolean(), columns: z.number().int().min(0).max(6),
+    hidden: z.array(z.string().max(60)).max(500), stack: z.boolean(), names: z.enum(["first", "full"]),
+    tileText: z.record(z.string().max(60), z.string().max(60)), tileColor: z.record(z.string().max(60), Color),
+    center: z.object({ clock: z.enum(["time", "production"]), seconds: z.boolean(), date: z.boolean() }).partial(),
     lan: z.boolean(), screen: z.object({ enabled: z.boolean(), displayId: z.number().nullable() }).partial(),
   }).partial().parse(req.body);
   res.json(saveBoardSettings(p as any));
@@ -64,19 +66,33 @@ boardRouter.delete("/mics/:id", (req, res) => {
 });
 
 const ImgKey = z.string().regex(/^(person|mic):[\w-]{1,40}$/);
-boardRouter.post("/images", (req, res) => {
-  const { key, dataUrl } = z.object({ key: ImgKey, dataUrl: z.string().max(12_000_000) }).parse(req.body);
-  const m = dataUrl.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/);
-  if (!m) return res.status(400).json({ error: "invalid_request", message: "Use a PNG, JPG or WebP picture" });
-  const id = files.save(Buffer.from(m[2], "base64"), m[1] === "jpeg" ? "jpg" : (m[1] as "png" | "webp"));
-  res.json(saveBoardSettings({ customImages: { ...boardSettings().customImages, [key]: id } }));
+const Pic = z.string().max(12_000_000);
+const fail = (res: any, e: unknown) => res.status((e as { status?: number }).status ?? 400).json({ error: "invalid_request", message: (e as Error).message });
+
+/** The backgrounds library: add (a picture, shrunk in the browser), rename, remove. */
+boardRouter.post("/backgrounds", (req, res) => {
+  const { name, dataUrl } = z.object({ name: z.string().max(80).default(""), dataUrl: Pic }).parse(req.body);
+  try { const bg = addBackground(name, pictureFrom(dataUrl)); res.json({ background: bg, settings: boardSettings() }); } catch (e) { fail(res, e); }
 });
-boardRouter.delete("/images/:key", (req, res) => {
-  const key = ImgKey.parse(req.params.key);
+boardRouter.put("/backgrounds/:id", (req, res) => {
+  renameBackground(req.params.id, z.object({ name: z.string().min(1).max(80) }).parse(req.body).name);
+  res.json(boardSettings());
+});
+boardRouter.delete("/backgrounds/:id", (req, res) => { removeBackground(req.params.id); res.json(boardSettings()); });
+
+/** Pick a background for a person (wherever they are) or a mic; null goes back to automatic. */
+boardRouter.put("/images", (req, res) => {
+  const { key, backgroundId } = z.object({ key: ImgKey, backgroundId: z.string().max(80).nullable() }).parse(req.body);
   const next = { ...boardSettings().customImages };
-  delete next[key];
+  if (backgroundId && boardSettings().backgrounds.some((b) => b.id === backgroundId)) next[key] = backgroundId; else delete next[key];
   res.json(saveBoardSettings({ customImages: next }));
 });
+
+/** The logo over the clock. */
+boardRouter.post("/logo", (req, res) => {
+  try { setLogo(pictureFrom(z.object({ dataUrl: Pic }).parse(req.body).dataUrl)); res.json(boardSettings()); } catch (e) { fail(res, e); }
+});
+boardRouter.delete("/logo", (_req, res) => { setLogo(null); res.json(boardSettings()); });
 
 export const boardOutRouter = Router();
 boardOutRouter.get("/state", h(async (_req, res) => res.set("Cache-Control", "no-store").json(await displayState())));

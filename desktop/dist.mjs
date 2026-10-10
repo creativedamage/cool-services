@@ -64,7 +64,7 @@ for (const id of ids) {
     },
     dmg: { ...base.dmg, title: a.name, artifactName: `${a.artifact}-\${version}.\${ext}` },
   };
-  if (cloud) delete config.mac.x64ArchFiles; // no NDI or Micboard inside
+  if (cloud) delete config.mac.x64ArchFiles; // no NDI inside
   // Nobody downloads a retired app new, so its farewell is only the updater's zip.
   await build({ targets: Platform.MAC.createTarget(farewell ? ["zip"] : ["dmg", "zip"], process.env.SUNDAYS_ARCH === "arm64" ? Arch.arm64 : Arch.universal), config, publish: "never" });
   for (const f of farewell ? [`${a.artifact}-${version}-mac.zip`] : [`${a.artifact}-${version}.dmg`, `${a.artifact}-${version}-mac.zip`]) {

@@ -49,7 +49,7 @@ app.userAgentFallback = `${app.userAgentFallback} SundaysApp/${APP_ID}`;
 /* ───────────── Folders ───────────── */
 
 const appData = app.getPath("appData");
-// Cool Services was renamed Sundays in 1.24. Its data folder (sign-ins, settings, notes, Micboard)
+// Cool Services was renamed Sundays in 1.24. Its data folder (sign-ins, settings, notes)
 // comes along: ~/Library/Application Support/Cool Services → …/Sundays, the first time.
 function sundaysDir(): string {
   const before = path.join(appData, "Cool Services");
@@ -337,8 +337,6 @@ async function hostEngine(): Promise<boolean> {
   // Taken over from Sundays FOH (adoptFoh): start as the FOH companion.
   const fohMoved = path.join(ENGINE_DIR, FOH_MOVED);
   if (fs.existsSync(fohMoved)) { process.env.SUNDAYS_INITIAL_APP_MODE = "companion"; fs.rmSync(fohMoved, { force: true }); }
-  // Micboard's runtime: Contents/Resources/micboard in the app, desktop/micboard-runtime when developing.
-  process.env.COOL_MICBOARD_NATIVE = app.isPackaged ? path.join(process.resourcesPath, "micboard") : path.join(__dirname, "..", "micboard-runtime");
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const srv = (serverMod ??= require("./server.cjs") as typeof import("../../server/src/app"));
@@ -353,7 +351,6 @@ async function hostEngine(): Promise<boolean> {
   startClockOutputs(origin, srv.clockOutputs);
   // Stage display (mic board / clock) on a second display.
   startBoardOutput(origin, srv.boardOutputs);
-  srv.setFolderOpener((dir) => { fs.mkdirSync(dir, { recursive: true }); void shell.openPath(dir); });
   // FOH companion: a page request takes over the screen until someone answers it.
   srv.setAttentionBridge((on) => attention(on));
   // FOH companion: the mic strip along the bottom of the screen between page requests.

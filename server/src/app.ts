@@ -33,7 +33,6 @@ import { boardOutRouter, boardRouter } from "./routes/board.js";
 import { startClock } from "./lib/clock.js";
 import { appModeRouter, companionClientRouter } from "./routes/companionClient.js";
 import { setAttentionBridge, setCompanionWindowBridge, startCompanion } from "./lib/companion.js";
-import { micboardRouter, setFolderOpener } from "./routes/micboard.js";
 import { serviceModeGuard } from "./lib/appMode.js";
 import { wavesRelayRouter } from "./routes/wavesRelay.js";
 import { resiRouter } from "./routes/resi.js";
@@ -42,7 +41,6 @@ import { syncRouter } from "./routes/sync.js";
 import { cloudRouter } from "./routes/cloud.js";
 import { startSync } from "./lib/sync.js";
 import { startResi } from "./lib/resi.js";
-import { initMicboard } from "./lib/micboard.js";
 import { initKiosk, kioskRouter } from "./kiosk.js";
 import { PcoError, SignedOutError } from "./pco/client.js";
 import { flush, settings } from "./lib/db.js";
@@ -76,7 +74,6 @@ export function createApp(webDir?: string) {
   app.use("/api/volunteer-checkin", requireAuth, volunteerCheckInRouter);
   app.use("/api/clock", requireAuth, clockRouter);
   app.use("/api/board", requireAuth, boardRouter);
-  app.use("/api/micboard", requireAuth, micboardRouter); // Micboard inside Sundays
   app.use("/api/cloud", requireAuth, cloudRouter); // Sundays | Operations (Supabase)
   app.use("/api/sync", requireAuth, syncRouter); // settings sync across your Macs
   app.use("/api/weekend", requireAuth, weekendRouter); // the weekend everything works on
@@ -139,7 +136,6 @@ export function startServer(opts: { port: number; webDir?: string }): Promise<Se
       console.log(usingPat() ? "  Data: shared Personal Access Token" : "  Data: each person's own sign-in");
       initKiosk(opts.webDir);
       startCompanion(); // if this Mac is an FOH companion, start watching the main computer
-      initMicboard(); // Micboard (not on an FOH companion)
       startResi(); // Resi live status, if it's set up
       startSmaart();
       startClock();
@@ -154,7 +150,7 @@ process.on("exit", flush);
 
 
 /** Used by the Mac app: its updater, Chat and Preferences (registerLocalApp), and the FOH companion's windows. */
-export { registerLocalApp, setAttentionBridge, setCompanionWindowBridge, setFolderOpener };
+export { registerLocalApp, setAttentionBridge, setCompanionWindowBridge };
 /** The Mac app's NDI sender and second-display window read clock output settings here. */
 export { clockOutputs } from "./lib/clock.js";
 /** …and the stage display's second-display window. */

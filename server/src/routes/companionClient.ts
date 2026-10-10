@@ -9,7 +9,6 @@ import { z } from "zod";
 import { appMode, appModeView, lockServiceMode, setAppMode, unlockServiceMode } from "../lib/appMode.js";
 import { act, pressTuning, companionState, findMains, linkTo, saveStrip, showCompanionWindow, startCompanion, stripSettings, unlink } from "../lib/companion.js";
 import { boardDisplays } from "../lib/board.js";
-import { restartMicboard } from "../lib/micboard.js";
 
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) =>
   fn(req, res).catch((e: Error) => res.status(400).json({ error: "companion", message: e.message }));
@@ -29,7 +28,6 @@ appModeRouter.put("/", pinErr((req, res) => {
   const v = setAppMode(mode, { pin, newPin });
   if ((before === "companion") !== (mode === "companion")) {
     startCompanion();
-    restartMicboard(); // an FOH companion doesn't run Micboard
   }
   res.json(v);
 }));

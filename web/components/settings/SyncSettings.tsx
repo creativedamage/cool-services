@@ -27,7 +27,7 @@ export function SyncSettings() {
           <h2 className="font-semibold">Sync across your Macs</h2>
           <p className="mt-0.5 text-sm text-ink-muted">
             Sign in to Sundays with Planning Center on another Mac and it gets the same setup: Preferences, mics and packs, the Mic board and Clock,
-            the Dashboard, campuses, team groups, Parent paging, ProPresenter computers, the console, Smaart, Micboard, Resi and the weekend you picked.
+            the Dashboard, campuses, team groups, Parent paging, ProPresenter computers, the console, Smaart, Resi, the mic board’s backgrounds and the weekend you picked.
           </p>
           <p className="mt-1 text-xs text-ink-faint">
             Each Mac keeps its own: Full / Service Mode / FOH Companion and the Service Mode PIN, which screens and network pages it shows, its MIDI output

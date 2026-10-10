@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import "@fontsource/barlow-condensed/500.css";
+import "@fontsource/barlow-condensed/600.css";
+import "@fontsource/barlow-condensed/700.css";
 import "./globals.css";
 import { Providers } from "./providers";
 import { themeBootScript } from "@/lib/theme";

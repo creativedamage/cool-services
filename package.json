@@ -16,7 +16,6 @@
     "dist:mac:arm": "cd desktop && node build.mjs --dist && SUNDAYS_ARCH=arm64 node dist.mjs",
     "set-repo": "node scripts/set-repo.mjs",
     "release": "node scripts/release.mjs",
-    "micboard:update": "git subtree pull --prefix vendor/micboard https://github.com/creativedamage/micboard.git main --squash",
     "site": "npm run dev -w ops-web",
     "build:site": "npm run build -w ops-web"
   },

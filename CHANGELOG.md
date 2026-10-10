@@ -4,6 +4,25 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.40.0
+A new mic board: photo cards down both sides, your logo and the clock in the middle, and backgrounds that follow you to every Mac.
+- **New mic board.** Each mic gets a photo card: the mic's name in its own color across the top, a
+  line of your own under it ("Worship leader"), a battery at the top right, their picture, and their
+  name. Half the mics go down the left side and half down the right, in Mic setup order.
+- **A real battery on every card,** read from the Shure receiver (read-only, as always). A low
+  battery gives the card a yellow edge; one to change now flashes red. "OFF" when the transmitter is off.
+- **Packs on the same card.** Someone on a vocal and a pack (acoustic, strings, anything) gets one
+  card labeled "VOX 1 + AG PACK", with a battery for each.
+- **Your logo over the clock.** In the middle of the board: your logo, and under it the time of day
+  (with the date) or just the production clock's countdown with the name of the timer under it.
+- **Backgrounds folder, synced.** Upload backgrounds once in Display settings and every Mac you sign
+  in on has them. Name one like a person ("Eddie") and it shows behind them, or pick one for a mic
+  or a person. Otherwise their Planning Center photo shows.
+- **Colors and your own line per mic,** and first or full names, in Display settings.
+- **Micboard is gone.** The mic board is now built from the ground up in Sundays, so Micboard (and the
+  Python that came with it) is no longer in the app, and Preferences → Micboard is gone. Backgrounds
+  you'd given Micboard move into the new library under the same names.
+
 ## 1.39.0
 Sundays AVL purchasing and job costing: purchase orders, receiving, work orders, vendor bills and change orders.
 - **Purchase orders from the budget.** Pick budget lines on a job and Sundays makes one draft PO per

@@ -7,7 +7,7 @@
 import { SyncSettings } from "@/components/settings/SyncSettings";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { AudioLines, Building2, Info, Laptop, MicVocal, MonitorPlay, Moon, Network, Palette, Power, Sun, Trash2, Upload, UserCheck } from "lucide-react";
+import { AudioLines, Building2, Info, Laptop, MonitorPlay, Moon, Network, Palette, Power, Sun, Trash2, Upload, UserCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppSettings, StartView, ThemePref } from "@shared/types";
@@ -27,7 +27,6 @@ import { ConsoleSettings } from "@/components/settings/ConsoleSettings";
 import { CampusSettings } from "@/components/settings/CampusSettings";
 import { ClockOutputsSettings } from "@/components/settings/ClockOutputsSettings";
 import { VolunteerCheckInSettings } from "@/components/settings/VolunteerCheckInSettings";
-import { MicboardSettings } from "@/components/settings/MicboardSettings";
 import { ResiSettings } from "@/components/settings/ResiSettings";
 
 const TABS: { id: PrefsTab; label: string; icon: typeof Info; blurb: string }[] = [
@@ -38,7 +37,6 @@ const TABS: { id: PrefsTab; label: string; icon: typeof Info; blurb: string }[] 
   { id: "checkins", label: "Team Check-ins", icon: UserCheck, blurb: "The Check-Ins event volunteers use, and each team’s area of serving." },
   { id: "audio", label: "Audio", icon: AudioLines, blurb: "Allen & Heath, Waves SuperRack and Smaart." },
   { id: "network", label: "Network Connections", icon: Network, blurb: "Kids & Nursery paging and iPads, team check-ins on phones, FOH companions." },
-  { id: "micboard", label: "Micboard", icon: MicVocal, blurb: "Micboard on the network, names and photos from Planning Center, and your backgrounds." },
   { id: "video", label: "Video", icon: MonitorPlay, blurb: "Clock outputs (NDI, network, second display), ProPresenter computers and Resi." },
 ];
 
@@ -124,7 +122,6 @@ function PreferencesOpen({ standalone }: { standalone?: boolean }) {
               {tab === "checkins" && <VolunteerCheckInSettings />}
               {tab === "audio" && <><ConsoleSettings /><WavesSettings w={s.waves} onChange={(waves) => save.mutate({ waves })} /><SmaartSettings /></>}
               {tab === "network" && <PagingSettings />}
-              {tab === "micboard" && <MicboardSettings />}
               {tab === "video" && <><ClockOutputsSettings /><ProComputersSettings /><ResiSettings /></>}
             </div>
           )}
