@@ -7,12 +7,13 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { Copy, Eye, EyeOff, ImagePlus, Plus, Trash2, WifiOff, MicVocal, MonitorUp, Settings2, Sparkles, Timer, Tv, Upload, Wifi, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Copy, Eye, EyeOff, Maximize, ImagePlus, Plus, Trash2, WifiOff, MicVocal, MonitorUp, Settings2, Sparkles, Timer, Tv, Upload, Wifi, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { TILE_COLORS, type BoardMic, type BoardSettings, type BoardTile, type DisplayMode } from "@shared/board";
 import { Api } from "@/lib/api";
 import { DisplayView } from "@/components/board/DisplayView";
+import { useFullScreenKey } from "@/components/board/useFullScreen";
 import { LogosPanel } from "@/components/board/LogoSchedule";
 import { pdfPageCount, stagePlotImage } from "@/lib/stagePlot";
 import { Drawer, Spinner } from "@/components/ui";
@@ -65,6 +66,8 @@ export default function MicBoardPage() {
   });
   const [open, setOpen] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const { full, toggle: toggleFull } = useFullScreenKey(useCallback(() => boardRef.current, []));
 
   if (!q.data) return <div className="p-8">{q.error ? <p className="text-bad">{(q.error as Error).message}</p> : <Spinner />}</div>;
   const { settings: s, state } = q.data;
@@ -90,6 +93,7 @@ export default function MicBoardPage() {
         <div className="ml-auto flex items-center gap-2 text-xs">
           <span className={clsx("flex items-center gap-1 rounded-full px-2 py-0.5", s.lan && q.data.urls.length ? "bg-ok-soft text-ok" : "bg-hover text-ink-muted")} title={q.data.urls[0]}><Wifi size={12} /> {s.lan ? "Network" : "Network off"}</span>
           <span className={clsx("flex items-center gap-1 rounded-full px-2 py-0.5", s.screen.enabled ? "bg-ok-soft text-ok" : "bg-hover text-ink-muted")}><MonitorUp size={12} /> {s.screen.enabled ? "Second display" : "Screen off"}</span>
+          <button className="btn-outline py-1 text-xs" onClick={toggleFull} title="Full screen (F)"><Maximize size={13} /> Full screen <kbd className="ml-0.5 rounded border border-line px-1 text-[10px] text-ink-muted">F</kbd></button>
           <button className="btn-outline py-1 text-xs" onClick={() => setOpen(true)}><Settings2 size={13} /> Display settings</button>
         </div>
       </header>
@@ -107,11 +111,13 @@ export default function MicBoardPage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
         {state.error && <p className="mb-3 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">{state.error}</p>}
-        <div className="mx-auto overflow-hidden rounded-2xl border border-line shadow-lg" style={{ aspectRatio: "16 / 9", maxHeight: "calc(100vh - 230px)" }}>
+        {/* F (or the button) makes the board itself take over the whole screen. */}
+        <div ref={boardRef} className={clsx("relative mx-auto overflow-hidden bg-black", full ? "h-screen w-screen" : "rounded-2xl border border-line shadow-lg")}
+          style={full ? undefined : { aspectRatio: "16 / 9", maxHeight: "calc(100vh - 230px)" }} onDoubleClick={toggleFull}>
           <DisplayView s={state} now={now} />
         </div>
         <p className="mt-2 text-center text-[11px] text-ink-faint">
-          This is what the display shows. Who’s on each mic comes from the service’s Mics panel; logo, clock, backgrounds and each mic’s color and line are in Display settings.
+          This is what the display shows (press F for full screen). Who’s on each mic comes from the service’s Mics panel; logo, clock, backgrounds and each mic’s color and line are in Display settings.
         </p>
         <NetworkPanel on={s.lan} urls={q.data.urls} onTurnOn={() => save.mutate({ lan: true })} />
       </div>
@@ -136,7 +142,7 @@ function NetworkPanel({ on, urls, onTurnOn }: { on: boolean; urls: string[]; onT
             </>
           ) : urls.length ? (
             <>
-              <p className="mt-1 text-sm text-ink-muted">On the display computer, open this in Chrome, Safari or Edge and make it full screen (on a Mac: Control-Command-F; on Windows: F11):</p>
+              <p className="mt-1 text-sm text-ink-muted">On the display computer, open this in Chrome, Safari or Edge, then press F to make it full screen:</p>
               <div className="mt-3 flex items-center gap-2">
                 <span className="select-all rounded-lg bg-hover px-3 py-2 font-mono text-lg font-semibold text-accent">{urls[0]}</span>
                 <button className="btn-outline py-2" onClick={() => copy(urls[0])}><Copy size={14} /> Copy</button>

@@ -477,7 +477,7 @@ Sidebar → **Mic board**. The big preview is exactly what the display shows. Ev
 **On another computer (the display endpoint).** Sundays runs on your main Mac; the display
 computer only needs a browser. On the Mic board page, **Show it on another computer → Turn on the
 network display**, then open the address it shows (like `http://192.168.1.20/display`) on the
-other computer and make the browser full screen. It shows exactly the preview and
+other computer and press **F** for full screen (no address bar or tabs; F or Esc again to leave). It shows exactly the preview and
 follows every change you make. Both computers
 must be on the same network; give the main Mac a fixed IP (a DHCP reservation) so the address doesn't
 change, and set the network port to 80 (Preferences → Network Connections → Kids & Nursery iPads)

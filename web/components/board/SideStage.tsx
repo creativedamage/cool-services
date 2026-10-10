@@ -158,10 +158,10 @@ function TimeOfDay({ now, seconds, date }: { now: number; seconds: boolean; date
   return (
     <>
       <div className="flex items-start justify-center tabular-nums" style={{ lineHeight: 0.9 }}>
-        <span className="font-bold" style={{ fontSize: "14cqh", letterSpacing: "-0.01em" }}>{hm}</span>
-        {seconds && <span className="font-semibold" style={{ fontSize: "4.8cqh", color: "#6B7280", marginLeft: "0.3cqw", marginTop: "1cqh", width: "2.2em" }}>{String(d.getSeconds()).padStart(2, "0")}</span>}
+        <span className="font-bold" style={{ fontSize: "14em", letterSpacing: "-0.01em" }}>{hm}</span>
+        {seconds && <span className="font-semibold" style={{ fontSize: "4.8em", color: "#6B7280", marginLeft: "0.1em", marginTop: "0.2em", width: "2.2em" }}>{String(d.getSeconds()).padStart(2, "0")}</span>}
       </div>
-      {date && <div className="font-semibold uppercase" style={{ fontSize: "2.5cqh", letterSpacing: "0.14em", color: "#8B8B92", marginTop: "0.5cqh" }}>{d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</div>}
+      {date && <div className="font-semibold uppercase" style={{ fontSize: "2.5em", letterSpacing: "0.14em", color: "#8B8B92", marginTop: "0.2em" }}>{d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</div>}
     </>
   );
 }
@@ -183,10 +183,10 @@ function Production({ seconds }: { seconds: boolean }) {
   const pulse = r.tone === "over" && Math.floor(now / 500) % 2 === 0;
   return (
     <>
-      <div className="font-bold tabular-nums" style={{ fontSize: text.length > 8 ? "10cqh" : text.length > 5 ? "12cqh" : "14cqh", lineHeight: 0.9, color: toneColor(r.tone, base), opacity: pulse ? 0.45 : 1, transition: "color .3s" }}>{text}</div>
-      <div className="flex items-center justify-center font-semibold uppercase" style={{ fontSize: "2.5cqh", letterSpacing: "0.14em", color: "#A1A1AA", marginTop: "0.6cqh", gap: "0.7cqw" }}>
-        <span className="block rounded-full" style={{ width: "0.9cqh", height: "0.9cqh", background: st.main.running ? "#EF4444" : "#52525B" }} />
-        <span className="max-w-[34cqw] truncate">{productionLabel(st)}</span>
+      <div className="font-bold tabular-nums" style={{ fontSize: text.length > 8 ? "10em" : text.length > 5 ? "12em" : "14em", lineHeight: 0.9, color: toneColor(r.tone, base), opacity: pulse ? 0.45 : 1, transition: "color .3s" }}>{text}</div>
+      <div className="flex items-center justify-center font-semibold uppercase" style={{ fontSize: "2.5em", letterSpacing: "0.14em", color: "#A1A1AA", marginTop: "0.25em", gap: "0.3em" }}>
+        <span className="block rounded-full" style={{ width: "0.36em", height: "0.36em", background: st.main.running ? "#EF4444" : "#52525B" }} />
+        <span className="max-w-[90cqw] truncate">{productionLabel(st)}</span>
       </div>
     </>
   );
@@ -196,11 +196,14 @@ function Center({ s, now }: { s: DisplayState; now: number }) {
   const c = s.settings.center;
   const plot = s.settings.plot;
   return (
-    <div className={clsx("flex h-full min-w-0 flex-1 flex-col items-center text-white", plot ? "justify-start" : "justify-center")}
-      style={plot ? { padding: "6cqh 1.5cqw 3cqh" } : { paddingBottom: "8cqh" }}>
+    // Sized in em of a base that grows on screens wider than 16:9 (up to 1.5× on 32:9), so the clock
+    // and logo don't sit small in a wide middle; on 16:9 it's 1% of the board's height. (The base is
+    // in the whole board's units: 0.5625cqw is 1cqh at 16:9.)
+    <div className={clsx("flex h-full min-w-0 flex-1 flex-col items-center text-white [container-type:size]", plot ? "justify-start" : "justify-center")}
+      style={{ fontSize: "clamp(1cqh, 0.5625cqw, 1.5cqh)", ...(plot ? { padding: "6cqh 1.5cqw 3cqh" } : { paddingBottom: "8cqh" }) }}>
       {c.logo && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={c.logo} alt="" className="shrink-0 object-contain" style={{ maxHeight: "8cqh", maxWidth: "16cqw", marginBottom: "2.2cqh" }} />
+        <img src={c.logo} alt="" className="shrink-0 object-contain" style={{ maxHeight: "8em", maxWidth: "min(28em, 90cqw)", marginBottom: "2.2em" }} />
       )}
       <div className="shrink-0 text-center">
         {c.clock === "production" ? <Production seconds={c.seconds} /> : <TimeOfDay now={now} seconds={c.seconds} date={c.date} />}

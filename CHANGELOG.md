@@ -4,6 +4,14 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.41.1
+Press F to make the mic board full screen, and a bigger middle on ultrawide screens.
+- **F for full screen.** On the display (http://<this Mac>/display) and on the Mic board page,
+  press F (or double-click the board) and the board takes over the whole screen: no address bar,
+  tabs or menus. F or Esc again to leave. On the Mic board page there's a Full screen button too.
+- **Ultrawide screens.** On screens wider than 16:9 (21:9, 32:9), the logo, clock and date in the
+  middle grow with the room they have (up to one and a half times), instead of sitting small.
+
 ## 1.41.0
 Your stage plot on the mic board, under the clock.
 - **Stage plot.** In Display settings → Middle of the board, add your stage plot as a PDF (pick the
