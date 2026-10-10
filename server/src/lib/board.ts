@@ -9,7 +9,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { DEFAULT_BOARD, TILE_COLORS, type BoardBackground, type BoardSettings, type BoardTile, type DisplayState, type DisplayView, type TileStatus } from "../../../shared/board.js";
+import { DEFAULT_BOARD, TILE_COLORS, activeLogo, type BoardBackground, type LogoRule, type BoardSettings, type BoardTile, type DisplayState, type DisplayView, type TileStatus } from "../../../shared/board.js";
 import type { ChannelStatus, DisplayInfo, PlanDetail, ReceiverStatus } from "../../../shared/types.js";
 import { pcoForUser } from "../auth/oauth.js";
 import type { PcoApi } from "../pco/api.js";
@@ -29,6 +29,13 @@ function load(): Stored {
   settings.screen = { ...DEFAULT_BOARD.screen, ...s.settings?.screen };
   settings.center = { ...DEFAULT_BOARD.center, ...s.settings?.center };
   settings.backgrounds ??= [];
+  settings.logos ??= [];
+  settings.logoSchedule ??= [];
+  // The logo from before the schedule (1.40) is the first in the logos library, and the default.
+  if (settings.center.logoId && !settings.logos.some((l) => l.id === settings.center.logoId)) {
+    const p = files.path(settings.center.logoId);
+    if (p) settings.logos.push({ id: settings.center.logoId, name: "Logo", bytes: fs.statSync(p).size, at: fs.statSync(p).mtime.toISOString() });
+  }
   settings.tileText ??= {};
   settings.tileColor ??= {};
   settings.customImages ??= {};
@@ -73,7 +80,7 @@ export function saveBoardSettings(patch: Partial<BoardSettings>) {
     ...cur, ...patch,
     banner: { ...cur.banner, ...patch.banner }, screen: { ...cur.screen, ...patch.screen }, center: { ...cur.center, ...patch.center },
     customImages: patch.customImages ?? cur.customImages, hidden: patch.hidden ?? cur.hidden ?? [],
-    backgrounds: patch.backgrounds ?? cur.backgrounds, tileText: patch.tileText ?? cur.tileText, tileColor: patch.tileColor ?? cur.tileColor,
+    backgrounds: patch.backgrounds ?? cur.backgrounds, logos: patch.logos ?? cur.logos, logoSchedule: patch.logoSchedule ?? cur.logoSchedule, tileText: patch.tileText ?? cur.tileText, tileColor: patch.tileColor ?? cur.tileColor,
   };
   persist();
   memo = null;
@@ -174,7 +181,8 @@ export function boardPlan(): Promise<PlanDetail | null> {
 }
 /** What the display needs from the settings (the logo as an address, not the picture itself). */
 function centerSettings(s: BoardSettings): DisplayState["settings"] {
-  const logo = s.center.logoId && files.path(s.center.logoId) ? imageUrl(s.center.logoId) : null;
+  const { logoId } = activeLogo(s, new Date());
+  const logo = logoId && files.path(logoId) ? imageUrl(logoId) : null;
   return { banner: s.banner, columns: s.columns, names: s.names ?? "first", center: { logo, clock: s.center.clock, seconds: s.center.seconds, date: s.center.date } };
 }
 
@@ -241,7 +249,7 @@ async function build(): Promise<DisplayState> {
       const main = list.find((t) => t.networked) ?? list[0];
       main.extras = list.filter((t) => t !== main).map((t) => {
         drop.add(t.channelId);
-        return { channelId: t.channelId, micLabel: t.micLabel, networked: t.networked, status: t.status, note: t.note, bars: t.battery?.bars ?? null, minutes: t.battery?.minutes ?? null };
+        return { channelId: t.channelId, micLabel: t.micLabel, networked: t.networked, status: t.status, note: t.note, bars: t.battery?.bars ?? null, minutes: t.battery?.minutes ?? null, percent: t.battery?.percent ?? null };
       });
     }
     tiles = tiles.filter((t) => !drop.has(t.channelId));
@@ -264,7 +272,7 @@ async function build(): Promise<DisplayState> {
 /** Files the display may show without signing in: the backgrounds library and the logo. */
 export function publicImage(fileId: string): boolean {
   const s = stored.settings;
-  return s.center.logoId === fileId || s.backgrounds.some((b) => b.id === fileId);
+  return s.center.logoId === fileId || s.backgrounds.some((b) => b.id === fileId) || s.logos.some((l) => l.id === fileId);
 }
 
 /* ───────────── Backgrounds library and logo (the files sync to your other Macs, sync.ts) ───────────── */
@@ -294,20 +302,45 @@ export function renameBackground(id: string, name: string) {
 /** Out of the library, and off every person and mic it was picked for. */
 export function removeBackground(id: string) {
   const s = stored.settings;
-  const p = s.center.logoId === id ? null : files.path(id);
+  const p = s.center.logoId === id || s.logos.some((l) => l.id === id) ? null : files.path(id);
   if (p) fs.rmSync(p, { force: true });
   saveBoardSettings({
     backgrounds: s.backgrounds.filter((b) => b.id !== id),
     customImages: Object.fromEntries(Object.entries(s.customImages).filter(([, v]) => v !== id)),
   });
 }
-export function setLogo(pic: Pic | null) {
-  saveBoardSettings({ center: { ...stored.settings.center, logoId: pic ? files.save(pic.data, pic.ext) : null } });
+/** A new logo in the logos library; the first one becomes the default. */
+export function addLogo(name: string, pic: Pic): BoardBackground {
+  const s = stored.settings;
+  if (s.logos.length >= 30) throw Object.assign(new Error("You have 30 logos. Remove some first."), { status: 400 });
+  const logo = { id: files.save(pic.data, pic.ext), name: name.trim() || "Logo", bytes: pic.data.length, at: new Date().toISOString() };
+  saveBoardSettings({ logos: [...s.logos, logo], center: s.center.logoId ? s.center : { ...s.center, logoId: logo.id } });
+  return logo;
+}
+export function renameLogo(id: string, name: string) {
+  saveBoardSettings({ logos: stored.settings.logos.map((l) => (l.id === id ? { ...l, name: name.trim() || l.name } : l)) });
+}
+/** Out of the library, off the schedule, and no longer the default. */
+export function removeLogo(id: string) {
+  const s = stored.settings;
+  if (!s.backgrounds.some((b) => b.id === id)) { const p = files.path(id); if (p) fs.rmSync(p, { force: true }); }
+  saveBoardSettings({
+    logos: s.logos.filter((l) => l.id !== id), logoSchedule: s.logoSchedule.filter((r) => r.logoId !== id),
+    center: s.center.logoId === id ? { ...s.center, logoId: null } : s.center,
+  });
+}
+export function setDefaultLogo(id: string | null) {
+  const s = stored.settings;
+  saveBoardSettings({ center: { ...s.center, logoId: id && s.logos.some((l) => l.id === id) ? id : null } });
+}
+export function setLogoSchedule(rules: LogoRule[]) {
+  const known = new Set(stored.settings.logos.map((l) => l.id));
+  saveBoardSettings({ logoSchedule: rules.filter((r) => known.has(r.logoId)) });
 }
 /** The files other Macs need: every background and the logo. */
 export function syncedFiles(): string[] {
   const s = stored.settings;
-  return [...s.backgrounds.map((b) => b.id), ...(s.center.logoId ? [s.center.logoId] : [])];
+  return [...new Set([...s.backgrounds.map((b) => b.id), ...s.logos.map((l) => l.id), ...(s.center.logoId ? [s.center.logoId] : [])])];
 }
 
 /**

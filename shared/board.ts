@@ -11,8 +11,27 @@
 export type DisplayView = "micboard" | "clock";
 export type DisplayMode = "auto" | DisplayView;
 
-/** A picture in the backgrounds library. The file syncs to every Mac you sign in on. */
+/** A picture in the backgrounds or logos library. The file syncs to every Mac you sign in on. */
 export interface BoardBackground { id: string; name: string; bytes: number; at: string }
+
+/**
+ * A logo on the schedule: from `date`, on the days it repeats, until `until` (inclusive), all day or
+ * between `from` and `to`. When several fit, one with times beats an all-day one, and the one added
+ * later beats the one added earlier. Nothing scheduled: the default logo.
+ */
+export interface LogoRule {
+  id: string;
+  logoId: string;
+  /** First day, "YYYY-MM-DD". */
+  date: string;
+  repeat: "none" | "daily" | "weekly" | "monthly" | "yearly";
+  /** Weekly: which days (0 = Sunday). Empty: the first day's weekday. */
+  days: number[];
+  until: string | null;
+  /** "HH:MM" (24-hour); both null = all day. */
+  from: string | null;
+  to: string | null;
+}
 
 export interface BoardSettings {
   /** What the display shows ("auto": the mic board around rehearsals and services). */
@@ -53,6 +72,9 @@ export interface BoardSettings {
    * time of day (with the date under it) or the production clock's main timer (with its name).
    */
   center: { logoId: string | null; clock: "time" | "production"; seconds: boolean; date: boolean };
+  /** Your logos (the default is center.logoId), and when each one shows. */
+  logos: BoardBackground[];
+  logoSchedule: LogoRule[];
   /** Cards per row on each side (0 = fit automatically). */
   columns: number;
   /** Network page (http://<this Mac>/display) and a second display on this Mac. */
@@ -83,7 +105,7 @@ export interface BoardTile {
   /** Read from a receiver (false: a mic that isn't on the network, shown for who has it). */
   networked: boolean;
   /** The same person's other mics, on this card's label (e.g. their acoustic guitar's pack). */
-  extras: { channelId: string; micLabel: string; networked: boolean; status: TileStatus; note: string | null; bars: number | null; minutes: number | null }[];
+  extras: { channelId: string; micLabel: string; networked: boolean; status: TileStatus; note: string | null; bars: number | null; minutes: number | null; percent: number | null }[];
   /** The label's color and your own line under the mic's name. */
   color: string;
   text: string | null;
@@ -113,6 +135,67 @@ export const DEFAULT_BOARD: BoardSettings = {
   mode: "auto", autoIdle: "micboard", follow: "weekend", serviceTypeId: null,
   banner: { enabled: false, text: "", scroll: false, size: "m", background: "#0B1220", color: "#FFFFFF", showService: true, showClock: true },
   images: "custom-then-pco", imageStyle: "background", customImages: {}, backgrounds: [], kinds: ["vocal", "pack", "other"], hideUnassigned: false, hidden: [], stack: true,
-  names: "first", tileText: {}, tileColor: {}, center: { logoId: null, clock: "time", seconds: true, date: true }, columns: 0,
+  names: "first", tileText: {}, tileColor: {}, center: { logoId: null, clock: "time", seconds: true, date: true }, logos: [], logoSchedule: [], columns: 0,
   lan: false, screen: { enabled: false, displayId: null },
 };
+
+/* ───────────── The logo schedule ───────────── */
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+/** "YYYY-MM-DD" for a day in local time. */
+export const ymd = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const parts = (day: string) => day.split("-").map(Number) as [number, number, number];
+export const weekday = (day: string) => { const [y, m, d] = parts(day); return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); };
+
+/** Whether a rule falls on a day ("YYYY-MM-DD"), ignoring its times. */
+export function occursOn(r: LogoRule, day: string): boolean {
+  if (day < r.date || (r.until && day > r.until)) return false;
+  const [, m, d] = parts(day), [, m0, d0] = parts(r.date);
+  switch (r.repeat) {
+    case "none": return day === r.date;
+    case "daily": return true;
+    case "weekly": return (r.days.length ? r.days : [weekday(r.date)]).includes(weekday(day));
+    case "monthly": return d === d0;
+    case "yearly": return d === d0 && m === m0;
+  }
+}
+
+const minutes = (hhmm: string) => { const [h, mi] = hhmm.split(":").map(Number); return h * 60 + mi; };
+/** Whether a rule is on at a moment (its day and, if it has them, its times; a window past midnight runs into the next day). */
+export function ruleActive(r: LogoRule, now: Date): boolean {
+  const day = ymd(now);
+  if (!r.from || !r.to) return occursOn(r, day);
+  const t = now.getHours() * 60 + now.getMinutes(), a = minutes(r.from), b = minutes(r.to);
+  if (a <= b) return occursOn(r, day) && t >= a && t < b;
+  const prev = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+  return (occursOn(r, day) && t >= a) || (occursOn(r, prev) && t < b);
+}
+
+/** The logo showing at a moment: the schedule's, or the default. */
+export function activeLogo(s: Pick<BoardSettings, "center" | "logos" | "logoSchedule">, now: Date): { logoId: string | null; rule: LogoRule | null } {
+  const known = new Set((s.logos ?? []).map((l) => l.id));
+  const on = (s.logoSchedule ?? []).filter((r) => known.has(r.logoId) && ruleActive(r, now));
+  const rule = on.filter((r) => r.from && r.to).at(-1) ?? on.at(-1) ?? null;
+  return { logoId: rule ? rule.logoId : s.center.logoId, rule };
+}
+
+/** "Every Sunday", "Yearly on Dec 25"… for the schedule's list. */
+export function describeRule(r: LogoRule): string {
+  const [y, m, d] = parts(r.date);
+  const date = new Date(y, m - 1, d);
+  const md = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const names = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+  const when = {
+    none: date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }),
+    daily: "Every day",
+    weekly: (() => { const ds = (r.days.length ? r.days : [weekday(r.date)]).slice().sort(); return ds.length === 7 ? "Every day" : `${ds.map((x) => names[x]).join(", ")}`; })(),
+    monthly: `Monthly on the ${d}${d % 10 === 1 && d !== 11 ? "st" : d % 10 === 2 && d !== 12 ? "nd" : d % 10 === 3 && d !== 13 ? "rd" : "th"}`,
+    yearly: `Yearly on ${md}`,
+  }[r.repeat];
+  const fmt = (hhmm: string) => { const [h, mi] = hhmm.split(":").map(Number); return new Date(2000, 0, 1, h, mi).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); };
+  const time = r.from && r.to ? ` · ${fmt(r.from)}–${fmt(r.to)}` : "";
+  const startsLater = r.date > ymd(new Date()) && !(r.repeat === "yearly" && y === new Date().getFullYear());
+  const from = r.repeat !== "none" && startsLater ? ` · from ${md}${y !== new Date().getFullYear() ? `, ${y}` : ""}` : "";
+  const until = r.until && r.repeat !== "none" ? ` until ${(() => { const [uy, um, ud] = parts(r.until!); return new Date(uy, um - 1, ud).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); })()}` : "";
+  return `${when}${time}${from}${until}`;
+}

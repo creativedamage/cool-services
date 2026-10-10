@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { TILE_COLORS, type BoardMic, type BoardSettings, type BoardTile, type DisplayMode } from "@shared/board";
 import { Api } from "@/lib/api";
 import { DisplayView } from "@/components/board/DisplayView";
+import { LogosPanel } from "@/components/board/LogoSchedule";
 import { Drawer, Spinner } from "@/components/ui";
 
 const KEY = ["stageDisplay"];
@@ -260,27 +261,11 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
 
 /** The middle of the board: your logo over the clock. */
 function CenterSection({ s, onSave }: { s: BoardSettings; onSave: Save }) {
-  const set = useSetSettings();
-  const logo = useMutation({ mutationFn: async (f: File | null) => Api.boardLogo(f ? await shrink(f, "logo") : null), onSuccess: set, onError: failed("save the logo") });
   const c = s.center;
   return (
     <section className="space-y-3">
       <h3 className="label">Middle of the board</h3>
-      <div className="flex items-center gap-3">
-        <div className="flex h-16 w-32 shrink-0 items-center justify-center rounded-lg border border-line bg-[#0E0E0F] p-2">
-          {c.logoId
-            // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={bgUrl(c.logoId)} alt="Your logo" className="max-h-full max-w-full object-contain" />
-            : <span className="text-[11px] text-ink-faint">No logo</span>}
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="btn-outline cursor-pointer py-1 text-xs"><Upload size={13} /> {c.logoId ? "Change logo" : "Add your logo"}
-            <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) logo.mutate(f); }} />
-          </label>
-          {c.logoId && <button className="btn-ghost justify-start py-1 text-xs text-ink-muted" onClick={() => logo.mutate(null)}><Trash2 size={13} /> Remove</button>}
-        </div>
-      </div>
-      <p className="text-[11px] text-ink-faint">Shown over the clock. A PNG with a see-through background looks best on the dark board.</p>
+      <LogosPanel s={s} shrink={(f) => shrink(f, "logo")} />
       <label className="block"><span className="text-xs text-ink-muted">Clock</span>
         <div className="mt-1"><Segmented value={c.clock} options={[["time", "Time of day"], ["production", "Production clock"]] as const} onChange={(v) => onSave({ center: { clock: v } })} /></div>
       </label>

@@ -5,7 +5,7 @@
  *
  *   ┌───────────────┐
  *   │    VOX 1 + AG │  ← the mic (and the same person's other mics), in the mic's color
- *   │ your text  ▮▮▯│  ← your own line, and the battery (from the Shure receiver, read-only)
+ *   │ your line 80%▮│  ← your own line, and the battery with its percentage (Shure, read-only)
  *   │   [picture]   │  ← their background, or their Planning Center photo
  *   │     EDDIE     │
  *   └───────────────┘
@@ -43,21 +43,34 @@ const tint = (hex: string, a: number) => {
 
 const BATTERY: Record<TileStatus, string> = { ok: "#4ADE80", low: "#FACC15", critical: "#EF4444", txoff: "#6B7280", offline: "#6B7280", noreceiver: "#6B7280" };
 
-/** A battery like the one on a phone: five cells from the receiver's bars (Shure reports 0–5). */
-function Battery({ status, bars, minutes, now, small = false, title }: { status: TileStatus; bars: number | null; minutes: number | null; now: number; small?: boolean; title: string }) {
+/**
+ * The battery: Material Symbols' battery_android_0 (Google, Apache License 2.0) as the frame, filled to
+ * the charge, with the percentage beside it like a phone's status bar. Shure reports a percentage for
+ * rechargeable packs; with batteries that only report bars (0–5), it's the bars as a percentage.
+ */
+const FRAME = "M130-240q-37.5 0-63.75-26.25T40-330v-300q0-37.5 26.25-63.75T130-720h620q37.5 0 63.75 26.25T840-630v300q0 37.5-26.25 63.75T750-240H130Zm0-60h620q12.75 0 21.38-8.63Q780-317.25 780-330v-300q0-12.75-8.62-21.38Q762.75-660 750-660H130q-12.75 0-21.37 8.62Q100-642.75 100-630v300q0 12.75 8.63 21.37Q117.25-300 130-300Zm740-87v-186h20q12 0 21 9t9 21v126q0 12-9 21t-21 9h-20Z";
+export function batteryPercent(percent: number | null, bars: number | null) {
+  if (percent != null) return Math.max(0, Math.min(100, Math.round(percent)));
+  return bars != null ? Math.max(0, Math.min(5, bars)) * 20 : null;
+}
+function Battery({ status, percent, bars, minutes, now, small = false, title }: {
+  status: TileStatus; percent: number | null; bars: number | null; minutes: number | null; now: number; small?: boolean; title: string;
+}) {
   const on = status !== "txoff" && status !== "offline" && status !== "noreceiver";
+  const pct = on ? batteryPercent(percent, bars) : null;
   const color = BATTERY[status];
   const flash = status === "critical" && Math.floor(now / 600) % 2 === 0;
-  const h = small ? "78%" : "100%";
+  const fillW = pct != null ? Math.max(pct > 0 ? 50 : 0, (620 * pct) / 100) : 0;
+  const words = `${title}: ${on ? `${pct ?? "?"}%${minutes != null ? ` · ${minutes} min left` : ""}` : status === "txoff" ? "transmitter off" : "receiver not answering"}`;
   return (
-    <span className="flex h-full shrink-0 items-center" style={{ opacity: flash ? 0.35 : 1, transition: "opacity .15s" }}
-      title={`${title}: ${on ? `${bars ?? "?"} of 5${minutes != null ? ` · ${minutes} min left` : ""}` : status === "txoff" ? "transmitter off" : "receiver not answering"}`}>
-      <span className="relative flex items-stretch" style={{ height: h, aspectRatio: "2.3 / 1", border: `max(1px, 0.1em) solid ${on ? color : "#4B5563"}`, borderRadius: "0.18em", padding: "0.1em", gap: "0.07em", fontSize: "6cqh" }}>
-        {on
-          ? [1, 2, 3, 4, 5].map((i) => <span key={i} className="block flex-1" style={{ background: bars != null && i <= bars ? color : "transparent", borderRadius: "0.04em" }} />)
-          : <span className="flex flex-1 items-center justify-center font-bold" style={{ fontSize: "17cqh", color: "#6B7280", letterSpacing: "0.04em", lineHeight: 1 }}>{status === "txoff" ? "OFF" : "—"}</span>}
-        <span className="absolute" style={{ right: "-0.16em", top: "30%", bottom: "30%", width: "0.1em", background: on ? color : "#4B5563", borderRadius: "0 0.05em 0.05em 0" }} />
+    <span className="flex h-full shrink-0 items-center" title={words} style={{ gap: "0.35em", opacity: flash ? 0.35 : 1, transition: "opacity .15s", height: small ? "84%" : "100%" }}>
+      <span className="font-bold tabular-nums" style={{ fontSize: "1em", lineHeight: 1, color: on ? (status === "ok" ? "#F4F4F5" : color) : "#71717A", letterSpacing: "0.02em" }}>
+        {on ? (pct != null ? `${pct}%` : "") : status === "txoff" ? "OFF" : "—"}
       </span>
+      <svg viewBox="30 -730 900 500" className="block h-full shrink-0" role="img" aria-label={words}>
+        <path d={FRAME} fill={on ? "#D4D4D8" : "#52525B"} />
+        {on && fillW > 0 && <rect x={130} y={-630} width={fillW} height={300} rx={30} fill={color} />}
+      </svg>
     </span>
   );
 }
@@ -76,25 +89,31 @@ export function StageCard({ t, now, names }: { t: BoardTile; now: number; names:
   const worst = [t, ...t.extras].some((x) => x.status === "critical") ? "critical" : [t, ...t.extras].some((x) => x.status === "low") ? "low" : null;
   const flash = worst === "critical" && Math.floor(now / 600) % 2 === 0;
   const batteries = (t.networked ? 1 : 0) + t.extras.filter((x) => x.networked).length;
+  const tall = Boolean(t.text) && batteries > 1;
   const edge = worst ? BATTERY[worst] : "transparent";
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden [container-type:size]"
       style={{ background: CARD, borderRadius: 0, boxShadow: worst ? `inset 0 0 0 ${flash ? "0.3cqh" : "0.7cqh"} ${edge}` : undefined }}>
-      {/* the mic (and their other mics), your line, the battery: sizes in the header's own units */}
-      <div className="relative flex shrink-0 flex-col [container-type:size]" style={{ height: "21cqh", background: tint(t.color, 0.16), color: t.color }}>
-        <div className="flex items-end justify-center px-[5cqw] text-center" style={{ height: "50cqh", paddingBottom: "2cqh" }}>
-          <span className="truncate font-bold uppercase" style={{ fontSize: label.length > 14 ? "26cqh" : "31cqh", letterSpacing: "0.05em", lineHeight: 1 }}>{label}</span>
+      {/* the mic (and their other mics), your line, the batteries: sizes in the header's own units.
+          Your line shares a row with one battery; with several, it gets a row of its own. */}
+      <div className="relative flex shrink-0 flex-col [container-type:size]" style={{ height: tall ? "27cqh" : "21cqh", background: tint(t.color, 0.16), color: t.color }}>
+        <div className="flex items-end justify-center px-[5cqw] text-center" style={{ height: tall ? "38cqh" : "50cqh", paddingBottom: "2cqh" }}>
+          <span className="truncate font-bold uppercase" style={{ fontSize: `${(label.length > 14 ? 26 : 31) * (tall ? 21 / 27 : 1)}cqh`, letterSpacing: "0.05em", lineHeight: 1 }}>{label}</span>
         </div>
-        {/* Your line stays centered beside one battery; next to several it starts at the left. */}
-        <div className={clsx("relative flex items-center", batteries > 1 ? "justify-start" : "justify-center")}
-          style={{ height: "44cqh", paddingLeft: batteries === 1 ? "30cqw" : "5cqw", paddingRight: batteries ? `${6 + batteries * 26}cqw` : "4cqw", ...(batteries === 0 ? { paddingLeft: "4cqw" } : {}) }}>
-          {t.text && <span className="min-w-0 truncate font-semibold uppercase" style={{ fontSize: "20cqh", letterSpacing: "0.08em", opacity: 0.85 }}>{t.text}</span>}
-          <span className="absolute flex items-center" style={{ right: "4cqw", top: "50%", height: "34cqh", transform: "translateY(-50%)", gap: "3cqw" }}>
+        {tall && (
+          <div className="flex items-center justify-center px-[5cqw]" style={{ height: "24cqh" }}>
+            <span className="min-w-0 truncate font-semibold uppercase" style={{ fontSize: "15.5cqh", letterSpacing: "0.08em", opacity: 0.85 }}>{t.text}</span>
+          </div>
+        )}
+        <div className={clsx("relative flex items-center", batteries ? "justify-start" : "justify-center")}
+          style={{ height: tall ? "34cqh" : "44cqh", paddingLeft: "5cqw", paddingRight: batteries ? `${6 + batteries * 40}cqw` : "5cqw" }}>
+          {t.text && !tall && <span className="min-w-0 truncate font-semibold uppercase" style={{ fontSize: "20cqh", letterSpacing: "0.08em", opacity: 0.85 }}>{t.text}</span>}
+          <span className="absolute flex items-center" style={{ right: "4cqw", top: "50%", height: tall ? "26.5cqh" : "34cqh", transform: "translateY(-50%)", gap: "4cqw", fontSize: tall ? "23.3cqh" : "30cqh" }}>
             {t.extras.filter((x) => x.networked).map((x) => (
-              <Battery key={x.channelId} status={x.status} bars={x.bars} minutes={x.minutes} now={now} small title={x.micLabel} />
+              <Battery key={x.channelId} status={x.status} percent={x.percent} bars={x.bars} minutes={x.minutes} now={now} small title={x.micLabel} />
             ))}
-            {t.networked && <Battery status={t.status} bars={t.battery?.bars ?? null} minutes={t.battery?.minutes ?? null} now={now} title={t.micLabel} />}
+            {t.networked && <Battery status={t.status} percent={t.battery?.percent ?? null} bars={t.battery?.bars ?? null} minutes={t.battery?.minutes ?? null} now={now} title={t.micLabel} />}
           </span>
         </div>
       </div>
@@ -109,11 +128,9 @@ export function StageCard({ t, now, names }: { t: BoardTile; now: number; names:
             {name ? initials(t.person!.name) : ""}
           </div>
         )}
-        {(t.note && t.status !== "ok" && t.status !== "txoff") || t.muted ? (
-          <span className="absolute inset-x-0 bottom-0 truncate text-center font-bold uppercase" style={{ fontSize: "5.4cqh", padding: "0.8cqh 3cqw", letterSpacing: "0.06em", background: t.muted ? "rgba(239,68,68,.85)" : tint(BATTERY[t.status], 0.85), color: "#0B0B0C" }}>
-            {t.muted ? "Muted" : t.note}
-          </span>
-        ) : null}
+        {t.muted && (
+          <span className="absolute inset-x-0 bottom-0 truncate text-center font-bold uppercase" style={{ fontSize: "5.4cqh", padding: "0.8cqh 3cqw", letterSpacing: "0.06em", background: "rgba(239,68,68,.85)", color: "#0B0B0C" }}>Muted</span>
+        )}
       </div>
 
       {/* who's on it */}

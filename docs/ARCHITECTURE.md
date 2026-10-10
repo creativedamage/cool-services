@@ -388,7 +388,11 @@ event and the team's location; `staffRows()` turns a plan's staff check-ins into
   `customImages["person:<id>"|"mic:<channelId>"]`, else a background named like the person, else the
   roster's Planning Center photo. Each tile also carries its label color (`tileColor`, else
   `TILE_COLORS` by Mic setup order) and your line (`tileText`). The library's files and the logo sync
-  to your other Macs as their own sync keys (`f:<file id>`, a data: URL, sent once; `sync.ts`). The state is shared for 1.5 s however many displays poll it. Uses the access of whoever last
+  to your other Macs as their own sync keys (`f:<file id>`, a data: URL, sent once; `sync.ts`).
+  Logos: a `logos` library, the default (`center.logoId`) and `logoSchedule` rules (date, repeat
+  none/daily/weekly/monthly/yearly, weekdays, until, optional from–to); `activeLogo()` in
+  shared/board.ts picks the logo for the moment (timed beats all-day, then the later rule), so the
+  display state's `center.logo` follows the schedule. The state is shared for 1.5 s however many displays poll it. Uses the access of whoever last
   opened the Mic board.
 - `server/src/routes/board.ts`: `/api/board` (signed in: settings, pictures) and `/api/board-out`
   (no sign-in: `/state`, `/image/<file>` limited to the library and the logo). The LAN

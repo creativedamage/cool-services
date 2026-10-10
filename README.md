@@ -441,12 +441,17 @@ Sidebar → **Mic board**. The big preview is exactly what the display shows. Ev
   (first or full names, from the service's Mics panel).
 - **One card per person:** someone on more than one mic (a vocal and their acoustic's pack) gets one
   card labeled "VOX 1 + AG PACK", with a battery for each mic.
-- **Battery:** read from the Shure receiver (read-only, see Mic setup below). A low battery gives the
-  card a yellow edge and a "Low battery" strip; one to change now, a flashing red edge. "OFF" means
+- **Battery:** an icon with the percentage, read from the Shure receiver (read-only, see Mic setup
+  below): the percentage for rechargeable packs, else the bars (0–5) as a percentage. A low battery
+  turns yellow and edges the card; one to change now flashes red. "OFF" means
   the transmitter is off. Mics that aren't on the network show who has them, without a battery.
-- **The middle:** your logo (Add your logo; a PNG with a see-through background looks best) over the
+- **The middle:** your logo (Add logo; a PNG with a see-through background looks best) over the
   clock: **Time of day** (seconds and the date are optional) or **Production clock**, which shows just
   the production clock's main timer and, under it, the name of the timer you loaded.
+- **Logo schedule:** add more logos and star the default. **Schedule** opens a month calendar: click
+  a day to put a logo on it once or repeating (every day, chosen weekdays, monthly, yearly), all day
+  or between two times, until a date or for good. A logo with times wins over an all-day one; then the
+  one added last. Nothing scheduled: the default.
 - **Backgrounds:** your backgrounds folder. Add pictures once and every Mac you sign in on has them
   (they sync with your other settings). A background named like a person ("Eddie", "Eddie Smith")
   shows behind them automatically; or pick one for a mic (whoever's on it) or for a person (on any

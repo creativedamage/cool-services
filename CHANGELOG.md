@@ -9,12 +9,17 @@ A new mic board: photo cards down both sides, your logo and the clock in the mid
 - **New mic board.** Each mic gets a photo card: the mic's name in its own color across the top, a
   line of your own under it ("Worship leader"), a battery at the top right, their picture, and their
   name. Half the mics go down the left side and half down the right, in Mic setup order.
-- **A real battery on every card,** read from the Shure receiver (read-only, as always). A low
-  battery gives the card a yellow edge; one to change now flashes red. "OFF" when the transmitter is off.
+- **A battery on every card, with its percentage,** read from the Shure receiver (read-only, as
+  always): the percentage for rechargeable packs, or the bars as a percentage. A low battery turns the
+  icon yellow and edges the card; one to change now flashes red. "OFF" when the transmitter is off.
 - **Packs on the same card.** Someone on a vocal and a pack (acoustic, strings, anything) gets one
   card labeled "VOX 1 + AG PACK", with a battery for each.
 - **Your logo over the clock.** In the middle of the board: your logo, and under it the time of day
   (with the date) or just the production clock's countdown with the name of the timer under it.
+- **Logo schedule.** Add as many logos as you like, star the default, and put the others on a
+  calendar: once, every day, chosen weekdays, monthly or yearly, all day or between two times, until
+  a date or for good. The board swaps them in by itself (a Christmas logo Dec 20–26, a youth-night logo
+  Wednesdays 6–9 PM). Logos and the schedule sync to every Mac you sign in on.
 - **Backgrounds folder, synced.** Upload backgrounds once in Display settings and every Mac you sign
   in on has them. Name one like a person ("Eddie") and it shows behind them, or pick one for a mic
   or a person. Otherwise their Planning Center photo shows.

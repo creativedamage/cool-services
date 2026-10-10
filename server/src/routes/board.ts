@@ -7,7 +7,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { BoardMic } from "../../../shared/board.js";
 import { files, mics } from "../lib/db.js";
-import { addBackground, boardDisplays, boardSettings, displayState, pictureFrom, publicImage, removeBackground, renameBackground, saveBoardSettings, setBoardOwner, setLogo, setOpenPlan } from "../lib/board.js";
+import { addBackground, addLogo, boardDisplays, boardSettings, displayState, pictureFrom, publicImage, removeBackground, removeLogo, renameBackground, renameLogo, saveBoardSettings, setBoardOwner, setDefaultLogo, setLogoSchedule, setOpenPlan } from "../lib/board.js";
 import { kioskAddresses } from "./paging.js";
 
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
@@ -88,11 +88,29 @@ boardRouter.put("/images", (req, res) => {
   res.json(saveBoardSettings({ customImages: next }));
 });
 
-/** The logo over the clock. */
-boardRouter.post("/logo", (req, res) => {
-  try { setLogo(pictureFrom(z.object({ dataUrl: Pic }).parse(req.body).dataUrl)); res.json(boardSettings()); } catch (e) { fail(res, e); }
+/** Logos over the clock: the library, the default, and the schedule. */
+boardRouter.post("/logos", (req, res) => {
+  const { name, dataUrl } = z.object({ name: z.string().max(80).default(""), dataUrl: Pic }).parse(req.body);
+  try { addLogo(name, pictureFrom(dataUrl)); res.json(boardSettings()); } catch (e) { fail(res, e); }
 });
-boardRouter.delete("/logo", (_req, res) => { setLogo(null); res.json(boardSettings()); });
+boardRouter.put("/logos/:id", (req, res) => { renameLogo(req.params.id, z.object({ name: z.string().min(1).max(80) }).parse(req.body).name); res.json(boardSettings()); });
+boardRouter.delete("/logos/:id", (req, res) => { removeLogo(req.params.id); res.json(boardSettings()); });
+boardRouter.put("/logo-default", (req, res) => { setDefaultLogo(z.object({ logoId: z.string().max(80).nullable() }).parse(req.body).logoId); res.json(boardSettings()); });
+const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const Time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+boardRouter.put("/logo-schedule", (req, res) => {
+  const { rules } = z.object({
+    rules: z.array(z.object({
+      id: z.string().min(1).max(40), logoId: z.string().max(80), date: Day, repeat: z.enum(["none", "daily", "weekly", "monthly", "yearly"]),
+      days: z.array(z.number().int().min(0).max(6)).max(7).default([]), until: Day.nullable().default(null),
+      from: Time.nullable().default(null), to: Time.nullable().default(null),
+    }).refine((r) => !r.until || r.until >= r.date, "It can’t end before it starts.")
+      .refine((r) => (r.from === null) === (r.to === null) && (r.from === null || r.from !== r.to), "Pick both times (or neither, for all day)."))
+      .max(300),
+  }).parse(req.body);
+  setLogoSchedule(rules);
+  res.json(boardSettings());
+});
 
 export const boardOutRouter = Router();
 boardOutRouter.get("/state", h(async (_req, res) => res.set("Cache-Control", "no-store").json(await displayState())));

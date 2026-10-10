@@ -7,7 +7,7 @@ import type {
 import type { UpdateStatus } from "@shared/updates";
 import type { AppId } from "@shared/apps";
 import type { ClockOutputSettings, ClockPreset, ClockState, ClockView } from "@shared/clock";
-import type { BoardBackground, BoardMic, BoardSettings, DisplayState } from "@shared/board";
+import type { BoardBackground, BoardMic, BoardSettings, DisplayState, LogoRule } from "@shared/board";
 
 export type SettingsPatch = Partial<Omit<AppSettings, "waves">> & {
   waves?: Partial<AppSettings["waves"]>;
@@ -100,7 +100,11 @@ export const Api = {
   addBoardBackground: (name: string, dataUrl: string) => api<{ background: BoardBackground; settings: BoardSettings }>("/board/backgrounds", { method: "POST", json: { name, dataUrl } }),
   renameBoardBackground: (id: string, name: string) => api<BoardSettings>(`/board/backgrounds/${encodeURIComponent(id)}`, { method: "PUT", json: { name } }),
   removeBoardBackground: (id: string) => api<BoardSettings>(`/board/backgrounds/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  boardLogo: (dataUrl: string | null) => (dataUrl ? api<BoardSettings>("/board/logo", { method: "POST", json: { dataUrl } }) : api<BoardSettings>("/board/logo", { method: "DELETE" })),
+  addBoardLogo: (name: string, dataUrl: string) => api<BoardSettings>("/board/logos", { method: "POST", json: { name, dataUrl } }),
+  renameBoardLogo: (id: string, name: string) => api<BoardSettings>(`/board/logos/${encodeURIComponent(id)}`, { method: "PUT", json: { name } }),
+  removeBoardLogo: (id: string) => api<BoardSettings>(`/board/logos/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  defaultBoardLogo: (logoId: string | null) => api<BoardSettings>("/board/logo-default", { method: "PUT", json: { logoId } }),
+  saveLogoSchedule: (rules: LogoRule[]) => api<BoardSettings>("/board/logo-schedule", { method: "PUT", json: { rules } }),
   clock: () => api<ClockView>("/clock"),
   clockAction: (a: Record<string, unknown> & { type: string }) => api<ClockState>("/clock/action", { method: "POST", json: a }),
   saveClockPresets: (list: ClockPreset[]) => api<ClockPreset[]>("/clock/presets", { method: "PUT", json: list }),
