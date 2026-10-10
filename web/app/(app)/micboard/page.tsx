@@ -304,10 +304,10 @@ function CardsSection({ s, onSave }: { s: BoardSettings; onSave: Save }) {
       </label>
       <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5" checked={s.stack ?? true} onChange={(e) => onSave({ stack: e.target.checked })} />
         <span>One card per person
-          <span className="block text-[11px] text-ink-faint">Someone on more than one mic (a vocal and their acoustic’s pack) gets one card, labeled “VOX 1 + AG PACK”, with a battery for each.</span>
+          <span className="block text-[11px] text-ink-faint">Someone on more than one mic (a vocal and their acoustic’s pack) gets one card, labeled “VOX 1 + AG PACK”. The battery shown is the card’s own mic (Vox 1).</span>
         </span>
       </label>
-      <p className="text-[11px] text-ink-faint">Mics fill the left side first, then the right, in Mic setup order. Each card’s battery is read from its Shure receiver (read-only); a low battery gets a yellow edge, one to change now a flashing red one.</p>
+      <p className="text-[11px] text-ink-faint">Mics fill the left side first, then the right, in Mic setup order. Each card’s battery is read from its Shure receiver (read-only); a low battery turns yellow, one to change now flashes red and edges the card in red.</p>
     </section>
   );
 }

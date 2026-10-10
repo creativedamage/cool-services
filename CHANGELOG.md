@@ -11,9 +11,9 @@ A new mic board: photo cards down both sides, your logo and the clock in the mid
   name. Half the mics go down the left side and half down the right, in Mic setup order.
 - **A battery on every card, with its percentage,** read from the Shure receiver (read-only, as
   always): the percentage for rechargeable packs, or the bars as a percentage. A low battery turns the
-  icon yellow and edges the card; one to change now flashes red. "OFF" when the transmitter is off.
+  icon yellow; one to change now flashes red and edges the card in red. "OFF" when the transmitter is off.
 - **Packs on the same card.** Someone on a vocal and a pack (acoustic, strings, anything) gets one
-  card labeled "VOX 1 + AG PACK", with a battery for each.
+  card labeled "VOX 1 + AG PACK", with the battery of their main mic.
 - **Your logo over the clock.** In the middle of the board: your logo, and under it the time of day
   (with the date) or just the production clock's countdown with the name of the timer under it.
 - **Logo schedule.** Add as many logos as you like, star the default, and put the others on a

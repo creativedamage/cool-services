@@ -440,10 +440,10 @@ Sidebar → **Mic board**. The big preview is exactly what the display shows. Ev
   own under it ("Worship leader"), the battery at the top right, the picture, and who's on it
   (first or full names, from the service's Mics panel).
 - **One card per person:** someone on more than one mic (a vocal and their acoustic's pack) gets one
-  card labeled "VOX 1 + AG PACK", with a battery for each mic.
+  card labeled "VOX 1 + AG PACK"; its battery is the card's own mic (Vox 1).
 - **Battery:** an icon with the percentage, read from the Shure receiver (read-only, see Mic setup
   below): the percentage for rechargeable packs, else the bars (0–5) as a percentage. A low battery
-  turns yellow and edges the card; one to change now flashes red. "OFF" means
+  turns yellow; one to change now flashes red and edges the card in red. "OFF" means
   the transmitter is off. Mics that aren't on the network show who has them, without a battery.
 - **The middle:** your logo (Add logo; a PNG with a see-through background looks best) over the
   clock: **Time of day** (seconds and the date are optional) or **Production clock**, which shows just
