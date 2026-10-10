@@ -4,6 +4,16 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.42.0
+The mic board follows the service you're working on, and it's the whole stage display now.
+- **The mic board shows the service you're working on.** Open a service under Services, or change
+  who's on which mic in its Mics panel, and the board switches to that service within a couple of
+  seconds. Before, it could stay on a different service from the weekend, so your changes didn't show.
+  The Mic board page's header says which service it's showing.
+- **No more banner, and no more mic board / clock switch.** The stage display is always the mic board,
+  with the clock (time of day or the production clock) in its middle. The Banner box and the Auto /
+  Mic board / Clock buttons are gone, along with their settings.
+
 ## 1.41.1
 Press F to make the mic board full screen, and a bigger middle on ultrawide screens.
 - **F for full screen.** On the display (http://<this Mac>/display) and on the Mic board page,

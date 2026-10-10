@@ -41,7 +41,7 @@ export function MicPanel({ plan }: { plan: PlanDetail }) {
   });
 
   const save = useMutation({
-    mutationFn: (a: MicAssignment[]) => Api.savePlanMics(plan.id, a),
+    mutationFn: (a: MicAssignment[]) => Api.savePlanMics(plan.id, a, plan.serviceTypeId),
     onMutate: (a) => qc.setQueryData<PlanMics>(qk.planMics(plan.id), (m) => m && { ...m, assignments: a }),
     onSuccess: (m) => qc.setQueryData(qk.planMics(plan.id), m),
     onError: (e) => { toast.error("Couldn’t save mic assignments", { description: (e as Error).message }); void mics.refetch(); },

@@ -379,8 +379,8 @@ event and the team's location; `staffRows()` turns a plan's staff check-ins into
 ## 5v. Mic board & stage display (1.18)
 
 - `shared/board.ts`: settings and `DisplayState` (view, banner, service, tiles, the middle: logo URL and clock source).
-- `server/src/lib/board.ts`: picks the service (`serviceTypeId` or any; the first upcoming plan that
-  isn't over), the view (manual, or auto from the plan's rehearsal/service times), and builds tiles
+- `server/src/lib/board.ts`: picks the service (the one last opened under Services or whose mics were
+  saved, `setOpenPlan`; else the picked weekend's next), and builds tiles
   from the mic setup + this plan's assignments + `micStatuses()` (receivers read at most every 2 s,
   shared with `/api/mics/status`; the ULX-D sample now also gives `audioLevel`). Status: no receiver /
   offline / TX off / critical (interference, ≤1 bar or ≤30 min) / low (≤2 bars or ≤60 min) / ok. Pictures (1.40):

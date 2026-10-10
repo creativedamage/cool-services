@@ -42,7 +42,7 @@ move to `~/Library/Application Support/Sundays` by themselves.
 <td><img src="docs/screenshots/micboard-display.png" alt="Mic board display"><br><b>Mic board</b>: every wireless mic with who's on it, their picture and battery, around your logo and the clock, on any screen in the building.</td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/micboard.png" alt="Mic board control"><br><b>Stage display control</b>: switch between the mic board and the clock (or let rehearsal and service times decide), and set the banner message.</td>
+<td><img src="docs/screenshots/micboard.png" alt="Mic board control"><br><b>Stage display control</b>: the board's logo, clock, stage plot, backgrounds and each mic's color and line.</td>
 <td><img src="docs/screenshots/phone-staff.png" alt="Team check-ins on a phone" width="45%"><br><b>On phones</b>: team leads see who's in; staff check people in, from <code>staff.yourchurch.org</code>.</td>
 </tr>
 <tr>
@@ -100,9 +100,8 @@ Screenshots use the built-in sample data (Sign in → "Or explore with sample da
 - **Mic board & stage display** (sidebar → Mic board): a photo card for every wireless mic, half
   down each side, with who's on it (from Planning Center), a battery read from its Shure receiver, and
   your own backgrounds (synced to every Mac you sign in on). In the middle: your logo over the time of
-  day or the production clock's countdown. The stage display can show the mic board or the clock,
-  chosen in the app or automatically (the mic board around rehearsals and services).
-  Open it on any other computer or TV at `http://<this Mac>/display`.
+  day or the production clock's countdown, and your stage plot. It follows the service you last
+  worked on. Open it on any other computer or TV at `http://<this Mac>/display`.
 - **Tuning**: every song's key, big, across the top of each service in service order ("Song 1 · A",
   "Song 2 · Db"). With Waves SuperRack connected in Settings, pressing a key recalls that key's
   SuperRack snapshot over MIDI.
@@ -463,14 +462,10 @@ Sidebar → **Mic board**. The big preview is exactly what the display shows. Ev
 
 ### The stage display
 
-- **Banner**: type a message or your mission statement in the Banner box and press Show. It can scroll,
-  be small/medium/large, use your colors, and show the service and the time on either side.
-- **What the display shows**: **Auto** (the mic board from 30 minutes before a rehearsal until it
-  ends and from an hour before each service until 15 minutes after, from the service's times in
-  Planning Center; your idle choice otherwise), or always the **Mic board** or the **Clock**.
-- **Which service**: **The service I have open** (default): open a service under Services and the
-  board switches to it; until you open one, it shows the next service. Or **Always the next service**
-  (of a type you choose, or any type).
+- **Which service**: the one you last worked on. Open a service under Services, or change its mics in
+  its Mics panel, and the board switches to it within a couple of seconds (the page's header says
+  which service it's showing). Until you've worked on one, it shows the picked weekend's next service.
+- The display is always the mic board; the clock is on it (Display settings → Middle of the board).
 - **Mics on the board** (Display settings): show or hide each mic (on the board and the FOH companion's
   strip), and add mics that aren't on the network.
 

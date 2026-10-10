@@ -93,7 +93,7 @@ export const Api = {
   boardOpenPlan: (serviceTypeId: string, planId: string) => api<{ ok: true }>("/board/open", { method: "POST", json: { serviceTypeId, planId } }),
   addBoardMic: (label: string, kind: BoardMic["kind"]) => api<{ id: string }>("/board/mics", { method: "POST", json: { label, kind } }),
   removeBoardMic: (id: string) => api<{ ok: true }>(`/board/mics/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  saveBoard: (p: Partial<Omit<BoardSettings, "banner" | "screen" | "center" | "plot">> & { banner?: Partial<BoardSettings["banner"]>; screen?: Partial<BoardSettings["screen"]>; center?: Partial<Omit<BoardSettings["center"], "logoId">>; plot?: { dark?: boolean } }) =>
+  saveBoard: (p: Partial<Omit<BoardSettings, "screen" | "center" | "plot">> & { screen?: Partial<BoardSettings["screen"]>; center?: Partial<Omit<BoardSettings["center"], "logoId">>; plot?: { dark?: boolean } }) =>
     api<BoardSettings>("/board/settings", { method: "PUT", json: p }),
   /** Pick a background for "person:<id>" or "mic:<channel id>" (null: automatic). */
   pickBoardImage: (key: string, backgroundId: string | null) => api<BoardSettings>("/board/images", { method: "PUT", json: { key, backgroundId } }),
@@ -210,8 +210,9 @@ export const Api = {
   saveMicSetup: (setup: MicSetup) => api<MicSetup>("/mics/setup", { method: "PUT", json: setup }),
   testReceiver: (ip: string) => api<{ ok: boolean; deviceId?: string; error?: string }>("/mics/test", { method: "POST", json: { ip } }),
   planMics: (plan: string) => api<PlanMics>(`/mics/plans/${plan}`),
-  savePlanMics: (plan: string, assignments: MicAssignment[]) =>
-    api<PlanMics>(`/mics/plans/${plan}`, { method: "PUT", json: { assignments } }),
+  /** Saving a service's mics also points the mic board at that service (the one you last worked on). */
+  savePlanMics: (plan: string, assignments: MicAssignment[], serviceTypeId?: string) =>
+    api<PlanMics>(`/mics/plans/${plan}`, { method: "PUT", json: { assignments, serviceTypeId } }),
   micStatus: () => api<ReceiverStatus[]>("/mics/status"),
   pagingConfig: () => api<PagingConfig>("/paging/config"),
   savePaging: (patch: PagingPatch) => api<PagingConfig>("/paging/config", { method: "PUT", json: patch }),

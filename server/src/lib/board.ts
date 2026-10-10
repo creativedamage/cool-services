@@ -9,7 +9,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { DEFAULT_BOARD, TILE_COLORS, activeLogo, type BoardBackground, type LogoRule, type BoardSettings, type BoardTile, type DisplayState, type DisplayView, type TileStatus } from "../../../shared/board.js";
+import { DEFAULT_BOARD, TILE_COLORS, activeLogo, type BoardBackground, type LogoRule, type BoardSettings, type BoardTile, type DisplayState, type TileStatus } from "../../../shared/board.js";
 import type { ChannelStatus, DisplayInfo, PlanDetail, ReceiverStatus } from "../../../shared/types.js";
 import { pcoForUser } from "../auth/oauth.js";
 import type { PcoApi } from "../pco/api.js";
@@ -25,7 +25,6 @@ function load(): Stored {
   const s = extras.get<Partial<Stored>>(KEY, {});
   const settings = { ...DEFAULT_BOARD, ...s.settings } as BoardSettings;
   settings.hidden ??= [];
-  settings.banner = { ...DEFAULT_BOARD.banner, ...s.settings?.banner };
   settings.screen = { ...DEFAULT_BOARD.screen, ...s.settings?.screen };
   settings.center = { ...DEFAULT_BOARD.center, ...s.settings?.center };
   settings.backgrounds ??= [];
@@ -48,11 +47,9 @@ function load(): Stored {
       if (p) settings.backgrounds.push({ id, name: "Picture", bytes: fs.statSync(p).size, at: fs.statSync(p).mtime.toISOString() });
     }
   }
-  // Stage plots were removed in 1.22: a display set to the stage plot shows the mic board.
-  if ((settings.mode as string) === "stageplot") settings.mode = "micboard";
-  if ((settings.autoIdle as string) === "stageplot") settings.autoIdle = "micboard";
-  // "Always the next service" became the picked weekend's service in 1.25.
-  if ((settings.follow as string) !== "open") settings.follow = "weekend";
+  // The banner and the choice of mic board or clock went in 1.42 (the clock is on the board), and
+  // the board always follows the service you last worked on.
+  for (const k of ["banner", "mode", "autoIdle", "follow", "serviceTypeId"]) delete (settings as unknown as Record<string, unknown>)[k];
   return { settings, owner: s.owner ?? null, open: s.open ?? null };
 }
 let stored = load();
@@ -79,7 +76,7 @@ export function saveBoardSettings(patch: Partial<BoardSettings>) {
   const cur = stored.settings;
   stored.settings = {
     ...cur, ...patch,
-    banner: { ...cur.banner, ...patch.banner }, screen: { ...cur.screen, ...patch.screen }, center: { ...cur.center, ...patch.center }, plot: { ...cur.plot, ...patch.plot },
+    screen: { ...cur.screen, ...patch.screen }, center: { ...cur.center, ...patch.center }, plot: { ...cur.plot, ...patch.plot },
     customImages: patch.customImages ?? cur.customImages, hidden: patch.hidden ?? cur.hidden ?? [],
     backgrounds: patch.backgrounds ?? cur.backgrounds, logos: patch.logos ?? cur.logos, logoSchedule: patch.logoSchedule ?? cur.logoSchedule, tileText: patch.tileText ?? cur.tileText, tileColor: patch.tileColor ?? cur.tileColor,
   };
@@ -93,12 +90,12 @@ export function setBoardOwner(owner: { userId: string; demo: boolean }) {
   stored.owner = owner;
   persist();
 }
-/** The service last opened in Sundays (the board follows it when follow is "open"). */
+/** The service you last worked on in Sundays: opened under Services, or changed its mics. The board follows it. */
 export function setOpenPlan(serviceTypeId: string, planId: string) {
+  memo = null; // its mics may have just changed: show them on the next look
   if (stored.open?.planId === planId && stored.open.serviceTypeId === serviceTypeId) return;
   stored.open = { serviceTypeId, planId };
   persist();
-  memo = null;
 }
 const pco = (): PcoApi | null => (stored.owner ? pcoForUser(stored.owner.userId, stored.owner.demo) : null);
 
@@ -137,25 +134,12 @@ function statusOf(c: ChannelStatus | undefined, rxOk: boolean | null): { status:
 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
-function autoView(plan: PlanDetail | null, idle: DisplayView): { view: DisplayView; reason: string } {
-  if (!plan) return { view: idle, reason: weekend() ? "No service that weekend" : "Pick a weekend in Sundays" };
-  const now = Date.now();
-  const within = (t: PlanDetail["times"][number], before: number, after: number) =>
-    now >= Date.parse(t.startsAt) - before && now <= Date.parse(t.endsAt || t.startsAt) + after;
-  const reh = plan.times.find((t) => t.kind === "rehearsal" && within(t, 30 * 60e3, 0));
-  if (reh) return { view: "micboard", reason: `Rehearsal ${clock(reh.startsAt)}` };
-  const svc = plan.times.find((t) => t.kind === "service" && within(t, 60 * 60e3, 15 * 60e3));
-  if (svc) return { view: "micboard", reason: `${clock(svc.startsAt)} service` };
-  return { view: idle, reason: "Between services" };
-}
-
 /* ───────────── The state every display draws ───────────── */
 
 let memo: { at: number; p: Promise<DisplayState> } | null = null;
 export function displayState(): Promise<DisplayState> {
   if (memo && Date.now() - memo.at < 1500) return memo.p;
   const p = build().catch((e): DisplayState => ({
-    view: stored.settings.mode === "auto" ? stored.settings.autoIdle : stored.settings.mode, mode: stored.settings.mode, reason: "",
     settings: centerSettings(stored.settings), service: null, tiles: [],
     error: (e as Error).message, at: new Date().toISOString(),
   }));
@@ -165,17 +149,16 @@ export function displayState(): Promise<DisplayState> {
 
 const imageUrl = (fileId: string) => `/api/board-out/image/${encodeURIComponent(fileId)}`;
 
-/** The service the display follows (the picked weekend's, or the one open in Sundays), looked up every 10 s at most. */
+/** The service the display follows (the one you last worked on, else the picked weekend's), looked up every 10 s at most. */
 let planMemo: { at: number; key: string; p: Promise<PlanDetail | null> } | null = null;
 export function boardPlan(): Promise<PlanDetail | null> {
-  const s = stored.settings;
-  const key = JSON.stringify([s.follow, s.serviceTypeId, stored.open, stored.owner, weekend()]);
+  const key = JSON.stringify([stored.open, stored.owner, weekend()]);
   if (planMemo && planMemo.key === key && Date.now() - planMemo.at < 10_000) return planMemo.p;
   const p = (async () => {
     const api = pco();
     if (!api) return null;
-    const opened = s.follow === "open" && stored.open ? await api.getPlan(stored.open.serviceTypeId, stored.open.planId).catch(() => null) : null;
-    return opened ?? (await weekendPlan(api, s.serviceTypeId).catch(() => null));
+    const opened = stored.open ? await api.getPlan(stored.open.serviceTypeId, stored.open.planId).catch(() => null) : null;
+    return opened ?? (await weekendPlan(api, null).catch(() => null));
   })();
   planMemo = { at: Date.now(), key, p };
   return p;
@@ -185,7 +168,7 @@ function centerSettings(s: BoardSettings): DisplayState["settings"] {
   const { logoId } = activeLogo(s, new Date());
   const logo = logoId && files.path(logoId) ? imageUrl(logoId) : null;
   const plot = s.plot.fileId && files.path(s.plot.fileId) ? { url: imageUrl(s.plot.fileId), dark: s.plot.dark } : null;
-  return { banner: s.banner, columns: s.columns, names: s.names ?? "first", center: { logo, clock: s.center.clock, seconds: s.center.seconds, date: s.center.date }, plot };
+  return { columns: s.columns, names: s.names ?? "first", center: { logo, clock: s.center.clock, seconds: s.center.seconds, date: s.center.date }, plot };
 }
 
 /** A background named like the person ("Eddie", "eddie smith") is theirs without picking it. */
@@ -199,8 +182,6 @@ async function build(): Promise<DisplayState> {
   const s = stored.settings;
   const api = pco();
   const plan = await boardPlan();
-  const { view, reason } = s.mode === "auto" ? autoView(plan, s.autoIdle) : { view: s.mode, reason: "Chosen in Sundays" };
-
   const setup = mics.setup();
   const assignments = plan ? mics.plan(plan.id).assignments : [];
   const statuses = await micStatuses().catch(() => [] as ReceiverStatus[]);
@@ -260,7 +241,7 @@ async function build(): Promise<DisplayState> {
   const now = Date.now();
   const next = plan?.times.filter((t) => t.kind === "service" && Date.parse(t.endsAt || t.startsAt) > now).sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
   return {
-    view, mode: s.mode, reason, settings: centerSettings(s),
+    settings: centerSettings(s),
     service: plan ? {
       planId: plan.id, serviceTypeId: plan.serviceTypeId, title: plan.title, serviceTypeName: plan.serviceTypeName,
       when: new Date(plan.sortDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }),

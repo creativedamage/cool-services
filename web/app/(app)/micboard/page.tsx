@@ -7,10 +7,10 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { Copy, Eye, EyeOff, Maximize, ImagePlus, Plus, Trash2, WifiOff, MicVocal, MonitorUp, Settings2, Sparkles, Timer, Tv, Upload, Wifi, X } from "lucide-react";
+import { Copy, Eye, EyeOff, Maximize, ImagePlus, Plus, Trash2, WifiOff, MicVocal, MonitorUp, Settings2, Tv, Upload, Wifi, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { TILE_COLORS, type BoardMic, type BoardSettings, type BoardTile, type DisplayMode } from "@shared/board";
+import { TILE_COLORS, type BoardMic, type BoardSettings, type BoardTile } from "@shared/board";
 import { Api } from "@/lib/api";
 import { DisplayView } from "@/components/board/DisplayView";
 import { useFullScreenKey } from "@/components/board/useFullScreen";
@@ -19,12 +19,6 @@ import { pdfPageCount, stagePlotImage } from "@/lib/stagePlot";
 import { Drawer, Spinner } from "@/components/ui";
 
 const KEY = ["stageDisplay"];
-const MODES: { mode: DisplayMode; label: string; icon: typeof Tv; hint: string }[] = [
-  { mode: "auto", label: "Auto", icon: Sparkles, hint: "The mic board from before each rehearsal and service until it ends (from Planning Center); otherwise your idle choice" },
-  { mode: "micboard", label: "Mic board", icon: MicVocal, hint: "Always the mic board" },
-  { mode: "clock", label: "Clock", icon: Timer, hint: "The production clock" },
-];
-const VIEW_NAME = { micboard: "Mic board", clock: "Clock" } as const;
 
 /**
  * Shrink a picture for the board: backgrounds to at most 1600 px on their long side (a JPEG), a logo
@@ -65,30 +59,19 @@ export default function MicBoardPage() {
     onError: (e) => toast.error("Couldn’t save", { description: (e as Error).message }),
   });
   const [open, setOpen] = useState(false);
-  const [banner, setBanner] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const { full, toggle: toggleFull } = useFullScreenKey(useCallback(() => boardRef.current, []));
 
   if (!q.data) return <div className="p-8">{q.error ? <p className="text-bad">{(q.error as Error).message}</p> : <Spinner />}</div>;
   const { settings: s, state } = q.data;
-  const text = banner ?? s.banner.text;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <header className="flex flex-wrap items-center gap-3 border-b border-line px-6 py-3 pr-28">
         <MicVocal size={18} className="text-accent" />
         <h1 className="text-lg font-semibold">Mic board</h1>
-        <div className="flex rounded-lg border border-line p-0.5">
-          {MODES.map(({ mode, label, icon: Icon, hint }) => (
-            <button key={mode} title={hint} onClick={() => save.mutate({ mode })}
-              className={clsx("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition", s.mode === mode ? "bg-accent text-white" : "text-ink-soft hover:bg-hover")}>
-              <Icon size={14} /> {label}
-            </button>
-          ))}
-        </div>
-        <span className="text-xs text-ink-muted">
-          Showing <b className="text-ink">{VIEW_NAME[state.view]}</b>{state.reason ? ` · ${state.reason}` : ""}
-          {state.service ? ` · ${state.service.serviceTypeName}, ${state.service.when}` : ""}
+        <span className="text-xs text-ink-muted" title="The board follows the service you last worked on: opened under Services, or changed its mics.">
+          {state.service ? <>Showing <b className="text-ink">{state.service.serviceTypeName}</b>, {state.service.when}</> : "Open a service under Services and the board shows its mics"}
         </span>
         <div className="ml-auto flex items-center gap-2 text-xs">
           <span className={clsx("flex items-center gap-1 rounded-full px-2 py-0.5", s.lan && q.data.urls.length ? "bg-ok-soft text-ok" : "bg-hover text-ink-muted")} title={q.data.urls[0]}><Wifi size={12} /> {s.lan ? "Network" : "Network off"}</span>
@@ -97,17 +80,6 @@ export default function MicBoardPage() {
           <button className="btn-outline py-1 text-xs" onClick={() => setOpen(true)}><Settings2 size={13} /> Display settings</button>
         </div>
       </header>
-
-      {/* Banner message: change it any time */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-2.5">
-        <span className="label">Banner</span>
-        <input className="input min-w-[16rem] flex-1 py-1.5 text-sm" placeholder="A message or your mission statement, across the top of the display" maxLength={400}
-          value={text} onChange={(e) => setBanner(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { save.mutate({ banner: { text, enabled: true } }); setBanner(null); } }} />
-        <button className="btn-primary py-1.5 text-sm" disabled={text === s.banner.text && s.banner.enabled} onClick={() => { save.mutate({ banner: { text, enabled: true } }); setBanner(null); }}>Show</button>
-        <label className="flex items-center gap-1.5 text-xs text-ink-soft"><input type="checkbox" checked={s.banner.scroll} onChange={(e) => save.mutate({ banner: { scroll: e.target.checked } })} /> Scroll</label>
-        <label className="flex items-center gap-1.5 text-xs text-ink-soft"><input type="checkbox" checked={s.banner.enabled} onChange={(e) => save.mutate({ banner: { enabled: e.target.checked } })} /> Banner on</label>
-      </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
         {state.error && <p className="mb-3 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">{state.error}</p>}
@@ -185,51 +157,6 @@ function SettingsDrawer({ s, data, onSave, onClose }: { s: BoardSettings; data: 
         <LibrarySection s={s} />
         <MicsSection s={s} mics={data.mics} onSave={onSave} />
         <PeopleSection s={s} tiles={data.state.tiles} />
-
-        <section className="space-y-2">
-          <h3 className="label">Service</h3>
-          <div className="flex rounded-lg border border-line p-0.5">
-            {([["weekend", "The weekend’s service"], ["open", "The service I have open"]] as const).map(([v, label]) => (
-              <button key={v} onClick={() => onSave({ follow: v })}
-                className={clsx("flex-1 rounded-md px-2 py-1.5 text-xs", (s.follow ?? "weekend") === v ? "bg-accent text-white" : "text-ink-soft hover:bg-hover")}>{label}</button>
-            ))}
-          </div>
-          <p className="text-[11px] text-ink-faint">
-            {(s.follow ?? "weekend") === "weekend" ? "Uses the weekend picked in the sidebar. It stays on that weekend until someone picks another." : "Open a service under Services and the board switches to it."}
-            {data.state.service ? <> Now: <span className="text-ink-soft">{data.state.service.serviceTypeName} · {data.state.service.when}</span></> : null}
-          </p>
-          <label className="block"><span className="text-xs text-ink-muted">{(s.follow ?? "weekend") === "open" ? "Until you open one, the weekend’s service of" : "The weekend’s service of"}</span>
-            <select className="input mt-1" value={s.serviceTypeId ?? ""} onChange={(e) => onSave({ serviceTypeId: e.target.value || null })}>
-              <option value="">Any type</option>
-              {types.data?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          </label>
-          <label className="block"><span className="text-xs text-ink-muted">In Auto, outside rehearsal and service times show</span>
-            <select className="input mt-1" value={s.autoIdle} onChange={(e) => onSave({ autoIdle: e.target.value as BoardSettings["autoIdle"] })}>
-              <option value="micboard">Mic board</option><option value="clock">Clock</option>
-            </select>
-          </label>
-          <p className="text-[11px] text-ink-faint">Auto uses the service’s times in Planning Center: the mic board from 30 minutes before a rehearsal until it ends, and from an hour before each service until 15 minutes after.</p>
-        </section>
-
-        <section className="space-y-2">
-          <h3 className="label">Banner</h3>
-          <div className="grid grid-cols-3 gap-2">
-            <label className="block"><span className="text-xs text-ink-muted">Size</span>
-              <select className="input mt-1" value={s.banner.size} onChange={(e) => onSave({ banner: { size: e.target.value as "m" } })}>
-                <option value="s">Small</option><option value="m">Medium</option><option value="l">Large</option>
-              </select>
-            </label>
-            <label className="block"><span className="text-xs text-ink-muted">Background</span>
-              <input type="color" className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-line bg-transparent" value={s.banner.background} onChange={(e) => onSave({ banner: { background: e.target.value } })} />
-            </label>
-            <label className="block"><span className="text-xs text-ink-muted">Text</span>
-              <input type="color" className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-line bg-transparent" value={s.banner.color} onChange={(e) => onSave({ banner: { color: e.target.value } })} />
-            </label>
-          </div>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={s.banner.showService} onChange={(e) => onSave({ banner: { showService: e.target.checked } })} /> Show the service and its time on the left</label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={s.banner.showClock} onChange={(e) => onSave({ banner: { showClock: e.target.checked } })} /> Show the time on the right</label>
-        </section>
 
         <section className="space-y-2">
           <h3 className="label">Where it shows</h3>

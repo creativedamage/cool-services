@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { PlanMics } from "../../../shared/types.js";
 import { cache, mics } from "../lib/db.js";
 import { probe } from "../lib/shure.js";
-import { micStatuses } from "../lib/board.js";
+import { micStatuses, setOpenPlan } from "../lib/board.js";
 
 export const micsRouter = Router();
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
@@ -46,10 +46,13 @@ micsRouter.get("/plans/:plan", h(async (req, res) => {
 
 const Assign = z.object({
   assignments: z.array(z.object({ channelId: z.string(), personId: z.string(), name: z.string().max(120) })).max(64),
+  /** The service's type: the mic board then follows this service (the one you last worked on). */
+  serviceTypeId: z.string().min(1).max(40).optional(),
 });
 micsRouter.put("/plans/:plan", h(async (req, res) => {
-  const { assignments } = Assign.parse(req.body);
+  const { assignments, serviceTypeId } = Assign.parse(req.body);
   mics.savePlan(req.params.plan, assignments);
+  if (serviceTypeId) setOpenPlan(serviceTypeId, req.params.plan);
   res.json({ planId: req.params.plan, ...mics.plan(req.params.plan) });
 }));
 
