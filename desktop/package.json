@@ -51,7 +51,7 @@
       ],
       "identity": "-",
       "artifactName": "Sundays-${version}-mac.${ext}",
-      "x64ArchFiles": "{**/app/native/**}",
+      "x64ArchFiles": "**/app/native/**",
       "extendInfo": {
         "NSLocalNetworkUsageDescription": "Sundays talks to your Shure receivers, ProPresenter, consoles and iPads on the church network."
       }

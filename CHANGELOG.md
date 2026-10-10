@@ -4,6 +4,12 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.40.1
+The new mic board, released (1.40.0's build didn't finish).
+- 1.40.0's Mac app build stopped partway, so it never reached Check for Updates. This release has
+  everything from 1.40.0: the new mic board, the battery with its percentage, your logo and its
+  schedule, and backgrounds that follow you to every Mac.
+
 ## 1.40.0
 A new mic board: photo cards down both sides, your logo and the clock in the middle, and backgrounds that follow you to every Mac.
 - **New mic board.** Each mic gets a photo card: the mic's name in its own color across the top, a
