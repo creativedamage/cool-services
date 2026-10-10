@@ -80,7 +80,7 @@ export function StageCard({ t, now, names }: { t: BoardTile; now: number; names:
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden [container-type:size]"
-      style={{ background: CARD, borderRadius: "1.6cqh", boxShadow: worst ? `inset 0 0 0 ${flash ? "0.3cqh" : "0.7cqh"} ${edge}` : undefined }}>
+      style={{ background: CARD, borderRadius: 0, boxShadow: worst ? `inset 0 0 0 ${flash ? "0.3cqh" : "0.7cqh"} ${edge}` : undefined }}>
       {/* the mic (and their other mics), your line, the battery: sizes in the header's own units */}
       <div className="relative flex shrink-0 flex-col [container-type:size]" style={{ height: "21cqh", background: tint(t.color, 0.16), color: t.color }}>
         <div className="flex items-end justify-center px-[5cqw] text-center" style={{ height: "50cqh", paddingBottom: "2cqh" }}>
@@ -149,10 +149,10 @@ function TimeOfDay({ now, seconds, date }: { now: number; seconds: boolean; date
   return (
     <>
       <div className="flex items-start justify-center tabular-nums" style={{ lineHeight: 0.9 }}>
-        <span className="font-bold" style={{ fontSize: "19cqh", letterSpacing: "-0.01em" }}>{hm}</span>
-        {seconds && <span className="font-semibold" style={{ fontSize: "6.4cqh", color: "#6B7280", marginLeft: "0.4cqw", marginTop: "1.4cqh", width: "2.2em" }}>{String(d.getSeconds()).padStart(2, "0")}</span>}
+        <span className="font-bold" style={{ fontSize: "14cqh", letterSpacing: "-0.01em" }}>{hm}</span>
+        {seconds && <span className="font-semibold" style={{ fontSize: "4.8cqh", color: "#6B7280", marginLeft: "0.3cqw", marginTop: "1cqh", width: "2.2em" }}>{String(d.getSeconds()).padStart(2, "0")}</span>}
       </div>
-      {date && <div className="font-semibold uppercase" style={{ fontSize: "3.2cqh", letterSpacing: "0.14em", color: "#8B8B92", marginTop: "0.6cqh" }}>{d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</div>}
+      {date && <div className="font-semibold uppercase" style={{ fontSize: "2.5cqh", letterSpacing: "0.14em", color: "#8B8B92", marginTop: "0.5cqh" }}>{d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</div>}
     </>
   );
 }
@@ -174,9 +174,9 @@ function Production({ seconds }: { seconds: boolean }) {
   const pulse = r.tone === "over" && Math.floor(now / 500) % 2 === 0;
   return (
     <>
-      <div className="font-bold tabular-nums" style={{ fontSize: text.length > 8 ? "13cqh" : text.length > 5 ? "16cqh" : "19cqh", lineHeight: 0.9, color: toneColor(r.tone, base), opacity: pulse ? 0.45 : 1, transition: "color .3s" }}>{text}</div>
-      <div className="flex items-center justify-center font-semibold uppercase" style={{ fontSize: "3.2cqh", letterSpacing: "0.14em", color: "#A1A1AA", marginTop: "0.8cqh", gap: "0.8cqw" }}>
-        <span className="block rounded-full" style={{ width: "1.1cqh", height: "1.1cqh", background: st.main.running ? "#EF4444" : "#52525B" }} />
+      <div className="font-bold tabular-nums" style={{ fontSize: text.length > 8 ? "10cqh" : text.length > 5 ? "12cqh" : "14cqh", lineHeight: 0.9, color: toneColor(r.tone, base), opacity: pulse ? 0.45 : 1, transition: "color .3s" }}>{text}</div>
+      <div className="flex items-center justify-center font-semibold uppercase" style={{ fontSize: "2.5cqh", letterSpacing: "0.14em", color: "#A1A1AA", marginTop: "0.6cqh", gap: "0.7cqw" }}>
+        <span className="block rounded-full" style={{ width: "0.9cqh", height: "0.9cqh", background: st.main.running ? "#EF4444" : "#52525B" }} />
         <span className="max-w-[34cqw] truncate">{productionLabel(st)}</span>
       </div>
     </>
@@ -189,7 +189,7 @@ function Center({ s, now }: { s: DisplayState; now: number }) {
     <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-center text-white" style={{ paddingBottom: "8cqh" }}>
       {c.logo && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={c.logo} alt="" className="object-contain" style={{ maxHeight: "10cqh", maxWidth: "19cqw", marginBottom: "2.6cqh" }} />
+        <img src={c.logo} alt="" className="object-contain" style={{ maxHeight: "8cqh", maxWidth: "16cqw", marginBottom: "2.2cqh" }} />
       )}
       {c.clock === "production" ? <Production seconds={c.seconds} /> : <TimeOfDay now={now} seconds={c.seconds} date={c.date} />}
     </div>
