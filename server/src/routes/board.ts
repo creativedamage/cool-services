@@ -7,7 +7,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { BoardMic } from "../../../shared/board.js";
 import { files, mics } from "../lib/db.js";
-import { addBackground, addLogo, boardDisplays, boardSettings, displayState, pictureFrom, publicImage, removeBackground, removeLogo, renameBackground, renameLogo, saveBoardSettings, setBoardOwner, setDefaultLogo, setLogoSchedule, setOpenPlan } from "../lib/board.js";
+import { addBackground, addLogo, boardDisplays, boardSettings, displayState, pictureFrom, publicImage, removeBackground, removeLogo, renameBackground, setPlot, renameLogo, saveBoardSettings, setBoardOwner, setDefaultLogo, setLogoSchedule, setOpenPlan } from "../lib/board.js";
 import { kioskAddresses } from "./paging.js";
 
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
@@ -35,6 +35,7 @@ boardRouter.put("/settings", (req, res) => {
     hidden: z.array(z.string().max(60)).max(500), stack: z.boolean(), names: z.enum(["first", "full"]),
     tileText: z.record(z.string().max(60), z.string().max(60)), tileColor: z.record(z.string().max(60), Color),
     center: z.object({ clock: z.enum(["time", "production"]), seconds: z.boolean(), date: z.boolean() }).partial(),
+    plot: z.object({ dark: z.boolean() }).partial(),
     lan: z.boolean(), screen: z.object({ enabled: z.boolean(), displayId: z.number().nullable() }).partial(),
   }).partial().parse(req.body);
   res.json(saveBoardSettings(p as any));
@@ -87,6 +88,13 @@ boardRouter.put("/images", (req, res) => {
   if (backgroundId && boardSettings().backgrounds.some((b) => b.id === backgroundId)) next[key] = backgroundId; else delete next[key];
   res.json(saveBoardSettings({ customImages: next }));
 });
+
+/** The stage plot under the clock: a picture made from the PDF in the browser. */
+boardRouter.post("/plot", (req, res) => {
+  const { name, dataUrl } = z.object({ name: z.string().max(120).default(""), dataUrl: Pic }).parse(req.body);
+  try { setPlot(pictureFrom(dataUrl), name); res.json(boardSettings()); } catch (e) { fail(res, e); }
+});
+boardRouter.delete("/plot", (_req, res) => { setPlot(null, null); res.json(boardSettings()); });
 
 /** Logos over the clock: the library, the default, and the schedule. */
 boardRouter.post("/logos", (req, res) => {

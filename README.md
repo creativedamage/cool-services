@@ -448,6 +448,9 @@ Sidebar → **Mic board**. The big preview is exactly what the display shows. Ev
 - **The middle:** your logo (Add logo; a PNG with a see-through background looks best) over the
   clock: **Time of day** (seconds and the date are optional) or **Production clock**, which shows just
   the production clock's main timer and, under it, the name of the timer you loaded.
+- **Stage plot:** add a PDF (pick the page if it has several) or a picture under **Stage plot**. It
+  fills the middle under the clock, cropped to the drawing; **Show it dark** turns a white page dark.
+  It's turned into a picture on the Mac you add it on and syncs to your other Macs.
 - **Logo schedule:** add more logos and star the default. **Schedule** opens a month calendar: click
   a day to put a logo on it once or repeating (every day, chosen weekdays, monthly, yearly), all day
   or between two times, until a date or for good. A logo with times wins over an all-day one; then the

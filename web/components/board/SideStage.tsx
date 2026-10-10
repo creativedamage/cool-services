@@ -194,13 +194,25 @@ function Production({ seconds }: { seconds: boolean }) {
 
 function Center({ s, now }: { s: DisplayState; now: number }) {
   const c = s.settings.center;
+  const plot = s.settings.plot;
   return (
-    <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-center text-white" style={{ paddingBottom: "8cqh" }}>
+    <div className={clsx("flex h-full min-w-0 flex-1 flex-col items-center text-white", plot ? "justify-start" : "justify-center")}
+      style={plot ? { padding: "6cqh 1.5cqw 3cqh" } : { paddingBottom: "8cqh" }}>
       {c.logo && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={c.logo} alt="" className="object-contain" style={{ maxHeight: "8cqh", maxWidth: "16cqw", marginBottom: "2.2cqh" }} />
+        <img src={c.logo} alt="" className="shrink-0 object-contain" style={{ maxHeight: "8cqh", maxWidth: "16cqw", marginBottom: "2.2cqh" }} />
       )}
-      {c.clock === "production" ? <Production seconds={c.seconds} /> : <TimeOfDay now={now} seconds={c.seconds} date={c.date} />}
+      <div className="shrink-0 text-center">
+        {c.clock === "production" ? <Production seconds={c.seconds} /> : <TimeOfDay now={now} seconds={c.seconds} date={c.date} />}
+      </div>
+      {/* The stage plot: whatever room is left under the clock. A white page can show dark (inverted, colors kept). */}
+      {plot && (
+        <div className="relative mt-[3cqh] min-h-0 w-full flex-1">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={plot.url} alt="Stage plot" className="absolute inset-0 h-full w-full object-contain"
+            style={plot.dark ? { filter: "invert(1) hue-rotate(180deg)", mixBlendMode: "screen" } : undefined} />
+        </div>
+      )}
     </div>
   );
 }

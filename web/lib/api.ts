@@ -93,13 +93,14 @@ export const Api = {
   boardOpenPlan: (serviceTypeId: string, planId: string) => api<{ ok: true }>("/board/open", { method: "POST", json: { serviceTypeId, planId } }),
   addBoardMic: (label: string, kind: BoardMic["kind"]) => api<{ id: string }>("/board/mics", { method: "POST", json: { label, kind } }),
   removeBoardMic: (id: string) => api<{ ok: true }>(`/board/mics/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  saveBoard: (p: Partial<Omit<BoardSettings, "banner" | "screen" | "center">> & { banner?: Partial<BoardSettings["banner"]>; screen?: Partial<BoardSettings["screen"]>; center?: Partial<Omit<BoardSettings["center"], "logoId">> }) =>
+  saveBoard: (p: Partial<Omit<BoardSettings, "banner" | "screen" | "center" | "plot">> & { banner?: Partial<BoardSettings["banner"]>; screen?: Partial<BoardSettings["screen"]>; center?: Partial<Omit<BoardSettings["center"], "logoId">>; plot?: { dark?: boolean } }) =>
     api<BoardSettings>("/board/settings", { method: "PUT", json: p }),
   /** Pick a background for "person:<id>" or "mic:<channel id>" (null: automatic). */
   pickBoardImage: (key: string, backgroundId: string | null) => api<BoardSettings>("/board/images", { method: "PUT", json: { key, backgroundId } }),
   addBoardBackground: (name: string, dataUrl: string) => api<{ background: BoardBackground; settings: BoardSettings }>("/board/backgrounds", { method: "POST", json: { name, dataUrl } }),
   renameBoardBackground: (id: string, name: string) => api<BoardSettings>(`/board/backgrounds/${encodeURIComponent(id)}`, { method: "PUT", json: { name } }),
   removeBoardBackground: (id: string) => api<BoardSettings>(`/board/backgrounds/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  boardPlot: (name: string | null, dataUrl: string | null) => (dataUrl ? api<BoardSettings>("/board/plot", { method: "POST", json: { name, dataUrl } }) : api<BoardSettings>("/board/plot", { method: "DELETE" })),
   addBoardLogo: (name: string, dataUrl: string) => api<BoardSettings>("/board/logos", { method: "POST", json: { name, dataUrl } }),
   renameBoardLogo: (id: string, name: string) => api<BoardSettings>(`/board/logos/${encodeURIComponent(id)}`, { method: "PUT", json: { name } }),
   removeBoardLogo: (id: string) => api<BoardSettings>(`/board/logos/${encodeURIComponent(id)}`, { method: "DELETE" }),

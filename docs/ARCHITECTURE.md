@@ -392,7 +392,9 @@ event and the team's location; `staffRows()` turns a plan's staff check-ins into
   Logos: a `logos` library, the default (`center.logoId`) and `logoSchedule` rules (date, repeat
   none/daily/weekly/monthly/yearly, weekdays, until, optional from–to); `activeLogo()` in
   shared/board.ts picks the logo for the moment (timed beats all-day, then the later rule), so the
-  display state's `center.logo` follows the schedule. The state is shared for 1.5 s however many displays poll it. Uses the access of whoever last
+  display state's `center.logo` follows the schedule. The stage plot (`plot`: file, name, dark) is a
+  PDF page rendered in the browser with pdf.js (`web/lib/stagePlot.ts`: page picked, white margin
+  cropped, under ~600 KB so it syncs) and stored and synced like the backgrounds. The state is shared for 1.5 s however many displays poll it. Uses the access of whoever last
   opened the Mic board.
 - `server/src/routes/board.ts`: `/api/board` (signed in: settings, pictures) and `/api/board-out`
   (no sign-in: `/state`, `/image/<file>` limited to the library and the logo). The LAN

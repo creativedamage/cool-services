@@ -14,6 +14,7 @@ import { TILE_COLORS, type BoardMic, type BoardSettings, type BoardTile, type Di
 import { Api } from "@/lib/api";
 import { DisplayView } from "@/components/board/DisplayView";
 import { LogosPanel } from "@/components/board/LogoSchedule";
+import { pdfPageCount, stagePlotImage } from "@/lib/stagePlot";
 import { Drawer, Spinner } from "@/components/ui";
 
 const KEY = ["stageDisplay"];
@@ -266,6 +267,7 @@ function CenterSection({ s, onSave }: { s: BoardSettings; onSave: Save }) {
     <section className="space-y-3">
       <h3 className="label">Middle of the board</h3>
       <LogosPanel s={s} shrink={(f) => shrink(f, "logo")} />
+      <StagePlotPanel s={s} onSave={onSave} />
       <label className="block"><span className="text-xs text-ink-muted">Clock</span>
         <div className="mt-1"><Segmented value={c.clock} options={[["time", "Time of day"], ["production", "Production clock"]] as const} onChange={(v) => onSave({ center: { clock: v } })} /></div>
       </label>
@@ -469,5 +471,65 @@ function PeopleSection({ s, tiles }: { s: BoardSettings; tiles: BoardTile[] }) {
       </div>
       <p className="text-[11px] text-ink-faint">Their background on any mic, any service. Automatic: one named like them, else their Planning Center photo.</p>
     </section>
+  );
+}
+
+/** The stage plot under the clock: a PDF (pick the page if it has several) or a picture. */
+function StagePlotPanel({ s, onSave }: { s: BoardSettings; onSave: Save }) {
+  const set = useSetSettings();
+  const [pending, setPending] = useState<{ file: File; pages: number; page: number } | null>(null);
+  const upload = useMutation({
+    mutationFn: async ({ file, page }: { file: File; page: number }) =>
+      Api.boardPlot(file.name.replace(/\.[^.]+$/, "") + (pending && pending.pages > 1 ? ` (page ${page})` : ""), await stagePlotImage(file, page)),
+    onSuccess: (v) => { set(v); setPending(null); toast.success("Stage plot added"); },
+    onError: failed("add the stage plot"),
+  });
+  const remove = useMutation({ mutationFn: () => Api.boardPlot(null, null), onSuccess: set, onError: failed("remove it") });
+  const choose = async (file: File) => {
+    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+      try {
+        const pages = await pdfPageCount(file);
+        if (pages > 1) return setPending({ file, pages, page: 1 });
+      } catch { return toast.error("That PDF couldn’t be opened.", { description: "Is it password-protected? Try saving it again, or use a picture of the plot." }); }
+    }
+    upload.mutate({ file, page: 1 });
+  };
+  const p = s.plot;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-ink-muted">Stage plot</span>
+        <div className="flex gap-1.5">
+          {p.fileId && <button className="btn-ghost py-1 text-xs text-ink-muted" onClick={() => remove.mutate()}><Trash2 size={13} /> Remove</button>}
+          <label className={clsx("btn-outline cursor-pointer py-1 text-xs", upload.isPending && "pointer-events-none opacity-60")}><Upload size={13} /> {upload.isPending ? "Adding…" : p.fileId ? "Replace" : "Add PDF"}
+            <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void choose(f); }} />
+          </label>
+        </div>
+      </div>
+      {pending && (
+        <div className="flex items-center gap-2 rounded-lg border border-line p-2 text-xs">
+          <span className="min-w-0 flex-1 truncate">{pending.file.name} has {pending.pages} pages. Show page</span>
+          <select className="input w-20 py-1 text-xs" value={pending.page} onChange={(e) => setPending({ ...pending, page: Number(e.target.value) })}>
+            {Array.from({ length: pending.pages }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
+          </select>
+          <button className="btn-primary py-1 text-xs" disabled={upload.isPending} onClick={() => upload.mutate({ file: pending.file, page: pending.page })}>Use it</button>
+          <button className="btn-ghost p-1" onClick={() => setPending(null)}><X size={13} /></button>
+        </div>
+      )}
+      {p.fileId ? (
+        <>
+          <div className="flex h-36 items-center justify-center overflow-hidden rounded-lg border border-line bg-[#0E0E0F] p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={bgUrl(p.fileId)} alt="Stage plot" className="max-h-full max-w-full object-contain" style={p.dark ? { filter: "invert(1) hue-rotate(180deg)", mixBlendMode: "screen" } : undefined} />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate text-[11px] text-ink-faint">{p.name}</span>
+            <label className="flex shrink-0 items-center gap-2 text-xs"><input type="checkbox" checked={p.dark} onChange={(e) => onSave({ plot: { dark: e.target.checked } })} /> Show it dark</label>
+          </div>
+        </>
+      ) : (
+        <p className="text-[11px] text-ink-faint">Add your stage plot as a PDF (or a picture) and it shows under the clock, filling the middle. On every Mac you sign in on.</p>
+      )}
+    </div>
   );
 }

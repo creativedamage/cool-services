@@ -72,6 +72,11 @@ export interface BoardSettings {
    * time of day (with the date under it) or the production clock's main timer (with its name).
    */
   center: { logoId: string | null; clock: "time" | "production"; seconds: boolean; date: boolean };
+  /**
+   * The stage plot under the clock: a PDF's page (made into a picture in the browser) or a picture,
+   * synced like the backgrounds. `dark` shows a white page as a dark one (inverted, colors kept).
+   */
+  plot: { fileId: string | null; name: string | null; dark: boolean };
   /** Your logos (the default is center.logoId), and when each one shows. */
   logos: BoardBackground[];
   logoSchedule: LogoRule[];
@@ -121,6 +126,7 @@ export interface DisplayState {
   reason: string;
   settings: Pick<BoardSettings, "banner" | "columns" | "names"> & {
     center: { logo: string | null; clock: "time" | "production"; seconds: boolean; date: boolean };
+    plot: { url: string; dark: boolean } | null;
   };
   service: { planId: string; serviceTypeId: string; title: string; serviceTypeName: string; when: string; nextTime: string | null } | null;
   tiles: BoardTile[];
@@ -135,7 +141,7 @@ export const DEFAULT_BOARD: BoardSettings = {
   mode: "auto", autoIdle: "micboard", follow: "weekend", serviceTypeId: null,
   banner: { enabled: false, text: "", scroll: false, size: "m", background: "#0B1220", color: "#FFFFFF", showService: true, showClock: true },
   images: "custom-then-pco", imageStyle: "background", customImages: {}, backgrounds: [], kinds: ["vocal", "pack", "other"], hideUnassigned: false, hidden: [], stack: true,
-  names: "first", tileText: {}, tileColor: {}, center: { logoId: null, clock: "time", seconds: true, date: true }, logos: [], logoSchedule: [], columns: 0,
+  names: "first", tileText: {}, tileColor: {}, center: { logoId: null, clock: "time", seconds: true, date: true }, plot: { fileId: null, name: null, dark: true }, logos: [], logoSchedule: [], columns: 0,
   lan: false, screen: { enabled: false, displayId: null },
 };
 

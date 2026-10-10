@@ -4,6 +4,13 @@ Each version's notes become its GitHub release notes (and what "What's new" show
 the newest version first. The line right under a version heading is its one-line summary: it names
 the GitHub Actions run and the release commit.
 
+## 1.41.0
+Your stage plot on the mic board, under the clock.
+- **Stage plot.** In Display settings → Middle of the board, add your stage plot as a PDF (pick the
+  page if it has several) or a picture. It shows under the clock and fills the middle of the board,
+  cropped to the drawing. **Show it dark** turns a white page dark to match the board (on by default).
+  It syncs to every Mac you sign in on, like your backgrounds and logos.
+
 ## 1.40.1
 The new mic board, released (1.40.0's build didn't finish).
 - 1.40.0's Mac app build stopped partway, so it never reached Check for Updates. This release has

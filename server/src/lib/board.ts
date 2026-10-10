@@ -30,6 +30,7 @@ function load(): Stored {
   settings.center = { ...DEFAULT_BOARD.center, ...s.settings?.center };
   settings.backgrounds ??= [];
   settings.logos ??= [];
+  settings.plot = { ...DEFAULT_BOARD.plot, ...s.settings?.plot };
   settings.logoSchedule ??= [];
   // The logo from before the schedule (1.40) is the first in the logos library, and the default.
   if (settings.center.logoId && !settings.logos.some((l) => l.id === settings.center.logoId)) {
@@ -78,7 +79,7 @@ export function saveBoardSettings(patch: Partial<BoardSettings>) {
   const cur = stored.settings;
   stored.settings = {
     ...cur, ...patch,
-    banner: { ...cur.banner, ...patch.banner }, screen: { ...cur.screen, ...patch.screen }, center: { ...cur.center, ...patch.center },
+    banner: { ...cur.banner, ...patch.banner }, screen: { ...cur.screen, ...patch.screen }, center: { ...cur.center, ...patch.center }, plot: { ...cur.plot, ...patch.plot },
     customImages: patch.customImages ?? cur.customImages, hidden: patch.hidden ?? cur.hidden ?? [],
     backgrounds: patch.backgrounds ?? cur.backgrounds, logos: patch.logos ?? cur.logos, logoSchedule: patch.logoSchedule ?? cur.logoSchedule, tileText: patch.tileText ?? cur.tileText, tileColor: patch.tileColor ?? cur.tileColor,
   };
@@ -183,7 +184,8 @@ export function boardPlan(): Promise<PlanDetail | null> {
 function centerSettings(s: BoardSettings): DisplayState["settings"] {
   const { logoId } = activeLogo(s, new Date());
   const logo = logoId && files.path(logoId) ? imageUrl(logoId) : null;
-  return { banner: s.banner, columns: s.columns, names: s.names ?? "first", center: { logo, clock: s.center.clock, seconds: s.center.seconds, date: s.center.date } };
+  const plot = s.plot.fileId && files.path(s.plot.fileId) ? { url: imageUrl(s.plot.fileId), dark: s.plot.dark } : null;
+  return { banner: s.banner, columns: s.columns, names: s.names ?? "first", center: { logo, clock: s.center.clock, seconds: s.center.seconds, date: s.center.date }, plot };
 }
 
 /** A background named like the person ("Eddie", "eddie smith") is theirs without picking it. */
@@ -272,7 +274,7 @@ async function build(): Promise<DisplayState> {
 /** Files the display may show without signing in: the backgrounds library and the logo. */
 export function publicImage(fileId: string): boolean {
   const s = stored.settings;
-  return s.center.logoId === fileId || s.backgrounds.some((b) => b.id === fileId) || s.logos.some((l) => l.id === fileId);
+  return s.center.logoId === fileId || s.plot.fileId === fileId || s.backgrounds.some((b) => b.id === fileId) || s.logos.some((l) => l.id === fileId);
 }
 
 /* ───────────── Backgrounds library and logo (the files sync to your other Macs, sync.ts) ───────────── */
@@ -309,6 +311,15 @@ export function removeBackground(id: string) {
     customImages: Object.fromEntries(Object.entries(s.customImages).filter(([, v]) => v !== id)),
   });
 }
+/** The stage plot under the clock (a new file each time, so other Macs fetch it once); null takes it off. */
+export function setPlot(pic: Pic | null, name: string | null) {
+  const s = stored.settings;
+  const old = s.plot.fileId;
+  saveBoardSettings({ plot: { ...s.plot, fileId: pic ? files.save(pic.data, pic.ext) : null, name: pic ? (name?.trim() || "Stage plot") : null } });
+  const p = old && !publicImage(old) ? files.path(old) : null;
+  if (p) fs.rmSync(p, { force: true });
+}
+
 /** A new logo in the logos library; the first one becomes the default. */
 export function addLogo(name: string, pic: Pic): BoardBackground {
   const s = stored.settings;
@@ -340,7 +351,7 @@ export function setLogoSchedule(rules: LogoRule[]) {
 /** The files other Macs need: every background and the logo. */
 export function syncedFiles(): string[] {
   const s = stored.settings;
-  return [...new Set([...s.backgrounds.map((b) => b.id), ...s.logos.map((l) => l.id), ...(s.center.logoId ? [s.center.logoId] : [])])];
+  return [...new Set([...s.backgrounds.map((b) => b.id), ...s.logos.map((l) => l.id), ...(s.center.logoId ? [s.center.logoId] : []), ...(s.plot.fileId ? [s.plot.fileId] : [])])];
 }
 
 /**
